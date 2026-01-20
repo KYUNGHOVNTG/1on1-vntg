@@ -144,8 +144,8 @@ export const LoginPage: React.FC = () => {
       {/* 로그인 카드 */}
       <div className="bg-white rounded-xl shadow-md p-8 w-full max-w-md">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">로그인</h2>
-          <p className="text-gray-600 text-sm">서비스를 이용하려면 로그인이 필요합니다.</p>
+          <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">로그인</h2>
+          <p className="text-gray-600 text-sm text-center">서비스를 이용하려면 로그인이 필요합니다.</p>
         </div>
 
         {error && (

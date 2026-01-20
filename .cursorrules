@@ -303,14 +303,42 @@ client/src/
         └── index.ts        # 내보내기
 ```
 
-### 6. 모던 핀테크 디자인 바이브
+### 6. 디자인 시스템 (1on1-Mirror)
 
-- **색상**: 청록색(Teal), 남색(Navy), 흰색, 밝은 회색 계열 중심
-- **타이포그래피**: 깔끔한 sans-serif (Inter, Pretendard), 16px 기본 크기
-- **간격**: 일관된 패딩/마진 (4px 단위: p-2, p-4, p-6, p-8)
-- **그림자**: 은은한 그림자 (shadow-sm, shadow-md)
-- **둥근 모서리**: 중간 정도 (rounded-lg, rounded-xl)
-- **애니메이션**: 부드럽고 빠른 전환 (transition-colors duration-200)
+모든 UI는 이 디자인 시스템을 엄격히 준수해야 합니다.
+
+#### 색상
+- Primary: `#5B5FED` / Hover: `#4f53d1` / Light: `bg-indigo-50`
+- Background: `bg-white` / Surface: `bg-[#F9FAFB]`
+- Border: `border-gray-200` / Divider: `bg-gray-100`
+- Text: `text-gray-900` (main) / `text-gray-500` (sub)
+- Status: `emerald-600` (success) / `orange-600` (warning) / `red-600` (error)
+
+#### 타이포그래피
+- Font: `'Noto Sans KR'` (전체 기본)
+- Size: H1(text-3xl) / H2(text-2xl) / H3(text-xl) / Body(text-sm) / Caption(text-xs)
+- Weight: Heading(font-bold) / Body(font-medium or default)
+- Tracking: Heading(tracking-tight)
+
+#### Spacing & Border
+- Padding/Margin: 4px 단위 (p-2, p-4, p-6, p-8)
+- Border Radius: 버튼/인풋(rounded-xl) / 카드(rounded-2xl) / 아바타(rounded-full)
+- Shadow: 기본(shadow-sm) / Hover(shadow-md) / Primary 버튼(shadow-lg shadow-indigo-100)
+
+#### 컴포넌트 필수 클래스
+**Button Primary:** `px-5 py-2.5 bg-[#5B5FED] hover:bg-[#4f53d1] text-white rounded-xl text-sm font-semibold shadow-sm transition-all`
+**Button Secondary:** `px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-medium transition-all`
+**Input:** `h-10 px-3 border border-gray-200 rounded-xl text-sm focus:border-[#5B5FED] focus:ring-1 focus:ring-[#5B5FED] outline-none transition-all`
+**Card:** `bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow`
+**Badge Success:** `px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100`
+
+#### AI 에이전트 필수 규칙
+1. 위 정의된 색상/클래스만 사용 (커스텀 색상 금지)
+2. 인라인 스타일 절대 금지
+3. 공통 컴포넌트(`@/core/ui`) 우선 사용
+4. 모든 인터랙티브 요소에 transition 적용
+5. lucide-react 아이콘 사용 (16-20px)
+
 
 ---
 
