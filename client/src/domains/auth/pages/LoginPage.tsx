@@ -12,16 +12,25 @@ export const LoginPage: React.FC = () => {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [userInfo, setUserInfo] = useState<{ email?: string; name?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessingCallback, setIsProcessingCallback] = useState(false);
 
   // URL에서 authorization code를 확인하고 로그인 처리
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
-    if (code) {
-      handleCallback(code);
+    // 이미 처리 중이거나 code가 없으면 무시
+    if (!code || isProcessingCallback) {
+      return;
     }
-  }, []);
+
+    // URL에서 code 즉시 제거 (중복 요청 방지)
+    window.history.replaceState({}, document.title, '/');
+
+    // 콜백 처리 시작
+    setIsProcessingCallback(true);
+    handleCallback(code);
+  }, [isProcessingCallback]);
 
   /**
    * Google OAuth 콜백 처리
@@ -44,9 +53,6 @@ export const LoginPage: React.FC = () => {
           email: response.email,
           name: response.name,
         });
-
-        // URL에서 code 파라미터 제거
-        window.history.replaceState({}, document.title, '/');
       } else {
         setError('로그인에 실패했습니다.');
       }

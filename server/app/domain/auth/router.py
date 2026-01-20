@@ -4,7 +4,7 @@ Auth API 라우터
 Google OAuth 로그인 엔드포인트를 제공합니다.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.database import get_db
@@ -41,7 +41,10 @@ async def get_google_auth_url(
 
     if not result.success:
         logger.error(f"Google OAuth URL 생성 실패: {result.error}")
-        raise Exception(result.error)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.error,
+        )
 
     return result.data
 
@@ -71,6 +74,9 @@ async def google_auth_callback(
 
     if not result.success:
         logger.error(f"Google OAuth 로그인 실패: {result.error}")
-        raise Exception(result.error)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=result.error,
+        )
 
     return result.data
