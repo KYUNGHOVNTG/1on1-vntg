@@ -62,7 +62,7 @@ async def get_user_menus(
         if not result.success:
             raise HTTPException(
                 status_code=500,
-                detail=result.message or "메뉴 조회에 실패했습니다."
+                detail=result.error or "메뉴 조회에 실패했습니다."
             )
 
         return result.data
@@ -126,7 +126,7 @@ async def get_menu_hierarchy(
         if not result.success:
             raise HTTPException(
                 status_code=500,
-                detail=result.message or "메뉴 계층 구조 조회에 실패했습니다."
+                detail=result.error or "메뉴 계층 구조 조회에 실패했습니다."
             )
 
         return result.data

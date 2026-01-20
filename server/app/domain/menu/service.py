@@ -110,10 +110,24 @@ class MenuService(BaseService[UserMenuRequest, UserMenuResponse]):
             ServiceResult[List[MenuHierarchyResponse]]: 계층 구조 메뉴 목록
         """
         try:
-            # 1. 최상위 메뉴 조회 (children 포함)
-            top_level_menus = await self.repository.get_menu_hierarchy(menu_codes)
+            # 1. 모든 메뉴 조회 (계층 구조 빌드를 위해 필요)
+            # provide()는 selectinload(Menu.children)을 포함하고 있어 모든 레벨의 관계가 로드됩니다.
+            all_menus = await self.repository.provide()
 
-            # 2. 응답 변환
+            # 2. 계층 구조 빌드
+            # (이 과정에서 menu.children이 리스트로 채워지며, SQLAlchemy의 Lazy Loading을 방지합니다)
+            full_hierarchy = self._build_menu_hierarchy(all_menus)
+
+            # 3. 요청된 메뉴 코드가 있으면 필터링 (최상위 레벨 기준)
+            if menu_codes:
+                top_level_menus = [
+                    menu for menu in full_hierarchy
+                    if menu.menu_code in menu_codes
+                ]
+            else:
+                top_level_menus = full_hierarchy
+
+            # 4. 응답 변환
             hierarchy = [
                 MenuHierarchyResponse.model_validate(menu)
                 for menu in top_level_menus
