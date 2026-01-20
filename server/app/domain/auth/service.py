@@ -106,7 +106,7 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 "google_login_success",
                 extra={
                     "email": user_info.get("email"),
-                    "name": user_info.get("name"),
+                    "user_name": user_info.get("name"),
                 },
             )
 
