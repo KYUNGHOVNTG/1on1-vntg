@@ -31,3 +31,11 @@ export interface GoogleAuthResponse {
   role?: string;
   position?: string;
 }
+
+/**
+ * 로그아웃 응답
+ */
+export interface LogoutResponse {
+  success: boolean;
+  message: string;
+}

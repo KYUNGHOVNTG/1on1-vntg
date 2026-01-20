@@ -32,8 +32,16 @@ class GoogleAuthResponse(BaseModel):
     position: str | None = Field(None, description="직급 (TEAM_LEADER, MEMBER 등)")
 
 
+class LogoutResponse(BaseModel):
+    """로그아웃 응답"""
+
+    success: bool = Field(default=True, description="로그아웃 성공 여부")
+    message: str = Field(default="로그아웃되었습니다", description="응답 메시지")
+
+
 __all__ = [
     "GoogleAuthURLResponse",
     "GoogleAuthCallbackRequest",
     "GoogleAuthResponse",
+    "LogoutResponse",
 ]

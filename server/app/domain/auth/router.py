@@ -13,6 +13,7 @@ from server.app.domain.auth.schemas import (
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
+    LogoutResponse,
 )
 from server.app.domain.auth.service import GoogleAuthService
 
@@ -80,3 +81,25 @@ async def google_auth_callback(
         )
 
     return result.data
+
+
+@router.post(
+    "/logout",
+    response_model=LogoutResponse,
+    summary="로그아웃",
+    description="로그아웃을 처리합니다. (클라이언트 측 토큰 제거 필요)",
+)
+async def logout() -> LogoutResponse:
+    """
+    로그아웃을 처리합니다.
+
+    Note:
+        - Access Token Only 방식이므로 서버 측 세션/토큰 무효화 처리 없음
+        - 클라이언트에서 localStorage의 토큰 제거 필요
+        - 단순히 200 OK 응답만 반환
+
+    Returns:
+        LogoutResponse: 로그아웃 성공 응답
+    """
+    logger.info("로그아웃 요청 처리")
+    return LogoutResponse(success=True, message="로그아웃되었습니다")

@@ -15,15 +15,19 @@ import { Sidebar } from './Sidebar';
 
 interface MainLayoutProps {
   children: React.ReactNode;
+  onLogout: () => void;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+export const MainLayout: React.FC<MainLayoutProps> = ({ children, onLogout }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
       {/* Header */}
-      <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <Header
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        onLogout={onLogout}
+      />
 
       {/* Content Container */}
       <div className="flex">
@@ -31,6 +35,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          onLogout={onLogout}
         />
 
         {/* Main Content */}

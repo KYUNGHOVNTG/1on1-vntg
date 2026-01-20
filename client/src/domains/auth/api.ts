@@ -9,6 +9,7 @@ import type {
   GoogleAuthURLResponse,
   GoogleAuthCallbackRequest,
   GoogleAuthResponse,
+  LogoutResponse,
 } from './types';
 
 /**
@@ -29,5 +30,13 @@ export async function handleGoogleCallback(
     '/v1/auth/google/callback',
     request
   );
+  return response.data;
+}
+
+/**
+ * 로그아웃을 처리합니다.
+ */
+export async function logout(): Promise<LogoutResponse> {
+  const response = await apiClient.post<LogoutResponse>('/v1/auth/logout');
   return response.data;
 }
