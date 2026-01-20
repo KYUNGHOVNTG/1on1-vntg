@@ -142,6 +142,22 @@ class Settings(BaseSettings):
     )
 
     # ====================
+    # Google OAuth Settings
+    # ====================
+    GOOGLE_CLIENT_ID: str = Field(
+        default="",
+        description="Google OAuth 클라이언트 ID"
+    )
+    GOOGLE_CLIENT_SECRET: str = Field(
+        default="",
+        description="Google OAuth 클라이언트 시크릿"
+    )
+    GOOGLE_REDIRECT_URI: str = Field(
+        default="http://localhost:3000/auth/google/callback",
+        description="Google OAuth 리다이렉트 URI"
+    )
+
+    # ====================
     # Domain Plugin Settings
     # ====================
     # 여기에 도메인별 설정을 추가할 수 있습니다
