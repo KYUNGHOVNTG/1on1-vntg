@@ -129,7 +129,7 @@ class Settings(BaseSettings):
         description="암호화 키 (운영환경에서 반드시 변경)"
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
-        default=30,
+        default=120,
         description="액세스 토큰 만료 시간 (분)"
     )
 
