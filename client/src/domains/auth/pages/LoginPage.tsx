@@ -7,7 +7,12 @@
 import { useState, useEffect } from 'react';
 import { getGoogleAuthURL, handleGoogleCallback } from '../api';
 
-export const LoginPage: React.FC = () => {
+interface LoginPageProps {
+  /** 로그인 성공 시 콜백 */
+  onLoginSuccess?: () => void;
+}
+
+export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [userInfo, setUserInfo] = useState<{ email?: string; name?: string } | null>(null);
@@ -27,9 +32,9 @@ export const LoginPage: React.FC = () => {
     // URL에서 code 즉시 제거 (중복 요청 방지)
     window.history.replaceState({}, document.title, '/');
 
-    // 콜백 처리 시작
+    // 콜백 처리 시작 (code는 위에서 null 체크를 통과했으므로 string 타입 보장)
     setIsProcessingCallback(true);
-    handleCallback(code);
+    handleCallback(code as string);
   }, [isProcessingCallback]);
 
   /**
@@ -42,7 +47,7 @@ export const LoginPage: React.FC = () => {
     try {
       const response = await handleGoogleCallback({ code });
 
-      if (response.success) {
+      if (response.success && response.access_token) {
         setLoginSuccess(true);
         setUserInfo({
           email: response.email,
@@ -59,6 +64,16 @@ export const LoginPage: React.FC = () => {
           position: response.position,
         });
         console.log('🔑 JWT 토큰:', response.access_token);
+
+        // 토큰 저장
+        localStorage.setItem('access_token', response.access_token);
+
+        // 로그인 성공 콜백 호출 (2초 후 대시보드로 이동)
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess();
+          }
+        }, 2000);
       } else {
         setError('로그인에 실패했습니다.');
       }

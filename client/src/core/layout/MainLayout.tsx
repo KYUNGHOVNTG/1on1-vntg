@@ -1,5 +1,5 @@
 /**
- * MainLayout Component (Skeleton)
+ * MainLayout Component
  *
  * 메인 레이아웃 - Header, Sidebar, Content 영역 구성
  *
@@ -18,23 +18,23 @@ interface MainLayoutProps {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-  // TODO: 반응형 레이아웃
-  // TODO: 사이드바 토글 상태 관리
-  // TODO: 모바일 뷰 최적화
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="layout">
-      <Header />
+    <div className="min-h-screen bg-[#F9FAFB]">
+      {/* Header */}
+      <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-      <div className="layout-container">
+      {/* Content Container */}
+      <div className="flex">
+        {/* Sidebar */}
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
 
-        <main className="layout-main">
+        {/* Main Content */}
+        <main className="flex-1 p-8 overflow-y-auto min-h-[calc(100vh-64px)]">
           {children}
         </main>
       </div>
