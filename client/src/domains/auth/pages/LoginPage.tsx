@@ -134,11 +134,18 @@ export const LoginPage: React.FC = () => {
 
   // 로그인 화면
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50">
-      <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">환영합니다</h1>
-          <p className="text-gray-600">Google 계정으로 로그인하세요</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+      {/* 상단 제목 영역 */}
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-2">1on1-Mirror</h1>
+        <p className="text-gray-600">성과 관리를 위한 새로운 기준</p>
+      </div>
+
+      {/* 로그인 카드 */}
+      <div className="bg-white rounded-xl shadow-md p-8 w-full max-w-md">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">로그인</h2>
+          <p className="text-gray-600 text-sm">서비스를 이용하려면 로그인이 필요합니다.</p>
         </div>
 
         {error && (
@@ -147,10 +154,11 @@ export const LoginPage: React.FC = () => {
           </div>
         )}
 
+        {/* Google 로그인 버튼 */}
         <button
           onClick={handleGoogleLogin}
           disabled={isLoading}
-          className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 rounded-lg px-6 py-3 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-700 font-medium hover:bg-gray-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <>
@@ -159,6 +167,7 @@ export const LoginPage: React.FC = () => {
             </>
           ) : (
             <>
+              {/* Google 로고 SVG */}
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
@@ -177,14 +186,43 @@ export const LoginPage: React.FC = () => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              <span>Google로 로그인</span>
+              <span>Google 계정으로 계속하기</span>
             </>
           )}
         </button>
+      </div>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Google OAuth 2.0을 사용한 안전한 로그인
-        </p>
+      {/* 하단 링크 */}
+      <div className="mt-6 flex items-center justify-center gap-4 text-sm text-gray-600">
+        <button
+          onClick={() => {
+            // TODO: 이용약관 페이지로 이동
+            console.log('이용약관 클릭');
+          }}
+          className="hover:text-gray-900 transition-colors"
+        >
+          이용약관
+        </button>
+        <span className="text-gray-400">|</span>
+        <button
+          onClick={() => {
+            // TODO: 개인정보처리방침 페이지로 이동
+            console.log('개인정보처리방침 클릭');
+          }}
+          className="hover:text-gray-900 transition-colors"
+        >
+          개인정보처리방침
+        </button>
+        <span className="text-gray-400">|</span>
+        <button
+          onClick={() => {
+            // TODO: 도움말 페이지로 이동
+            console.log('도움말 클릭');
+          }}
+          className="hover:text-gray-900 transition-colors"
+        >
+          도움말
+        </button>
       </div>
     </div>
   );
