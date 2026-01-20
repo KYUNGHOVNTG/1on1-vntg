@@ -11,6 +11,7 @@ body {
   background-color: #f8fafc; /* Slate 50 */
   color: #0f172a; /* Slate 900 */
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.025em;
 }
 
 /* Custom Prose Styles for Markdown */
@@ -194,6 +195,41 @@ body {
   padding: 0.5714286em;
 }
 
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E5E7EB;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D1D5DB;
+}
+
+/* Animations */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
 
 @keyframes mesh-gradient {
   0% { background-position: 0% 50%; }
