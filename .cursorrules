@@ -14,7 +14,7 @@ Cursor나 Claude AI 에이전트와 협업할 때 다음 규칙을 **엄격히**
 5. **도메인 간 의존성 금지**: 한 도메인이 다른 도메인의 내부 구현에 의존하지 않도록
 6. **인라인 스타일 금지**: React 컴포넌트에서 `style={{ ... }}` 사용 금지 (Tailwind CSS 사용)
 7. **타입 힌트 생략 금지**: Python, TypeScript 모두 명시적 타입 선언 필수
-
+8. **SUPABASE 기능 사용 금지** : 추후 PostgreSQL로 이관 계획이 있으므로 Supabase Auth, Storage, Realtime 기능 사용 금지
 ---
 
 ## 📐 General Principles
@@ -31,6 +31,31 @@ Cursor나 Claude AI 에이전트와 협업할 때 다음 규칙을 **엄격히**
 - **TypeScript**: `any` 타입 사용 금지 (불가피한 경우 `unknown` 사용 후 타입 가드)
 - **Pydantic**: Request/Response DTO는 반드시 Pydantic BaseModel 상속
 - **Generic Types**: BaseService, BaseRepository 등은 제네릭 타입 파라미터 명시
+
+---
+
+
+🗄️ DB Migration Rule (필수)
+DB 스키마 변경 시 직접 DDL 실행 금지
+테이블 생성/변경/삭제(ALTER, DROP 포함)는 DB 콘솔에서 직접 실행하지 않는다.
+모든 스키마 변경은 migration SQL로만 관리
+루트 /migration/ 폴더 하위에 SQL 파일로 이력 관리한다.
+파일명 규칙 (필수)
+
+YYYYMMDD_행위명.sql
+
+예)
+
+20260119_create_user_table.sql
+20260120_alter_user_add_phone.sql
+
+기존 migration 파일 수정 금지
+migration은 append-only (추가만 가능)
+AI 에이전트 규칙
+DB 스키마 변경이 감지되면
+반드시 migration SQL 생성 안내 + SQL 내용 제시 후
+ORM / Repository 변경을 진행한다.
+
 
 ---
 
