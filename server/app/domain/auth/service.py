@@ -172,6 +172,9 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                     name=user_info.get("name"),
                     role=role_name,
                     position=position_name,
+                    # 메뉴 권한 조회를 위한 코드 추가
+                    role_code=user.role_code,
+                    position_code=user.position_code,
                 )
             )
 

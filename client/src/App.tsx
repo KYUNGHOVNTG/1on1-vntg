@@ -1,29 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { LoadingOverlay } from './core/loading';
 import { LoginPage } from './domains/auth';
 import { logout as logoutAPI } from './domains/auth/api';
 import { DashboardPage } from './domains/dashboard';
 import { MainLayout } from './core/layout';
+import { useAuthStore } from './core/store/useAuthStore';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // useAuthStore에서 인증 상태 가져오기
+  const { isAuthenticated, logout: logoutStore } = useAuthStore();
 
   // 로그인 상태 확인 (URL에서 code 파라미터가 있으면 콜백 처리 중)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
-    // 로컬 스토리지에서 인증 토큰 확인
+    // 로컬 스토리지에 access_token이 있는지 확인 (추가 검증용)
     const token = localStorage.getItem('access_token');
 
-    if (token && !code) {
-      setIsAuthenticated(true);
-    }
-  }, []);
+    console.log('🔍 App 초기화:', { isAuthenticated, hasToken: !!token, hasCode: !!code });
+  }, [isAuthenticated]);
 
   // 로그인 성공 핸들러
   const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
+    console.log('✅ 로그인 성공! 대시보드로 이동');
+    // useAuthStore에서 이미 상태가 변경되어 자동으로 리렌더링됨
   };
 
   // 로그아웃 핸들러
@@ -38,8 +39,10 @@ function App() {
       // localStorage에서 토큰 제거
       localStorage.removeItem('access_token');
 
-      // 인증 상태 초기화
-      setIsAuthenticated(false);
+      // useAuthStore 상태 초기화
+      logoutStore();
+
+      console.log('✅ 로그아웃 완료');
     }
   };
 

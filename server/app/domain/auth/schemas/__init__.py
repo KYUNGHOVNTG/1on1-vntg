@@ -30,6 +30,9 @@ class GoogleAuthResponse(BaseModel):
     name: str | None = Field(None, description="사용자 이름")
     role: str | None = Field(None, description="역할 (HR, GENERAL 등)")
     position: str | None = Field(None, description="직급 (TEAM_LEADER, MEMBER 등)")
+    role_code: str | None = Field(None, description="역할 코드 (R001, R002 등)")
+    position_code: str | None = Field(None, description="직급 코드 (P001, P002 등)")
+
 
 
 class LogoutResponse(BaseModel):

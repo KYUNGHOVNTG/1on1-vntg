@@ -14,6 +14,8 @@ interface User {
   id: string;
   email: string;
   name: string;
+  /** 직책 코드 (예: P001) */
+  position_code: string;
   // TODO: 추가 사용자 정보
 }
 

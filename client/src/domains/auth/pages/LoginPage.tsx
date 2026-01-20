@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { getGoogleAuthURL, handleGoogleCallback } from '../api';
+import { useAuthStore } from '@/core/store/useAuthStore';
 
 interface LoginPageProps {
   /** 로그인 성공 시 콜백 */
@@ -18,6 +19,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [userInfo, setUserInfo] = useState<{ email?: string; name?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessingCallback, setIsProcessingCallback] = useState(false);
+
+  // useAuthStore에서 setUser 가져오기
+  const { setUser } = useAuthStore();
 
   // URL에서 authorization code를 확인하고 로그인 처리
   useEffect(() => {
@@ -62,11 +66,39 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           name: response.name,
           role: response.role,
           position: response.position,
+          position_code: response.position_code,
         });
         console.log('🔑 JWT 토큰:', response.access_token);
 
         // 토큰 저장
         localStorage.setItem('access_token', response.access_token);
+
+        // ✅ useAuthStore에 사용자 정보 저장
+        if (response.user_id && response.email && response.name) {
+          // position_code 확인 (백엔드에서 반드시 제공해야 함)
+          const positionCode = response.position_code;
+
+          if (!positionCode) {
+            console.warn('⚠️ position_code가 백엔드 응답에 없습니다. fallback 사용:', response.position);
+          }
+
+          setUser({
+            id: response.user_id,
+            email: response.email,
+            name: response.name,
+            position_code: positionCode || response.position || 'P005', // fallback
+          });
+
+          console.log('✅ useAuthStore에 사용자 정보 저장:', {
+            id: response.user_id,
+            email: response.email,
+            name: response.name,
+            role: response.role,
+            role_code: response.role_code,
+            position: response.position,
+            position_code: positionCode || response.position || 'P005',
+          });
+        }
 
         // 로그인 성공 콜백 호출 (2초 후 대시보드로 이동)
         setTimeout(() => {

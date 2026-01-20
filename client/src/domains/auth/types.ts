@@ -30,6 +30,8 @@ export interface GoogleAuthResponse {
   name?: string;
   role?: string;
   position?: string;
+  role_code?: string; // 역할 코드 (R001, R002 등)
+  position_code?: string; // 메뉴 권한 조회를 위한 직책 코드 (P001, P002 등)
 }
 
 /**
