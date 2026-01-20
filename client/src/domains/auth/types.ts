@@ -23,6 +23,11 @@ export interface GoogleAuthCallbackRequest {
  */
 export interface GoogleAuthResponse {
   success: boolean;
+  access_token?: string;
+  token_type?: string;
+  user_id?: string;
   email?: string;
   name?: string;
+  role?: string;
+  position?: string;
 }

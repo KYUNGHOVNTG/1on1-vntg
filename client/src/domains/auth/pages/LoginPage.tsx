@@ -49,10 +49,16 @@ export const LoginPage: React.FC = () => {
           name: response.name,
         });
 
-        console.log('✅ Google 로그인 성공:', {
+        // 전체 응답 로깅 (JWT 토큰 및 사용자 Context 확인)
+        console.log('✅ Google 로그인 성공 - 전체 응답:', response);
+        console.log('📋 사용자 정보:', {
+          user_id: response.user_id,
           email: response.email,
           name: response.name,
+          role: response.role,
+          position: response.position,
         });
+        console.log('🔑 JWT 토큰:', response.access_token);
       } else {
         setError('로그인에 실패했습니다.');
       }
