@@ -1,5 +1,5 @@
 import React from 'react';
-import { ToggleProps } from './Toggle.types';
+import type { ToggleProps } from './Toggle.types';
 import { cn } from '../../utils/cn';
 
 export const Toggle: React.FC<ToggleProps> = ({

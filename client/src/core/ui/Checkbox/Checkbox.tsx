@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
-import { CheckboxProps } from './Checkbox.types';
+import type { CheckboxProps } from './Checkbox.types';
 import { cn } from '../../utils/cn';
 
 export const Checkbox: React.FC<CheckboxProps> = ({

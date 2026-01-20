@@ -1,5 +1,5 @@
 import React from 'react';
-import { CardProps } from './Card.types';
+import type { CardProps } from './Card.types';
 import { cn } from '../../utils/cn';
 
 export const Card: React.FC<CardProps> = ({

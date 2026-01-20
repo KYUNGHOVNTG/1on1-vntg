@@ -1,5 +1,5 @@
 import React from 'react';
-import { BadgeProps } from './Badge.types';
+import type { BadgeProps } from './Badge.types';
 import { cn } from '../../utils/cn';
 
 export const Badge: React.FC<BadgeProps> = ({

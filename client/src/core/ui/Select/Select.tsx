@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
-import { SelectProps } from './Select.types';
+import type { SelectProps } from './Select.types';
 import { cn } from '../../utils/cn';
 
 export const Select: React.FC<SelectProps> = ({

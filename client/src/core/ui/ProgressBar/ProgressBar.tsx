@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProgressBarProps } from './ProgressBar.types';
+import type { ProgressBarProps } from './ProgressBar.types';
 import { cn } from '../../utils/cn';
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
