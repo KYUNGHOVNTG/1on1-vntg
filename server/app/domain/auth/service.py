@@ -5,9 +5,10 @@ Google OAuth 2.0 Authorization Code Flow를 구현합니다.
 """
 
 import urllib.parse
-from typing import Any
+from typing import Any, Optional
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.config import settings
@@ -17,6 +18,7 @@ from server.app.domain.auth.schemas import (
     GoogleAuthResponse,
     GoogleAuthURLResponse,
 )
+from server.app.domain.user.models import User
 from server.app.shared.base.service import BaseService
 from server.app.shared.exceptions import (
     ExternalServiceException,
@@ -85,7 +87,8 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
         흐름:
             1. Authorization Code를 Access Token으로 교환
             2. Access Token으로 사용자 정보 조회
-            3. 성공 여부 반환
+            3. CM_USER 테이블에서 사용자 검증 (존재 여부, use_yn 확인)
+            4. 검증 성공 시 로그인 성공 처리
 
         Args:
             request: Google OAuth 콜백 요청 (authorization code 포함)
@@ -101,20 +104,37 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
             # 2. Access Token → 사용자 정보 조회
             user_info = await self._get_user_info(access_token)
 
-            # 3. 성공 로그 출력 (작업 요구사항)
+            email = user_info.get("email")
+            if not email:
+                logger.error("Google OAuth에서 이메일을 받지 못했습니다")
+                return ServiceResult.fail("이메일 정보를 가져올 수 없습니다")
+
+            # 3. CM_USER 테이블에서 사용자 검증
+            user = await self._validate_user_registration(email)
+            if user is None:
+                logger.warning(
+                    "로그인 실패: 등록되지 않은 사용자 또는 비활성 계정",
+                    extra={"email": email}
+                )
+                return ServiceResult.fail("등록되지 않은 사용자이거나 비활성화된 계정입니다")
+
+            # 4. 로그인 성공 로그 출력
             logger.info(
-                "google_login_success",
+                "로그인 성공",
                 extra={
-                    "email": user_info.get("email"),
+                    "user_id": user.user_id,
+                    "email": email,
                     "user_name": user_info.get("name"),
+                    "role_code": user.role_code,
+                    "position_code": user.position_code,
                 },
             )
 
-            # 4. 성공 응답 반환
+            # 5. 성공 응답 반환
             return ServiceResult.ok(
                 GoogleAuthResponse(
                     success=True,
-                    email=user_info.get("email"),
+                    email=email,
                     name=user_info.get("name"),
                 )
             )
@@ -231,3 +251,64 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 f"Google API 연결 실패: {str(e)}",
                 details={"error": str(e)},
             )
+
+    async def _validate_user_registration(self, email: str) -> Optional[User]:
+        """
+        이메일을 기반으로 CM_USER 테이블에서 사용자를 검증합니다.
+
+        검증 로직:
+            1. 이메일에서 @ 앞 문자열을 추출하여 user_id 생성
+            2. CM_USER 테이블에서 user_id로 사용자 조회
+            3. 존재하지 않거나 use_yn='N'이면 None 반환
+            4. 존재하고 use_yn='Y'이면 User 객체 반환
+
+        Args:
+            email: Google 계정 이메일 주소
+
+        Returns:
+            Optional[User]: 검증된 사용자 객체 또는 None
+        """
+        try:
+            # 1. 이메일에서 user_id 추출 (@ 앞 문자열)
+            if "@" not in email:
+                logger.error(f"유효하지 않은 이메일 형식: {email}")
+                return None
+
+            user_id = email.split("@")[0]
+            logger.info(f"이메일에서 user_id 추출: {user_id}", extra={"email": email})
+
+            # 2. CM_USER 테이블에서 user_id로 조회
+            stmt = select(User).where(User.user_id == user_id)
+            result = await self.db.execute(stmt)
+            user = result.scalar_one_or_none()
+
+            # 3. 사용자가 존재하지 않는 경우
+            if user is None:
+                logger.warning(f"CM_USER 테이블에 존재하지 않는 사용자: {user_id}")
+                return None
+
+            # 4. use_yn이 'N'인 경우 (비활성 계정)
+            if user.use_yn.upper() != 'Y':
+                logger.warning(
+                    f"비활성화된 계정: {user_id}",
+                    extra={"use_yn": user.use_yn}
+                )
+                return None
+
+            # 5. 검증 성공
+            logger.info(
+                f"사용자 검증 성공: {user_id}",
+                extra={
+                    "email": email,
+                    "role_code": user.role_code,
+                    "position_code": user.position_code,
+                }
+            )
+            return user
+
+        except Exception as e:
+            logger.error(
+                f"사용자 검증 중 오류 발생: {str(e)}",
+                extra={"email": email}
+            )
+            return None
