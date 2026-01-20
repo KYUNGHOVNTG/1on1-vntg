@@ -13,11 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.config import settings
 from server.app.core.logging import get_logger
+from server.app.core.security import create_access_token
 from server.app.domain.auth.schemas import (
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
 )
+from server.app.domain.common.service import CommonCodeService
 from server.app.domain.user.models import User
 from server.app.shared.base.service import BaseService
 from server.app.shared.exceptions import (
@@ -118,24 +120,58 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 )
                 return ServiceResult.fail("등록되지 않은 사용자이거나 비활성화된 계정입니다")
 
-            # 4. 로그인 성공 로그 출력
+            # 4. 공통코드 조회 - role_code, position_code를 의미값으로 변환
+            code_service = CommonCodeService(self.db)
+            role_name = await code_service.get_role_name(user.role_code)
+            position_name = await code_service.get_position_name(user.position_code)
+
+            # 코드가 없는 경우 기본값 설정 (에러 방지)
+            if not role_name:
+                logger.warning(
+                    f"역할 코드에 대한 코드명을 찾을 수 없습니다: {user.role_code}",
+                    extra={"user_id": user.user_id}
+                )
+                role_name = user.role_code  # fallback to code itself
+
+            if not position_name:
+                logger.warning(
+                    f"직급 코드에 대한 코드명을 찾을 수 없습니다: {user.position_code}",
+                    extra={"user_id": user.user_id}
+                )
+                position_name = user.position_code  # fallback to code itself
+
+            # 5. JWT 토큰 생성
+            jwt_payload = {
+                "user_id": user.user_id,
+                "email": email,
+                "role": role_name,
+                "position": position_name,
+            }
+            access_token = create_access_token(data=jwt_payload)
+
+            # 6. 로그인 성공 로그 출력
             logger.info(
                 "로그인 성공",
                 extra={
                     "user_id": user.user_id,
                     "email": email,
                     "user_name": user_info.get("name"),
-                    "role_code": user.role_code,
-                    "position_code": user.position_code,
+                    "role": role_name,
+                    "position": position_name,
                 },
             )
 
-            # 5. 성공 응답 반환
+            # 7. 성공 응답 반환
             return ServiceResult.ok(
                 GoogleAuthResponse(
                     success=True,
+                    access_token=access_token,
+                    token_type="bearer",
+                    user_id=user.user_id,
                     email=email,
                     name=user_info.get("name"),
+                    role=role_name,
+                    position=position_name,
                 )
             )
 
