@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LoadingOverlay } from './core/loading';
 import { LoginPage } from './domains/auth';
+import { logout as logoutAPI } from './domains/auth/api';
 import { DashboardPage } from './domains/dashboard';
 import { MainLayout } from './core/layout';
 
@@ -25,6 +26,23 @@ function App() {
     setIsAuthenticated(true);
   };
 
+  // 로그아웃 핸들러
+  const handleLogout = async () => {
+    try {
+      // 서버에 로그아웃 요청 (선택적)
+      await logoutAPI();
+    } catch (error) {
+      console.error('로그아웃 API 호출 실패:', error);
+      // API 실패해도 클라이언트 측 로그아웃은 진행
+    } finally {
+      // localStorage에서 토큰 제거
+      localStorage.removeItem('access_token');
+
+      // 인증 상태 초기화
+      setIsAuthenticated(false);
+    }
+  };
+
   return (
     <>
       {/* 전역 로딩 오버레이 */}
@@ -32,7 +50,7 @@ function App() {
 
       {/* 라우팅: 로그인 vs 대시보드 */}
       {isAuthenticated ? (
-        <MainLayout>
+        <MainLayout onLogout={handleLogout}>
           <DashboardPage />
         </MainLayout>
       ) : (

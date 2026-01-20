@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { Layout, ListTodo, Users, Settings } from 'lucide-react';
+import { Layout, ListTodo, Users, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 
 interface SidebarProps {
@@ -16,6 +16,8 @@ interface SidebarProps {
   isOpen?: boolean;
   /** 사이드바 닫기 핸들러 (모바일) */
   onClose?: () => void;
+  /** 로그아웃 핸들러 */
+  onLogout?: () => void;
 }
 
 /** 네비게이션 메뉴 아이템 타입 */
@@ -37,7 +39,7 @@ const systemItems: NavItem[] = [
   { icon: <Settings size={18} />, label: '시스템 관리' },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose, onLogout }) => {
   return (
     <>
       {/* 모바일 오버레이 */}
@@ -81,14 +83,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
           ))}
         </nav>
 
-        {/* 사용자 프로필 (하단) */}
-        <div className="mt-auto p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
-            JD
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">John Doe</p>
-            <p className="text-xs text-gray-500 truncate">Team Lead</p>
+        {/* 하단 영역 */}
+        <div className="mt-auto space-y-3">
+          {/* 로그아웃 버튼 */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all duration-200 group"
+            >
+              <LogOut size={18} className="group-hover:scale-110 transition-transform duration-200" />
+              <span>로그아웃</span>
+            </button>
+          )}
+
+          {/* 사용자 프로필 */}
+          <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
+              JD
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-900 truncate">John Doe</p>
+              <p className="text-xs text-gray-500 truncate">Team Lead</p>
+            </div>
           </div>
         </div>
       </aside>
