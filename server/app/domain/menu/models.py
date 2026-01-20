@@ -5,10 +5,10 @@ Menu 도메인 ORM 모델
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
-from sqlalchemy import String, Integer, CHAR, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, CHAR, DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.app.core.database import Base
 
@@ -55,6 +55,27 @@ class Menu(Base):
         comment="비고"
     )
 
+    # 계층 구조 (Hierarchy)
+    up_menu_code: Mapped[Optional[str]] = mapped_column(
+        String(10),
+        ForeignKey("cm_menu.menu_code", ondelete="CASCADE"),
+        nullable=True,
+        comment="상위 메뉴 코드 (NULL: 최상위 메뉴)"
+    )
+
+    menu_level: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        comment="메뉴 깊이 (1: 최상위, 2: 2차, 3: 3차...)"
+    )
+
+    menu_url: Mapped[Optional[str]] = mapped_column(
+        String(200),
+        nullable=True,
+        comment="프론트엔드 라우팅 경로"
+    )
+
     # 이력 관리
     in_user: Mapped[Optional[str]] = mapped_column(
         String(50),
@@ -79,6 +100,21 @@ class Menu(Base):
         DateTime,
         nullable=True,
         comment="수정일시"
+    )
+
+    # 관계 설정 (Self-Referencing)
+    children: Mapped[List["Menu"]] = relationship(
+        "Menu",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        foreign_keys=[up_menu_code]
+    )
+
+    parent: Mapped[Optional["Menu"]] = relationship(
+        "Menu",
+        back_populates="children",
+        remote_side="Menu.menu_code",
+        foreign_keys=[up_menu_code]
     )
 
     def __repr__(self) -> str:
