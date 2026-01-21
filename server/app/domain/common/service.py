@@ -154,3 +154,63 @@ class CommonCodeService:
         await self.db.delete(master)
         await self.db.commit()
         return True
+
+    async def create_detail(self, full_data) -> object:
+        """
+        공통코드 상세를 생성합니다.
+        """
+        # Check duplication
+        stmt = select(CodeDetail).where(
+            CodeDetail.code_type == full_data.code_type,
+            CodeDetail.code == full_data.code
+        )
+        result = await self.db.execute(stmt)
+        if result.scalar_one_or_none():
+            raise ValueError(f"Code '{full_data.code}' already exists in '{full_data.code_type}'.")
+
+        new_detail = CodeDetail(**full_data.model_dump())
+        self.db.add(new_detail)
+        await self.db.commit()
+        await self.db.refresh(new_detail)
+        return new_detail
+
+    async def update_detail(self, code_type: str, code: str, update_data) -> Optional[object]:
+        """
+        공통코드 상세를 수정합니다.
+        """
+        stmt = select(CodeDetail).where(
+            CodeDetail.code_type == code_type,
+            CodeDetail.code == code
+        )
+        result = await self.db.execute(stmt)
+        detail = result.scalar_one_or_none()
+        
+        if not detail:
+            return None
+
+        # Update fields
+        update_dict = update_data.model_dump(exclude_unset=True)
+        for key, value in update_dict.items():
+            setattr(detail, key, value)
+
+        await self.db.commit()
+        await self.db.refresh(detail)
+        return detail
+
+    async def delete_detail(self, code_type: str, code: str) -> bool:
+        """
+        공통코드 상세를 삭제합니다.
+        """
+        stmt = select(CodeDetail).where(
+            CodeDetail.code_type == code_type,
+            CodeDetail.code == code
+        )
+        result = await self.db.execute(stmt)
+        detail = result.scalar_one_or_none()
+        
+        if not detail:
+            return False
+
+        await self.db.delete(detail)
+        await self.db.commit()
+        return True

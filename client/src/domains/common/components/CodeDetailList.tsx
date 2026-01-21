@@ -1,15 +1,24 @@
 import React from 'react';
+import { Plus, Edit2, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import type { CodeDetail } from '../types';
 import { Badge } from '@/core/ui';
 
 interface CodeDetailListProps {
     details: CodeDetail[];
     loading: boolean;
+    onAdd: () => void;
+    onEdit: (detail: CodeDetail) => void;
+    onDelete: (detail: CodeDetail) => void;
+    onSort: (detail: CodeDetail, direction: 'up' | 'down') => void;
 }
 
 export const CodeDetailList: React.FC<CodeDetailListProps> = ({
     details,
     loading,
+    onAdd,
+    onEdit,
+    onDelete,
+    onSort,
 }) => {
     if (loading) {
         return (
@@ -20,41 +29,89 @@ export const CodeDetailList: React.FC<CodeDetailListProps> = ({
     }
 
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-                <h3 className="font-bold text-gray-900">상세 코드</h3>
-                <p className="text-xs text-gray-500 mt-1">총 {details.length}건</p>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full transition-all hover:shadow-md">
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                <div>
+                    <h3 className="font-bold text-gray-900">상세 코드</h3>
+                    <p className="text-xs text-gray-500 mt-1">총 {details.length}건</p>
+                </div>
+                <button
+                    onClick={onAdd}
+                    className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm active:scale-95 flex items-center gap-1 text-xs font-semibold"
+                >
+                    <Plus size={14} />
+                    <span>추가</span>
+                </button>
             </div>
 
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 dark-scrollbar">
                 <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-500 font-semibold text-xs uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
+                    <thead className="bg-gray-50 text-gray-500 font-semibold text-xs uppercase tracking-wider sticky top-0 z-10 backdrop-blur-sm bg-opacity-90">
                         <tr>
                             <th className="px-4 py-3 border-b border-gray-100 w-24">코드</th>
                             <th className="px-4 py-3 border-b border-gray-100">코드명</th>
-                            <th className="px-4 py-3 border-b border-gray-100 w-20 text-center">정렬</th>
+                            <th className="px-4 py-3 border-b border-gray-100 w-24 text-center">정렬</th>
                             <th className="px-4 py-3 border-b border-gray-100 w-20 text-center">사용</th>
                             <th className="px-4 py-3 border-b border-gray-100">비고</th>
+                            <th className="px-4 py-3 border-b border-gray-100 w-20 text-right">관리</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {details.length > 0 ? (
-                            details.map((detail) => (
-                                <tr key={detail.code} className="hover:bg-gray-50 transition-colors">
+                            details.map((detail, index) => (
+                                <tr key={detail.code} className="hover:bg-gray-50 transition-colors group">
                                     <td className="px-4 py-3 font-medium text-gray-900">{detail.code}</td>
                                     <td className="px-4 py-3 text-gray-700">{detail.code_name}</td>
-                                    <td className="px-4 py-3 text-center text-gray-500">{detail.sort_seq}</td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex justify-center items-center gap-1">
+                                            <span className="text-xs text-gray-500 w-4">{detail.sort_seq}</span>
+                                            <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => onSort(detail, 'up')}
+                                                    disabled={index === 0}
+                                                    className="text-gray-400 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-gray-400"
+                                                >
+                                                    <ArrowUp size={10} />
+                                                </button>
+                                                <button
+                                                    onClick={() => onSort(detail, 'down')}
+                                                    disabled={index === details.length - 1}
+                                                    className="text-gray-400 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-gray-400"
+                                                >
+                                                    <ArrowDown size={10} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
                                     <td className="px-4 py-3 text-center">
                                         <Badge variant={detail.use_yn === 'Y' ? 'success' : 'neutral'}>
                                             {detail.use_yn === 'Y' ? '사용' : '미사용'}
                                         </Badge>
                                     </td>
                                     <td className="px-4 py-3 text-gray-500 truncate max-w-[150px]" title={detail.rmk}>{detail.rmk}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <div className="flex justify-end gap-1 transition-opacity">
+                                            <button
+                                                onClick={() => onEdit(detail)}
+                                                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-md transition-all"
+                                                title="수정"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => onDelete(detail)}
+                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-md transition-all"
+                                                title="삭제"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                                     등록된 상세 코드가 없습니다.
                                 </td>
                             </tr>

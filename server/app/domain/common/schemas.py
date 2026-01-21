@@ -41,6 +41,22 @@ class CodeDetailBase(BaseModel):
     rmk: Optional[str] = Field(None, description="비고")
 
 
+class CodeDetailCreate(BaseModel):
+    code_type: str = Field(..., description="코드 타입")
+    code: str = Field(..., description="코드 (CD001 형태)")
+    code_name: str = Field(..., description="코드명")
+    use_yn: str = Field("Y", description="사용여부")
+    sort_seq: int = Field(1, description="정렬순서")
+    rmk: Optional[str] = Field(None, description="비고")
+
+
+class CodeDetailUpdate(BaseModel):
+    code_name: Optional[str] = Field(None, description="코드명")
+    use_yn: Optional[str] = Field(None, description="사용여부")
+    sort_seq: Optional[int] = Field(None, description="정렬순서")
+    rmk: Optional[str] = Field(None, description="비고")
+
+
 class CodeDetailResponse(CodeDetailBase):
     in_user: Optional[str] = Field(None, description="등록자")
     in_date: datetime = Field(..., description="등록일시")

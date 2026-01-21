@@ -5,8 +5,18 @@ import { Breadcrumb, ConfirmModal } from '@/core/ui';
 import { CodeMasterList } from '../components/CodeMasterList';
 import { CodeDetailList } from '../components/CodeDetailList';
 import { CodeMasterDialog } from '../components/CodeMasterDialog';
-import { fetchCodeMasters, fetchCodeDetails, createCodeMaster, updateCodeMaster, deleteCodeMaster } from '../api';
-import type { CodeMaster, CodeDetail } from '../types';
+import { CodeDetailDialog } from '../components/CodeDetailDialog';
+import {
+    fetchCodeMasters,
+    fetchCodeDetails,
+    createCodeMaster,
+    updateCodeMaster,
+    deleteCodeMaster,
+    createCodeDetail,
+    updateCodeDetail,
+    deleteCodeDetail
+} from '../api';
+import type { CodeMaster, CodeDetail, CodeDetailCreateRequest } from '../types';
 
 export const CodeManagementPage: React.FC = () => {
     const [masters, setMasters] = useState<CodeMaster[]>([]);
@@ -21,9 +31,18 @@ export const CodeManagementPage: React.FC = () => {
     const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
     const [editingMaster, setEditingMaster] = useState<CodeMaster | null>(null);
 
-    // Delete Confirmation State
+    // Delete Confirmation State (Master)
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [masterToDelete, setMasterToDelete] = useState<CodeMaster | null>(null);
+
+    // Detail Dialog State
+    const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+    const [detailDialogMode, setDetailDialogMode] = useState<'create' | 'edit'>('create');
+    const [editingDetail, setEditingDetail] = useState<CodeDetail | null>(null);
+
+    // Detail Delete Confirmation State
+    const [deleteDetailConfirmOpen, setDeleteDetailConfirmOpen] = useState(false);
+    const [detailToDelete, setDetailToDelete] = useState<CodeDetail | null>(null);
 
     // 마스터 목록 조회
     const loadMasters = async () => {
@@ -135,6 +154,119 @@ export const CodeManagementPage: React.FC = () => {
         }
     };
 
+    // Detail CRUD Handlers
+    const handleAddDetail = () => {
+        setDetailDialogMode('create');
+        setEditingDetail(null);
+        setIsDetailDialogOpen(true);
+    };
+
+    const handleEditDetail = (detail: CodeDetail) => {
+        setDetailDialogMode('edit');
+        setEditingDetail(detail);
+        setIsDetailDialogOpen(true);
+    };
+
+    const handleDeleteDetail = (detail: CodeDetail) => {
+        setDetailToDelete(detail);
+        setDeleteDetailConfirmOpen(true);
+    };
+
+    const handleConfirmDeleteDetail = async () => {
+        if (!detailToDelete || !selectedMaster) return;
+
+        try {
+            await deleteCodeDetail(selectedMaster, detailToDelete.code);
+            toast.success('상세 코드가 삭제되었습니다.');
+
+            // Reload details
+            const data = await fetchCodeDetails(selectedMaster);
+            setDetails(data);
+        } catch (err) {
+            console.error('Failed to delete detail:', err);
+            toast.error('삭제 중 오류가 발생했습니다.');
+        } finally {
+            setDeleteDetailConfirmOpen(false);
+            setDetailToDelete(null);
+        }
+    };
+
+    const handleSaveDetail = async (data: CodeDetailCreateRequest) => {
+        if (!selectedMaster) return;
+
+        try {
+            if (detailDialogMode === 'create') {
+                await createCodeDetail(selectedMaster, data);
+                toast.success('상세 코드가 등록되었습니다.');
+            } else {
+                await updateCodeDetail(selectedMaster, data.code, {
+                    code_name: data.code_name,
+                    use_yn: data.use_yn,
+                    sort_seq: data.sort_seq,
+                    rmk: data.rmk
+                });
+                toast.success('상세 코드가 수정되었습니다.');
+            }
+
+            // Reload details
+            const newData = await fetchCodeDetails(selectedMaster);
+            setDetails(newData);
+        } catch (err) {
+            console.error('Failed to save detail:', err);
+            toast.error('저장 중 오류가 발생했습니다.');
+            throw err;
+        }
+    };
+
+    const handleSortDetail = async (detail: CodeDetail, direction: 'up' | 'down') => {
+        if (!selectedMaster) return;
+
+        const currentIndex = details.findIndex(d => d.code === detail.code);
+        if (currentIndex === -1) return;
+
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= details.length) return;
+
+        const targetDetail = details[targetIndex];
+
+        // Swap sort_seq
+        // Optimistic update
+        const newDetails = [...details];
+        const tempSeq = newDetails[currentIndex].sort_seq;
+        newDetails[currentIndex].sort_seq = newDetails[targetIndex].sort_seq;
+        newDetails[targetIndex].sort_seq = tempSeq;
+
+        // Swap positions in array to reflect visual change immediately (though sort_seq helps)
+        newDetails[currentIndex] = { ...newDetails[currentIndex] }; // clone
+        newDetails[targetIndex] = { ...targetDetail }; // clone
+
+        // Sort by seq again to be sure? No, just swap in array is enough for now if we rely on array order.
+        // But backend relies on sort_seq.
+        // Let's swap the array items
+        [newDetails[currentIndex], newDetails[targetIndex]] = [newDetails[targetIndex], newDetails[currentIndex]];
+
+        setDetails(newDetails);
+
+        try {
+            // Update both items
+            await Promise.all([
+                updateCodeDetail(selectedMaster, detail.code, { sort_seq: targetDetail.sort_seq }),
+                updateCodeDetail(selectedMaster, targetDetail.code, { sort_seq: detail.sort_seq })
+            ]);
+
+            // Ideally reload to be safe, but optimistic is better for UI.
+            // Maybe silently reload
+            fetchCodeDetails(selectedMaster).then(setDetails);
+
+        } catch (err) {
+            console.error('Failed to sort details:', err);
+            toast.error('정렬 순서 변경에 실패했습니다.');
+            // Revert on error
+            const originData = await fetchCodeDetails(selectedMaster);
+            setDetails(originData);
+        }
+    };
+
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center p-12 text-center h-[50vh]">
@@ -199,6 +331,10 @@ export const CodeManagementPage: React.FC = () => {
                         <CodeDetailList
                             details={details}
                             loading={loadingDetails}
+                            onAdd={handleAddDetail}
+                            onEdit={handleEditDetail}
+                            onDelete={handleDeleteDetail}
+                            onSort={handleSortDetail}
                         />
                     ) : (
                         <div className="h-full bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-center items-center p-12">
@@ -226,7 +362,19 @@ export const CodeManagementPage: React.FC = () => {
                 onSave={handleSaveMaster}
             />
 
-            {/* Delete Confirmation Modal */}
+            {/* Detail Dialog */}
+            {selectedMaster && (
+                <CodeDetailDialog
+                    isOpen={isDetailDialogOpen}
+                    mode={detailDialogMode}
+                    codeType={selectedMaster}
+                    initialData={editingDetail}
+                    onClose={() => setIsDetailDialogOpen(false)}
+                    onSave={handleSaveDetail}
+                />
+            )}
+
+            {/* Delete Confirmation Modal (Master) */}
             <ConfirmModal
                 isOpen={deleteConfirmOpen}
                 onClose={() => {
@@ -239,6 +387,22 @@ export const CodeManagementPage: React.FC = () => {
                 confirmText="삭제하기"
                 isDangerous
             />
+
+            {/* Delete Confirmation Modal (Detail) */}
+            <ConfirmModal
+                isOpen={deleteDetailConfirmOpen}
+                onClose={() => {
+                    setDeleteDetailConfirmOpen(false);
+                    setDetailToDelete(null);
+                }}
+                onConfirm={handleConfirmDeleteDetail}
+                title="상세 코드 삭제"
+                message={`'${detailToDelete?.code_name}' (${detailToDelete?.code}) 코드를 정말 삭제하시겠습니까?`}
+                confirmText="삭제하기"
+                isDangerous
+            />
+
+
 
             <style>{`
         @keyframes fade-in-up {

@@ -7,7 +7,9 @@ from server.app.domain.common.schemas import (
     CodeMasterResponse, 
     CodeDetailResponse, 
     CodeMasterCreate, 
-    CodeMasterUpdate
+    CodeMasterUpdate,
+    CodeDetailCreate,
+    CodeDetailUpdate
 )
 from server.app.domain.common.service import CommonCodeService
 from server.app.shared.types import ServiceResult
@@ -102,3 +104,66 @@ async def delete_code_master(
     if not success:
         return ServiceResult.fail(message=f"Code Type '{code_type}' not found.", error="NOT_FOUND")
     return ServiceResult.ok(data=True, message="공통코드 마스터 삭제 성공")
+
+
+@router.post(
+    "/masters/{code_type}/details",
+    response_model=ServiceResult[CodeDetailResponse],
+    summary="공통코드 상세 생성",
+    description="새로운 공통코드 상세를 생성합니다.",
+)
+async def create_code_detail(
+    code_type: str = Path(..., description="코드 타입"),
+    data: "CodeDetailCreate" = None,
+    db: AsyncSession = Depends(get_db),
+):
+    # Ensure URL code_type matches data code_type, or just trust URL and override?
+    # Ideally data should contain it.
+    if data.code_type != code_type:
+        return ServiceResult.fail(message="URL code_type and body code_type mismatch", error="VALIDATION_ERROR")
+
+    service = CommonCodeService(db)
+    try:
+        detail = await service.create_detail(data)
+        return ServiceResult.ok(data=detail, message="공통코드 상세 생성 성공")
+    except ValueError as e:
+        return ServiceResult.fail(message=str(e), error="DUPLICATE_CODE")
+    except Exception as e:
+        return ServiceResult.fail(message="공통코드 상세 생성 중 오류 발생", error=str(e))
+
+
+@router.put(
+    "/masters/{code_type}/details/{code}",
+    response_model=ServiceResult[CodeDetailResponse],
+    summary="공통코드 상세 수정",
+    description="공통코드 상세 정보를 수정합니다.",
+)
+async def update_code_detail(
+    code_type: str = Path(..., description="코드 타입"),
+    code: str = Path(..., description="코드"),
+    data: "CodeDetailUpdate" = None,
+    db: AsyncSession = Depends(get_db),
+):
+    service = CommonCodeService(db)
+    detail = await service.update_detail(code_type, code, data)
+    if not detail:
+        return ServiceResult.fail(message=f"Code '{code}' not found in '{code_type}'.", error="NOT_FOUND")
+    return ServiceResult.ok(data=detail, message="공통코드 상세 수정 성공")
+
+
+@router.delete(
+    "/masters/{code_type}/details/{code}",
+    response_model=ServiceResult[bool],
+    summary="공통코드 상세 삭제",
+    description="공통코드 상세를 삭제합니다.",
+)
+async def delete_code_detail(
+    code_type: str = Path(..., description="코드 타입"),
+    code: str = Path(..., description="코드"),
+    db: AsyncSession = Depends(get_db),
+):
+    service = CommonCodeService(db)
+    success = await service.delete_detail(code_type, code)
+    if not success:
+        return ServiceResult.fail(message=f"Code '{code}' not found in '{code_type}'.", error="NOT_FOUND")
+    return ServiceResult.ok(data=True, message="공통코드 상세 삭제 성공")

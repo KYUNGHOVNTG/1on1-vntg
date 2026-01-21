@@ -13,6 +13,7 @@
  */
 
 import React from 'react';
+import { cn } from '../utils/cn';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -27,25 +28,35 @@ export const Input: React.FC<InputProps> = ({
   className = '',
   ...props
 }) => {
-  // TODO: 에러 상태 스타일링
-  // TODO: 레이블, 헬퍼텍스트 스타일링
-
   return (
-    <div className={`input-wrapper ${className}`}>
+    <div className={cn('space-y-1.5', className)}>
       {label && (
-        <label className="input-label">
+        <label className="text-xs font-semibold text-gray-700 ml-1 block">
           {label}
         </label>
       )}
-      <input
-        className={`input ${error ? 'input-error' : ''}`}
-        {...props}
-      />
+      <div className="relative group">
+        <input
+          className={cn(
+            'w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm transition-all duration-200 outline-none',
+            'placeholder:text-gray-400',
+            'focus:border-[#5B5FED] focus:ring-1 focus:ring-[#5B5FED]',
+            'group-hover:border-gray-300 focus:group-hover:border-[#5B5FED]',
+            error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '',
+            props.disabled ? 'bg-gray-50 text-gray-400 cursor-not-allowed border-gray-100' : ''
+          )}
+          {...props}
+        />
+      </div>
       {error && (
-        <span className="input-error-text">{error}</span>
+        <p className="text-[11px] font-medium text-red-500 ml-1 mt-1 animate-in fade-in slide-in-from-top-1">
+          {error}
+        </p>
       )}
       {helperText && !error && (
-        <span className="input-helper-text">{helperText}</span>
+        <p className="text-[11px] text-gray-400 ml-1 mt-1">
+          {helperText}
+        </p>
       )}
     </div>
   );

@@ -32,3 +32,19 @@ export interface CodeDetail {
     up_user?: string;
     up_date?: string;
 }
+
+export interface CodeDetailCreateRequest {
+    code_type: string;
+    code: string;
+    code_name: string;
+    use_yn: string;
+    sort_seq?: number;
+    rmk?: string;
+}
+
+export interface CodeDetailUpdateRequest {
+    code_name?: string;
+    use_yn?: string;
+    sort_seq?: number;
+    rmk?: string;
+}
