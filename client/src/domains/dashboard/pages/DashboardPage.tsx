@@ -83,7 +83,7 @@ export const DashboardPage: React.FC = () => {
               color="bg-secondary"
               className="h-2.5"
             />
-            <div className="flex justify-between text-[10px] mt-2 font-bold uppercase tracking-tighter">
+            <div className="flex justify-between text-xs mt-2 font-bold uppercase tracking-tighter">
               <span className="text-secondary">Current: 78%</span>
               <span className="text-gray-400">Target: 80%</span>
             </div>
@@ -121,7 +121,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50/50 text-gray-500 font-bold text-[10px] uppercase tracking-widest border-b border-gray-100">
+              <thead className="bg-gray-50/50 text-gray-500 font-bold text-sm uppercase tracking-widest border-b border-gray-100">
                 <tr>
                   <th className="px-6 py-4">담당자</th>
                   <th className="px-6 py-4">핵심 과제 (R&R)</th>
@@ -136,7 +136,7 @@ export const DashboardPage: React.FC = () => {
                       <Avatar initials={item.name[0]} size="sm" className="group-hover:border-primary/30 transition-colors" />
                       <div>
                         <p className="font-bold text-gray-900 leading-none">{item.name}</p>
-                        <p className="text-[10px] text-gray-400 mt-1 font-medium">{item.role}</p>
+                        <p className="text-xs text-gray-400 mt-1 font-medium">{item.role}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4 font-semibold text-gray-700">{item.task}</td>
@@ -164,7 +164,7 @@ export const DashboardPage: React.FC = () => {
                 <Calendar size={20} className="text-secondary" />
                 오늘의 1on1
               </h3>
-              <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded-md uppercase tracking-wider">
+              <span className="text-xs font-bold text-primary bg-primary/5 px-2 py-1 rounded-md uppercase tracking-wider">
                 Today
               </span>
             </div>
@@ -177,11 +177,11 @@ export const DashboardPage: React.FC = () => {
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <div className="text-center min-w-[3.5rem] py-1 bg-gray-50 rounded-lg group-hover:bg-primary/5 transition-colors">
                     <p className="text-sm font-bold text-gray-900">{meeting.time}</p>
-                    <p className="text-[8px] text-gray-400 font-black uppercase">PM</p>
+                    <p className="text-xs text-gray-400 font-black uppercase">PM</p>
                   </div>
                   <div className="flex-1">
                     <p className="font-bold text-gray-900 leading-tight">{meeting.name}</p>
-                    <p className="text-[10px] text-gray-500 font-medium">{meeting.role}</p>
+                    <p className="text-xs text-gray-500 font-medium">{meeting.role}</p>
                   </div>
                   <button className="p-2 rounded-lg bg-gray-50 text-gray-400 group-hover:text-white group-hover:bg-primary transition-all">
                     <ChevronRight size={16} />
@@ -202,7 +202,7 @@ export const DashboardPage: React.FC = () => {
                     <p className="text-sm font-bold text-gray-700">
                       Lee Design Lead
                     </p>
-                    <p className="text-[10px] text-gray-400 font-medium">어제, 11:00 AM</p>
+                    <p className="text-xs text-gray-400 font-medium">어제, 11:00 AM</p>
                   </div>
                 </div>
               </div>
