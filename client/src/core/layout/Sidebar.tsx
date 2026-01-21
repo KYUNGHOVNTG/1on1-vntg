@@ -16,6 +16,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  Bell,
   type LucideIcon,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -77,22 +78,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose, onLogo
       <aside
         className={cn(
           'fixed lg:static inset-y-0 left-0 z-50',
-          'w-64 border-r border-gray-200 bg-white',
-          'flex flex-col p-4',
+          'w-64 h-screen border-r border-gray-200 bg-white',
+          'flex flex-col',
           'transition-transform duration-300 lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full',
           'lg:flex'
         )}
       >
+        {/* 로고 영역 */}
+        <div className="p-6 border-b border-gray-100">
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+            1on1-Mirror
+          </h1>
+        </div>
+
         {/* 메뉴 섹션 헤더 */}
-        <div className="mb-6 px-3">
+        <div className="mt-6 mb-4 px-6">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             메인 메뉴
           </p>
         </div>
 
         {/* 메인 메뉴 */}
-        <nav className="space-y-1 flex-1">
+        <nav className="space-y-1 flex-1 px-3">
           {loading ? (
             <div className="px-3 py-2 text-sm text-gray-500">메뉴 로딩 중...</div>
           ) : mainMenus.length > 0 ? (
@@ -115,7 +123,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose, onLogo
         </nav>
 
         {/* 하단 영역 */}
-        <div className="mt-auto space-y-3">
+        <div className="mt-auto p-4 space-y-3 border-t border-gray-100">
+          {/* 알림 버튼 */}
+          <button
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200 group relative"
+            title="알림"
+          >
+            <Bell size={18} className="group-hover:scale-110 transition-transform duration-200" />
+            <span>알림</span>
+            {/* 알림 뱃지 (예시) */}
+            <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-semibold">
+              3
+            </span>
+          </button>
+
           {/* 로그아웃 버튼 */}
           {onLogout && (
             <button

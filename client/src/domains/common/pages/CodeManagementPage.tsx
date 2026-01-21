@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Database, Sparkles } from 'lucide-react';
+import { Breadcrumb } from '@/core/ui';
 import { CodeMasterList } from '../components/CodeMasterList';
 import { CodeDetailList } from '../components/CodeDetailList';
 import { fetchCodeMasters, fetchCodeDetails } from '../api';
@@ -84,11 +85,21 @@ export const CodeManagementPage: React.FC = () => {
 
     return (
         <div className="h-[calc(100vh-100px)] flex flex-col animate-fade-in-up">
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+            {/* 브레드크럼 */}
+            <Breadcrumb
+                items={[
+                    { label: '시스템 관리', href: '/system' },
+                    { label: '코드 관리' }
+                ]}
+                className="mb-4"
+            />
+
+            {/* 페이지 타이틀 */}
+            <div className="mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
                     공통코드 관리
                 </h2>
-                <p className="text-gray-500 mt-1 text-sm">
+                <p className="text-gray-500 mt-2 text-sm">
                     시스템에서 사용되는 공통코드를 조회하고 관리할 수 있습니다.
                 </p>
             </div>
@@ -117,9 +128,18 @@ export const CodeManagementPage: React.FC = () => {
                             loading={loadingDetails}
                         />
                     ) : (
-                        <div className="h-full bg-white rounded-2xl border border-dashed border-gray-200 flex flex-col justify-center items-center text-gray-400 p-8">
-                            <AlertCircle size={48} className="mb-4 opacity-20" />
-                            <p>좌측에서 마스터 코드를 선택해주세요.</p>
+                        <div className="h-full bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-center items-center p-12">
+                            <div className="relative">
+                                <Database size={64} className="text-gray-200 mb-4" />
+                                <Sparkles size={24} className="text-indigo-400 absolute -top-2 -right-2 animate-pulse" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-700 mb-2 mt-4">
+                                코드 선택 대기중
+                            </h3>
+                            <p className="text-sm text-gray-400 text-center max-w-xs">
+                                좌측 목록에서 마스터 코드를 선택하면<br />
+                                상세 코드 정보가 표시됩니다.
+                            </p>
                         </div>
                     )}
                 </div>

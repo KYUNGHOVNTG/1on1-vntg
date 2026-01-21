@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Plus, Users, CheckCircle2, MessageSquare, TrendingUp, ListTodo, Calendar, ChevronRight } from 'lucide-react';
-import { Badge } from '@/core/ui';
+import { Badge, Breadcrumb } from '@/core/ui';
 
 /** Mock 데이터: R&R 테이블 */
 const mockRnRData = [
@@ -25,13 +25,21 @@ const mockMeetings = [
 export const DashboardPage: React.FC = () => {
   return (
     <div className="animate-fade-in-up">
+      {/* 브레드크럼 */}
+      <Breadcrumb
+        items={[
+          { label: '대시보드' }
+        ]}
+        className="mb-4"
+      />
+
       {/* Welcome Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+          <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
             안녕하세요, 김민수님! 👋
           </h2>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 mt-2 text-sm">
             오늘 예정된 1on1 미팅이{' '}
             <span className="text-[#5B5FED] font-bold">2건</span> 있습니다.
           </p>
