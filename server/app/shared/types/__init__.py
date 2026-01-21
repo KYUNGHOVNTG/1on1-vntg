@@ -32,13 +32,14 @@ class ServiceResult(BaseModel, Generic[T]):
 
     success: bool
     data: T | None = None
+    message: str | None = None
     error: str | None = None
     metadata: dict[str, Any] | None = None
 
     @classmethod
-    def ok(cls, data: T, metadata: dict[str, Any] | None = None) -> "ServiceResult[T]":
+    def ok(cls, data: T, message: str | None = None, metadata: dict[str, Any] | None = None) -> "ServiceResult[T]":
         """성공 결과 생성"""
-        return cls(success=True, data=data, metadata=metadata)
+        return cls(success=True, data=data, message=message, metadata=metadata)
 
     @classmethod
     def fail(cls, error: str, metadata: dict[str, Any] | None = None) -> "ServiceResult[T]":

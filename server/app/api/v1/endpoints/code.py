@@ -24,7 +24,7 @@ async def read_code_masters(
 ):
     service = CommonCodeService(db)
     masters = await service.get_all_masters()
-    return ServiceResult(success=True, data=masters, message="공통코드 마스터 목록 조회 성공")
+    return ServiceResult.ok(data=masters, message="공통코드 마스터 목록 조회 성공")
 
 
 @router.get(
@@ -39,4 +39,4 @@ async def read_code_details(
 ):
     service = CommonCodeService(db)
     details = await service.get_details_by_master_id(code_type)
-    return ServiceResult(data=details, message="공통코드 상세 목록 조회 성공")
+    return ServiceResult.ok(data=details, message="공통코드 상세 목록 조회 성공")
