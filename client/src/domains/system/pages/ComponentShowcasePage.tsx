@@ -64,13 +64,13 @@ export const ComponentShowcasePage: React.FC = () => {
                             <p className="text-sm text-gray-500">Caption Text (Small)</p>
                             <p className="text-xs text-gray-400">Tiny Text (Extra Small)</p>
                         </Card>
-                        <Card className="p-6 grid grid-cols-2 gap-4">
-                            <div className="bg-indigo-600 text-white p-4 rounded-lg text-center">Primary</div>
-                            <div className="bg-gray-900 text-white p-4 rounded-lg text-center">Secondary</div>
-                            <div className="bg-green-500 text-white p-4 rounded-lg text-center">Success</div>
-                            <div className="bg-red-500 text-white p-4 rounded-lg text-center">Error</div>
-                            <div className="bg-yellow-500 text-white p-4 rounded-lg text-center">Warning</div>
-                            <div className="bg-blue-500 text-white p-4 rounded-lg text-center">Info</div>
+                        <Card className="p-6 grid grid-cols-2 md:grid-cols-3 gap-6">
+                            <div className="bg-primary text-white p-4 rounded-xl text-center shadow-sm">Primary</div>
+                            <div className="bg-secondary text-white p-4 rounded-xl text-center shadow-sm">Secondary</div>
+                            <div className="bg-success text-white p-4 rounded-xl text-center shadow-sm">Success</div>
+                            <div className="bg-error text-white p-4 rounded-xl text-center shadow-sm">Error</div>
+                            <div className="bg-warning text-white p-4 rounded-xl text-center shadow-sm">Warning</div>
+                            <div className="bg-blue-500 text-white p-4 rounded-xl text-center shadow-sm">Info</div>
                         </Card>
                     </div>
                 </section>
@@ -84,7 +84,7 @@ export const ComponentShowcasePage: React.FC = () => {
                             <div className="flex flex-wrap gap-3">
                                 <Button variant="primary">Primary</Button>
                                 <Button variant="secondary">Secondary</Button>
-                                <Button variant="outline">Outline</Button>
+                                <Button variant="outline" className="text-gray-600">Outline</Button>
                                 <Button variant="ghost">Ghost</Button>
                             </div>
                         </div>

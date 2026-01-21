@@ -56,7 +56,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             'px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all',
             action.variant === 'secondary'
               ? 'bg-white border border-gray-200 hover:bg-gray-50 text-gray-700'
-              : 'bg-[#5B5FED] hover:bg-[#4f53d1] text-white shadow-indigo-100'
+              : 'bg-primary hover:bg-primary-hover text-white shadow-primary/20'
           )}
         >
           {action.label}

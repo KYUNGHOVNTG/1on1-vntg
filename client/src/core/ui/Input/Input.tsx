@@ -24,7 +24,7 @@ export const Input: React.FC<InputProps> = ({
           'w-full h-10 px-3 rounded-xl text-sm outline-none transition-all',
           hasError
             ? 'bg-red-50/30 border border-red-300 text-red-600 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-            : 'bg-white border border-gray-200 focus:border-[#5B5FED] focus:ring-1 focus:ring-[#5B5FED]',
+            : 'bg-white border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary',
           className
         )}
         {...props}

@@ -51,8 +51,8 @@ export const Select: React.FC<SelectProps> = ({
           disabled={disabled}
           className={cn(
             'w-full h-10 pl-3 pr-10 bg-white border border-gray-200 rounded-xl text-sm text-left transition-all duration-200 outline-none',
-            'hover:border-gray-300 focus:border-[#5B5FED] focus:ring-1 focus:ring-[#5B5FED]',
-            isOpen ? 'border-[#5B5FED] ring-1 ring-[#5B5FED]' : '',
+            'hover:border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary',
+            isOpen ? 'border-primary ring-1 ring-primary' : '',
             disabled ? 'bg-gray-50 text-gray-400 cursor-not-allowed border-gray-100' : 'cursor-pointer'
           )}
         >
@@ -62,7 +62,7 @@ export const Select: React.FC<SelectProps> = ({
           <ChevronDown
             className={cn(
               'absolute right-3 top-3 text-gray-400 transition-transform duration-200 pointer-events-none',
-              isOpen ? 'rotate-180 text-[#5B5FED]' : ''
+              isOpen ? 'rotate-180 text-primary' : ''
             )}
             size={16}
           />
@@ -87,13 +87,13 @@ export const Select: React.FC<SelectProps> = ({
                       className={cn(
                         'w-full px-3 py-2 text-sm text-left transition-colors flex items-center justify-between',
                         option.value === value
-                          ? 'bg-indigo-50 text-[#5B5FED] font-semibold'
+                          ? 'bg-primary/5 text-primary font-semibold'
                           : 'text-gray-700 hover:bg-gray-50'
                       )}
                     >
                       <span>{option.label}</span>
                       {option.value === value && (
-                        <Check size={14} className="text-[#5B5FED]" />
+                        <Check size={14} className="text-primary" />
                       )}
                     </button>
                   ))

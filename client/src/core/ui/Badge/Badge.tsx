@@ -9,11 +9,11 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    success: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    warning: 'bg-orange-50 text-orange-600 border-orange-100',
-    error: 'bg-red-50 text-red-600 border-red-100',
-    neutral: 'bg-gray-100 text-gray-600 border-gray-200',
-    primary: 'bg-indigo-50 text-indigo-600 border-indigo-100',
+    success: 'bg-success/5 text-success border-success/20',
+    warning: 'bg-warning/5 text-warning border-warning/20',
+    error: 'bg-error/5 text-error border-error/20',
+    neutral: 'bg-gray-50 text-gray-500 border-gray-200',
+    primary: 'bg-primary/5 text-primary border-primary/20',
   };
 
   return (

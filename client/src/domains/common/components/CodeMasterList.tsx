@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import type { CodeMaster } from '../types';
 import { cn } from '@/core/utils/cn';
+import { Button, Card } from '@/core/ui';
 
 interface CodeMasterListProps {
     masters: CodeMaster[];
@@ -21,22 +22,23 @@ export const CodeMasterList: React.FC<CodeMasterListProps> = ({
     onDelete,
 }) => {
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full transition-all hover:shadow-md">
+        <Card className="flex flex-col h-full transition-all hover:shadow-md">
             <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                 <div>
                     <h3 className="font-bold text-gray-900">공통코드 마스터</h3>
                     <p className="text-xs text-gray-500 mt-1">총 {masters.length}건</p>
                 </div>
-                <button
+                <Button
+                    size="sm"
                     onClick={(e) => {
                         e.stopPropagation();
                         onAdd();
                     }}
-                    className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm active:scale-95 flex items-center gap-1 text-xs font-semibold"
+                    className="gap-1 px-3"
                 >
                     <Plus size={14} />
                     <span>추가</span>
-                </button>
+                </Button>
             </div>
 
             <div className="overflow-y-auto flex-1 dark-scrollbar">
@@ -56,24 +58,24 @@ export const CodeMasterList: React.FC<CodeMasterListProps> = ({
                                     onClick={() => onSelect(master.code_type)}
                                     className={cn(
                                         "cursor-pointer transition-colors hover:bg-gray-50 group",
-                                        selectedCodeType === master.code_type ? "bg-indigo-50 hover:bg-indigo-50" : ""
+                                        selectedCodeType === master.code_type ? "bg-primary/5 hover:bg-primary/5" : ""
                                     )}
                                 >
                                     <td className={cn(
-                                        "px-4 py-3 font-medium",
-                                        selectedCodeType === master.code_type ? "text-indigo-600" : "text-gray-900"
+                                        "px-4 py-3 font-medium text-sm",
+                                        selectedCodeType === master.code_type ? "text-primary" : "text-gray-900"
                                     )}>
                                         {master.code_type}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-700">{master.code_type_name}</td>
+                                    <td className="px-4 py-3 text-gray-700 text-sm">{master.code_type_name}</td>
                                     <td className="px-4 py-3 text-right">
-                                        <div className="flex justify-end gap-1 transition-opacity">
+                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onEdit(master);
                                                 }}
-                                                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-md transition-all"
+                                                className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
                                                 title="수정"
                                             >
                                                 <Edit2 size={14} />
@@ -83,7 +85,7 @@ export const CodeMasterList: React.FC<CodeMasterListProps> = ({
                                                     e.stopPropagation();
                                                     onDelete(master);
                                                 }}
-                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-md transition-all"
+                                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                                 title="삭제"
                                             >
                                                 <Trash2 size={14} />
@@ -102,6 +104,6 @@ export const CodeMasterList: React.FC<CodeMasterListProps> = ({
                     </tbody>
                 </table>
             </div>
-        </div>
+        </Card>
     );
 };

@@ -12,7 +12,7 @@ export const Toggle: React.FC<ToggleProps> = ({
       <div
         className={cn(
           'w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300',
-          checked ? 'bg-[#5B5FED]' : 'bg-gray-200'
+          checked ? 'bg-primary' : 'bg-gray-200'
         )}
       >
         <div

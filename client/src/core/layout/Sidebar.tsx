@@ -10,7 +10,7 @@ import {
   Bell,
   type LucideIcon,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/core/utils/cn';
 import { useAuthStore } from '@/core/store/useAuthStore';
@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={cn(
             'hidden lg:flex absolute -right-3 top-9 z-50',
             'w-7 h-7 items-center justify-center rounded-full bg-white border border-gray-200 shadow-md',
-            'text-gray-500 hover:text-indigo-600 hover:border-indigo-100 transition-all duration-200',
+            'text-gray-500 hover:text-primary hover:border-primary/20 transition-all duration-200',
             'transform hover:scale-110'
           )}
         >
@@ -107,13 +107,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isCollapsed ? "justify-center px-0" : "px-8"
         )}>
           {isCollapsed ? (
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-indigo-200 shadow-lg">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-black text-lg shadow-primary/20 shadow-lg ring-4 ring-primary/5">
               1
             </div>
           ) : (
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-              1on1-VNTG
-            </h1>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white font-black text-sm shadow-primary/20 shadow-lg">
+                1
+              </div>
+              <h1 className="text-xl font-black bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent tracking-tight">
+                1on1-VNTG
+              </h1>
+            </div>
           )}
         </div>
 
@@ -150,21 +155,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {/* 시스템 메뉴 */}
+          {/* 시스템 메뉴 */}
           {systemMenus.length > 0 && (
-            <>
-              {!isCollapsed ? (
-                <div className="my-6 h-px bg-gray-100 mx-2" />
-              ) : (
-                <div className="my-4" />
+            <div className="mt-6">
+              {!isCollapsed && (
+                <div className="mb-2 px-8 animate-fade-in-up">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    System Management
+                  </p>
+                </div>
               )}
-              {systemMenus.map((menu) => (
-                <MenuItemComponent
-                  key={menu.menu_code}
-                  menu={menu}
-                  isCollapsed={isCollapsed}
-                />
-              ))}
-            </>
+              {isCollapsed && <div className="my-4 h-px bg-gray-100 mx-4" />}
+
+              <div className="space-y-1">
+                {systemMenus.map((menu) => (
+                  <MenuItemComponent
+                    key={menu.menu_code}
+                    menu={menu}
+                    isCollapsed={isCollapsed}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </nav>
 
@@ -220,7 +232,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               "flex items-center",
               isCollapsed ? "justify-center pt-2" : "gap-3 pt-2"
             )}>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center text-sm font-bold text-indigo-600 border-2 border-white shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center text-sm font-black text-primary border-2 border-white shadow-sm ring-4 ring-primary/5">
                 {user.name.substring(0, 1).toUpperCase()}
               </div>
               {!isCollapsed && (
@@ -247,10 +259,24 @@ interface MenuItemComponentProps {
 const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu, level = 0, isCollapsed }) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const hasChildren = menu.children && menu.children.length > 0;
 
-  // TODO: 현재 활성화된 메뉴를 확인하여 active 상태 설정
-  const active = false;
+  // 현재 활성화된 메뉴 확인 (URL 일치 여부)
+  const active = menu.menu_url ? location.pathname === menu.menu_url : false;
+
+  // 하위 메뉴 중 하나라도 활성 상태인지 확인
+  const isChildActive = React.useMemo(() => {
+    if (!hasChildren) return false;
+    return menu.children.some(child => child.menu_url && location.pathname === child.menu_url);
+  }, [menu.children, location.pathname, hasChildren]);
+
+  // 활성 상태가 변경될 때 하위 메뉴가 있으면 확장
+  React.useEffect(() => {
+    if (isChildActive && !isCollapsed) {
+      setIsExpanded(true);
+    }
+  }, [isChildActive, isCollapsed]);
 
   const handleClick = () => {
     if (hasChildren && !isCollapsed) {
@@ -260,57 +286,78 @@ const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu, level = 0, 
     }
   };
 
-  // 사이드바가 접히면 하위 메뉴는 자동으로 닫힘 (선택적 UX)
-  // 여기서는 isCollapsed가 true가 되면 렌더링에서 숨겨지므로 state는 유지해도 됨.
+  const isLevel0 = level === 0;
 
   return (
     <div className="relative">
       <button
         onClick={handleClick}
         className={cn(
-          'w-full flex items-center rounded-xl transition-all duration-200 group relative',
-          'min-h-[44px]', // 터치 타겟 확보
-          isCollapsed
-            ? 'justify-center px-0 py-3'
-            : 'px-4 py-3 gap-3',
-          active
-            ? 'bg-indigo-50 text-indigo-600'
-            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
-          !isCollapsed && level > 0 && 'pl-11' // 계층 구조 들여쓰기
+          'w-full flex items-center transition-all duration-200 group relative',
+          isCollapsed ? 'justify-center px-0 py-3 rounded-xl' : '',
+          !isCollapsed && isLevel0 ? 'px-4 py-3 gap-3 rounded-xl' : '',
+          !isCollapsed && !isLevel0 ? 'pl-12 pr-4 py-2.5 rounded-lg' : '', // 2Depth Indentation
+
+          // Active & Hover States
+          (active || (isLevel0 && isChildActive))
+            ? isLevel0
+              ? 'bg-primary/5 text-primary font-bold shadow-sm shadow-primary/5' // 1Depth Active
+              : 'text-primary font-semibold bg-primary/5' // 2Depth Active
+            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50', // Default
+
+          !isLevel0 && !active && 'text-gray-500 font-medium text-[13px]' // 2Depth default style
         )}
         title={isCollapsed ? menu.menu_name : undefined}
       >
-        <span
-          className={cn(
-            'transition-transform duration-200 flex-shrink-0',
-            active ? 'scale-100' : 'group-hover:scale-110'
-          )}
-        >
-          {getMenuIcon(menu.menu_code)}
-        </span>
+        {/* 1Depth Icon Area */}
+        {isLevel0 && (
+          <span
+            className={cn(
+              'transition-transform duration-200 flex-shrink-0',
+              (active || isChildActive) ? 'scale-100' : 'group-hover:scale-110'
+            )}
+          >
+            {getMenuIcon(menu.menu_code)}
+          </span>
+        )}
+
+        {/* Active Indicator (Left Bar) - Only for 1Depth or when collapsed */}
+        {(active || (isLevel0 && isChildActive)) && (
+          <motion.div
+            layoutId={`active-indicator-${level}`}
+            className={cn(
+              "absolute bg-primary rounded-full",
+              isCollapsed
+                ? "right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5"
+                : isLevel0
+                  ? "left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-lg" // 1Depth Bar
+                  : "left-8 top-1/2 -translate-y-1/2 w-1 h-4 rounded-r-lg opacity-0" // 2Depth (Hidden or subtle)
+            )}
+          />
+        )}
 
         {!isCollapsed && (
           <>
-            <span className="flex-1 text-left text-sm font-medium truncate">
+            <span className={cn(
+              "flex-1 text-left truncate",
+              isLevel0 ? "text-sm" : "text-[13px]"
+            )}>
               {menu.menu_name}
             </span>
             {hasChildren && (
               <ChevronRight
-                size={16}
+                size={14} // Reduced size
                 className={cn(
-                  'transition-transform duration-200 text-gray-400',
+                  'transition-transform duration-200 text-gray-400', // Subtle color
                   isExpanded && 'rotate-90'
                 )}
               />
             )}
           </>
         )}
-
-        {/* Collapsed 상태일 때 Hover 시 툴팁처럼 이름 표시 (우측으로 띄우기) - Option */}
-        {/* 브라우저 기본 title 속성을 사용했으므로 커스텀 툴팁은 생략하거나 추가 가능 */}
       </button>
 
-      {/* 하위 메뉴 (framer-motion 적용) */}
+      {/* 하위 메뉴 (framer-motion applied) */}
       <AnimatePresence>
         {hasChildren && isExpanded && !isCollapsed && (
           <motion.div
@@ -320,7 +367,8 @@ const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu, level = 0, 
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="mt-1 space-y-1">
+            <div className="mt-1 space-y-0.5 relative">
+              {/* Optional: Add a vertical line for hierarchy guide if needed, keeping it simple for now */}
               {menu.children.map((child) => (
                 <MenuItemComponent
                   key={child.menu_code}

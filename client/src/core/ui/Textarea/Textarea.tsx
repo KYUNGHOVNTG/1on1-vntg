@@ -21,8 +21,8 @@ export const Textarea: React.FC<TextareaProps> = ({
           className={cn(
             'w-full p-3 bg-white border border-gray-200 rounded-xl text-sm transition-all duration-200 outline-none',
             'placeholder:text-gray-400',
-            'focus:border-[#5B5FED] focus:ring-1 focus:ring-[#5B5FED]',
-            'group-hover:border-gray-300 focus:group-hover:border-[#5B5FED]',
+            'focus:border-primary focus:ring-1 focus:ring-primary',
+            'group-hover:border-gray-300 focus:group-hover:border-primary',
             'resize-none'
           )}
           {...props}

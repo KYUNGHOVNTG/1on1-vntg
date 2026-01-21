@@ -227,41 +227,52 @@ export const CodeManagementPage: React.FC = () => {
         const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
         if (targetIndex < 0 || targetIndex >= details.length) return;
 
-        const targetDetail = details[targetIndex];
+        const currentItem = details[currentIndex];
+        const targetItem = details[targetIndex];
 
-        // Swap sort_seq
+        // 정렬 순서값 교환
+        const currentSeq = currentItem.sort_seq || 0;
+        const targetSeq = targetItem.sort_seq || 0;
+
+        // 같은 정렬 순서일 경우 자동으로 조정
+        let finalCurrentSeq = targetSeq;
+        let finalTargetSeq = currentSeq;
+
+        if (currentSeq === targetSeq) {
+            if (direction === 'up') {
+                finalCurrentSeq = Math.max(0, currentSeq - 1);
+                finalTargetSeq = currentSeq;
+            } else {
+                finalCurrentSeq = currentSeq + 1;
+                finalTargetSeq = currentSeq;
+            }
+        }
+
         // Optimistic update
         const newDetails = [...details];
-        const tempSeq = newDetails[currentIndex].sort_seq;
-        newDetails[currentIndex].sort_seq = newDetails[targetIndex].sort_seq;
-        newDetails[targetIndex].sort_seq = tempSeq;
+        const newCurrentItem = { ...currentItem, sort_seq: finalCurrentSeq };
+        const newTargetItem = { ...targetItem, sort_seq: finalTargetSeq };
 
-        // Swap positions in array to reflect visual change immediately (though sort_seq helps)
-        newDetails[currentIndex] = { ...newDetails[currentIndex] }; // clone
-        newDetails[targetIndex] = { ...targetDetail }; // clone
-
-        // Sort by seq again to be sure? No, just swap in array is enough for now if we rely on array order.
-        // But backend relies on sort_seq.
-        // Let's swap the array items
-        [newDetails[currentIndex], newDetails[targetIndex]] = [newDetails[targetIndex], newDetails[currentIndex]];
+        // 배열 위치 교환 및 값 업데이트
+        newDetails[currentIndex] = newTargetItem;
+        newDetails[targetIndex] = newCurrentItem;
 
         setDetails(newDetails);
 
         try {
-            // Update both items
+            // 서버 업데이트
             await Promise.all([
-                updateCodeDetail(selectedMaster, detail.code, { sort_seq: targetDetail.sort_seq }),
-                updateCodeDetail(selectedMaster, targetDetail.code, { sort_seq: detail.sort_seq })
+                updateCodeDetail(selectedMaster, currentItem.code, { sort_seq: finalCurrentSeq }),
+                updateCodeDetail(selectedMaster, targetItem.code, { sort_seq: finalTargetSeq })
             ]);
 
-            // Ideally reload to be safe, but optimistic is better for UI.
-            // Maybe silently reload
-            fetchCodeDetails(selectedMaster).then(setDetails);
-
+            // 정렬 순서대로 다시 로드하여 일관성 유지
+            const refreshedData = await fetchCodeDetails(selectedMaster);
+            setDetails(refreshedData);
         } catch (err) {
             console.error('Failed to sort details:', err);
             toast.error('정렬 순서 변경에 실패했습니다.');
-            // Revert on error
+            // 실패 시 원복
             const originData = await fetchCodeDetails(selectedMaster);
             setDetails(originData);
         }

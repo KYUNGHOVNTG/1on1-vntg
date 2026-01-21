@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { Button, Input, Select, Textarea } from '@/core/ui';
 import type { CodeDetail, CodeDetailCreateRequest } from '../types';
 
 interface CodeDetailDialogProps {
@@ -47,7 +48,7 @@ export const CodeDetailDialog: React.FC<CodeDetailDialogProps> = ({
                     code: '',
                     code_name: '',
                     use_yn: 'Y',
-                    sort_seq: 1, // Default could be max + 1, but handled by user for now
+                    sort_seq: 1,
                     rmk: '',
                 });
             }
@@ -82,93 +83,66 @@ export const CodeDetailDialog: React.FC<CodeDetailDialogProps> = ({
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                            코드 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            required
-                            disabled={mode === 'edit'}
-                            value={formData.code}
-                            onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                            className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none ${mode === 'edit' ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200' : 'bg-white border-gray-200 hover:border-indigo-300'
-                                }`}
-                            placeholder="예: ROLE_HR, CD001"
-                        />
-                        {mode === 'edit' && <p className="text-xs text-gray-400 mt-1.5 ml-1">코드는 수정할 수 없습니다.</p>}
-                    </div>
+                    <Input
+                        label="코드"
+                        required
+                        disabled={mode === 'edit'}
+                        value={formData.code}
+                        onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                        placeholder="예: ROLE_HR, CD001"
+                        helperText={mode === 'edit' ? "코드는 수정할 수 없습니다." : undefined}
+                    />
 
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                            코드명 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            required
-                            value={formData.code_name}
-                            onChange={(e) => setFormData(prev => ({ ...prev, code_name: e.target.value }))}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none hover:border-indigo-300"
-                            placeholder="예: 인사담당자, 팀장"
-                        />
-                    </div>
+                    <Input
+                        label="코드명"
+                        required
+                        value={formData.code_name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, code_name: e.target.value }))}
+                        placeholder="예: 인사담당자, 팀장"
+                    />
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                사용여부
-                            </label>
-                            <select
-                                value={formData.use_yn}
-                                onChange={(e) => setFormData(prev => ({ ...prev, use_yn: e.target.value }))}
-                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none hover:border-indigo-300 bg-white"
-                            >
-                                <option value="Y">사용</option>
-                                <option value="N">미사용</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                정렬순서
-                            </label>
-                            <input
-                                type="number"
-                                required
-                                min={1}
-                                value={formData.sort_seq}
-                                onChange={(e) => setFormData(prev => ({ ...prev, sort_seq: parseInt(e.target.value) || 0 }))}
-                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none hover:border-indigo-300"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                            비고
-                        </label>
-                        <textarea
-                            value={formData.rmk}
-                            onChange={(e) => setFormData(prev => ({ ...prev, rmk: e.target.value }))}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all min-h-[100px] outline-none hover:border-indigo-300 resize-none"
-                            placeholder="설명을 입력하세요"
+                        <Select
+                            label="사용여부"
+                            value={formData.use_yn}
+                            onChange={(val) => setFormData(prev => ({ ...prev, use_yn: val }))}
+                            options={[
+                                { label: '사용', value: 'Y' },
+                                { label: '미사용', value: 'N' },
+                            ]}
+                        />
+                        <Input
+                            label="정렬순서"
+                            type="number"
+                            required
+                            min={1}
+                            value={formData.sort_seq}
+                            onChange={(e) => setFormData(prev => ({ ...prev, sort_seq: parseInt(e.target.value) || 0 }))}
                         />
                     </div>
 
+                    <Textarea
+                        label="비고"
+                        value={formData.rmk}
+                        onChange={(e) => setFormData(prev => ({ ...prev, rmk: e.target.value }))}
+                        placeholder="설명을 입력하세요"
+                        rows={3}
+                    />
+
                     <div className="flex justify-end gap-3 mt-8 pt-2">
-                        <button
+                        <Button
                             type="button"
+                            variant="outline"
                             onClick={onClose}
-                            className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-all"
                         >
                             취소
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
-                            disabled={isSubmitting}
-                            className="px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+                            isLoading={isSubmitting}
                         >
-                            {isSubmitting ? '저장 중...' : '저장하기'}
-                        </button>
+                            저장하기
+                        </Button>
                     </div>
                 </form>
             </div>

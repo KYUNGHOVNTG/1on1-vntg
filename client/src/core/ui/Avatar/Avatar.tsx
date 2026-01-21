@@ -32,7 +32,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           className="w-full h-full object-cover"
         />
       ) : (
-        <div className="w-full h-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
+        <div className="w-full h-full bg-primary/5 text-primary flex items-center justify-center font-bold">
           {initials || '?'}
         </div>
       )}

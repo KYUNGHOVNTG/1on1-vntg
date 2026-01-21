@@ -308,11 +308,18 @@ client/src/
 모든 UI는 이 디자인 시스템을 엄격히 준수해야 합니다.
 
 #### 색상
-- Primary: `#5B5FED` / Hover: `#4f53d1` / Light: `bg-indigo-50`
+- Point Colors:
+  - Primary: `#4950DC` (메인 포인트)
+  - Secondary: `#2E81B1` (서브 포인트)
+  - Accent/Success: `#14B287` (강조/성공)
+- Hover Colors:
+  - Primary Hover: `#3840C5`
+  - Secondary Hover: `#256991`
+  - Accent Hover: `#108E6C`
 - Background: `bg-white` / Surface: `bg-[#F9FAFB]`
 - Border: `border-gray-200` / Divider: `bg-gray-100`
 - Text: `text-gray-900` (main) / `text-gray-500` (sub)
-- Status: `emerald-600` (success) / `orange-600` (warning) / `red-600` (error)
+- Status: `14B287` (success) / `orange-600` (warning) / `red-600` (error)
 
 #### 타이포그래피
 - Font: `'Noto Sans KR'` (전체 기본)
@@ -326,9 +333,9 @@ client/src/
 - Shadow: 기본(shadow-sm) / Hover(shadow-md) / Primary 버튼(shadow-lg shadow-indigo-100)
 
 #### 컴포넌트 필수 클래스
-**Button Primary:** `px-5 py-2.5 bg-[#5B5FED] hover:bg-[#4f53d1] text-white rounded-xl text-sm font-semibold shadow-sm transition-all`
+**Button Primary:** `px-5 py-2.5 bg-[#4950DC] hover:bg-[#3840C5] text-white rounded-xl text-sm font-semibold shadow-sm transition-all`
 **Button Secondary:** `px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-medium transition-all`
-**Input:** `h-10 px-3 border border-gray-200 rounded-xl text-sm focus:border-[#5B5FED] focus:ring-1 focus:ring-[#5B5FED] outline-none transition-all`
+**Input:** `h-10 px-3 border border-gray-200 rounded-xl text-sm focus:border-[#4950DC] focus:ring-1 focus:ring-[#4950DC] outline-none transition-all`
 **Card:** `bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow`
 **Badge Success:** `px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100`
 

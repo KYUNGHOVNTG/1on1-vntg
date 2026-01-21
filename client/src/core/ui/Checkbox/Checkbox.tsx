@@ -15,8 +15,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         className={cn(
           'w-5 h-5 rounded-md border flex items-center justify-center transition-all',
           checked
-            ? 'bg-[#5B5FED] border-[#5B5FED]'
-            : 'bg-white border-gray-300 group-hover:border-[#5B5FED]'
+            ? 'bg-primary border-primary'
+            : 'bg-white border-gray-300 group-hover:border-primary'
         )}
       >
         {checked && <Check size={14} className="text-white" />}

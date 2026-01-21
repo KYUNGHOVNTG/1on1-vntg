@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn';
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   value,
   label,
-  color = 'bg-[#5B5FED]',
+  color = 'bg-primary',
   className,
   ...props
 }) => {
@@ -16,7 +16,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       {label && (
         <div className="flex justify-between text-xs font-medium">
           <span className="text-gray-700">{label}</span>
-          <span className="text-[#5B5FED]">{clampedValue}%</span>
+          <span className="text-primary">{clampedValue}%</span>
         </div>
       )}
       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Loader2 } from 'lucide-react';
 import type { ButtonProps } from './Button.types';
 import { cn } from '../../utils/cn';
 
@@ -6,6 +7,7 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
   icon,
+  isLoading,
   className,
   children,
   disabled,
@@ -14,9 +16,10 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyles = 'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all';
 
   const variantStyles = {
-    primary: 'bg-[#5B5FED] hover:bg-[#4f53d1] text-white shadow-sm',
+    primary: 'bg-primary hover:bg-primary-hover text-white shadow-sm',
     secondary: 'bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700',
-    ghost: 'bg-transparent hover:bg-gray-50 text-[#5B5FED]',
+    outline: 'bg-white border border-current hover:bg-gray-50',
+    ghost: 'bg-transparent hover:bg-gray-50 text-primary',
   };
 
   const sizeStyles = {
@@ -36,10 +39,10 @@ export const Button: React.FC<ButtonProps> = ({
         disabledStyles,
         className
       )}
-      disabled={disabled}
+      disabled={disabled || isLoading}
       {...props}
     >
-      {icon && <span>{icon}</span>}
+      {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : (icon && <span>{icon}</span>)}
       {children}
     </button>
   );

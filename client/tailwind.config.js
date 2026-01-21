@@ -14,8 +14,16 @@ export default {
       },
       colors: {
         primary: {
-          DEFAULT: '#5B5FED',
-          hover: '#4f53d1',
+          DEFAULT: '#4950DC',
+          hover: '#3840C5',
+        },
+        secondary: {
+          DEFAULT: '#2E81B1',
+          hover: '#256991',
+        },
+        accent: {
+          DEFAULT: '#14B287',
+          hover: '#108E6C',
         },
         surface: '#F9FAFB',
         border: '#E5E7EB',
@@ -24,7 +32,7 @@ export default {
           sub: '#6B7280',
         },
         success: {
-          DEFAULT: '#059669', // emerald-600
+          DEFAULT: '#14B287', // Using accent for success consistency
         },
         warning: {
           DEFAULT: '#ea580c', // orange-600
