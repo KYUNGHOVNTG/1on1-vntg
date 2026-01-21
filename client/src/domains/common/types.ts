@@ -9,6 +9,17 @@ export interface CodeMaster {
     up_date?: string;
 }
 
+export interface CodeMasterCreateRequest {
+    code_type: string;
+    code_type_name: string;
+    rmk?: string;
+}
+
+export interface CodeMasterUpdateRequest {
+    code_type_name?: string;
+    rmk?: string;
+}
+
 export interface CodeDetail {
     code_type: string;
     code: string;

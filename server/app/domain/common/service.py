@@ -97,3 +97,60 @@ class CommonCodeService:
         
         result = await self.db.execute(stmt)
         return result.scalars().all()
+
+    async def create_master(self, full_data) -> object:
+        """
+        공통코드 마스터를 생성합니다.
+        """
+        from server.app.domain.common.models import CodeMaster
+        
+        # Check duplication
+        stmt = select(CodeMaster).where(CodeMaster.code_type == full_data.code_type)
+        result = await self.db.execute(stmt)
+        if result.scalar_one_or_none():
+            raise ValueError(f"Code Type '{full_data.code_type}' already exists.")
+
+        new_master = CodeMaster(**full_data.model_dump())
+        self.db.add(new_master)
+        await self.db.commit()
+        await self.db.refresh(new_master)
+        return new_master
+
+    async def update_master(self, code_type: str, update_data) -> Optional[object]:
+        """
+        공통코드 마스터를 수정합니다.
+        """
+        from server.app.domain.common.models import CodeMaster
+
+        stmt = select(CodeMaster).where(CodeMaster.code_type == code_type)
+        result = await self.db.execute(stmt)
+        master = result.scalar_one_or_none()
+        
+        if not master:
+            return None
+
+        # Update fields
+        update_dict = update_data.model_dump(exclude_unset=True)
+        for key, value in update_dict.items():
+            setattr(master, key, value)
+
+        await self.db.commit()
+        await self.db.refresh(master)
+        return master
+
+    async def delete_master(self, code_type: str) -> bool:
+        """
+        공통코드 마스터를 삭제합니다.
+        """
+        from server.app.domain.common.models import CodeMaster
+
+        stmt = select(CodeMaster).where(CodeMaster.code_type == code_type)
+        result = await self.db.execute(stmt)
+        master = result.scalar_one_or_none()
+        
+        if not master:
+            return False
+
+        await self.db.delete(master)
+        await self.db.commit()
+        return True

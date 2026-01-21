@@ -3,7 +3,8 @@ import { AlertCircle, Database, Sparkles } from 'lucide-react';
 import { Breadcrumb } from '@/core/ui';
 import { CodeMasterList } from '../components/CodeMasterList';
 import { CodeDetailList } from '../components/CodeDetailList';
-import { fetchCodeMasters, fetchCodeDetails } from '../api';
+import { CodeMasterDialog } from '../components/CodeMasterDialog';
+import { fetchCodeMasters, fetchCodeDetails, createCodeMaster, updateCodeMaster, deleteCodeMaster } from '../api';
 import type { CodeMaster, CodeDetail } from '../types';
 
 export const CodeManagementPage: React.FC = () => {
@@ -14,27 +15,34 @@ export const CodeManagementPage: React.FC = () => {
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Dialog State
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
+    const [editingMaster, setEditingMaster] = useState<CodeMaster | null>(null);
+
     // 마스터 목록 조회
+    const loadMasters = async () => {
+        try {
+            setLoadingMasters(true);
+            const data = await fetchCodeMasters();
+            setMasters(data);
+            return data;
+        } catch (err) {
+            console.error('Failed to fetch code masters:', err);
+            setError('마스터 코드 목록을 불러오는데 실패했습니다.');
+            return [];
+        } finally {
+            setLoadingMasters(false);
+        }
+    };
+
     useEffect(() => {
-        const loadMasters = async () => {
-            try {
-                setLoadingMasters(true);
-                const data = await fetchCodeMasters();
-                setMasters(data);
-
-                // 첫 번째 항목 자동 선택
-                if (data.length > 0) {
-                    setSelectedMaster(data[0].code_type);
-                }
-            } catch (err) {
-                console.error('Failed to fetch code masters:', err);
-                setError('마스터 코드 목록을 불러오는데 실패했습니다.');
-            } finally {
-                setLoadingMasters(false);
+        loadMasters().then((data) => {
+            // 첫 번째 항목 자동 선택 (초기 로드 시에만)
+            if (data.length > 0 && !selectedMaster) {
+                setSelectedMaster(data[0].code_type);
             }
-        };
-
-        loadMasters();
+        });
     }, []);
 
     // 상세 목록 조회 (마스터 변경 시)
@@ -51,7 +59,6 @@ export const CodeManagementPage: React.FC = () => {
                 setDetails(data);
             } catch (err) {
                 console.error('Failed to fetch code details:', err);
-                // 상세 조회 실패는 전체 에러로 처리하지 않음 (해당 섹션만 비움)
                 setDetails([]);
             } finally {
                 setLoadingDetails(false);
@@ -63,6 +70,50 @@ export const CodeManagementPage: React.FC = () => {
 
     const handleMasterSelect = (codeType: string) => {
         setSelectedMaster(codeType);
+    };
+
+    // CRUD Handlers
+    const handleAddMaster = () => {
+        setDialogMode('create');
+        setEditingMaster(null);
+        setIsDialogOpen(true);
+    };
+
+    const handleEditMaster = (master: CodeMaster) => {
+        setDialogMode('edit');
+        setEditingMaster(master);
+        setIsDialogOpen(true);
+    };
+
+    const handleDeleteMaster = async (master: CodeMaster) => {
+        try {
+            await deleteCodeMaster(master.code_type);
+            const newMasters = await loadMasters();
+            if (selectedMaster === master.code_type) {
+                setSelectedMaster(newMasters.length > 0 ? newMasters[0].code_type : null);
+            }
+        } catch (err) {
+            console.error('Failed to delete master:', err);
+            alert('삭제 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleSaveMaster = async (data: { code_type: string; code_type_name: string; rmk?: string }) => {
+        try {
+            if (dialogMode === 'create') {
+                await createCodeMaster(data);
+            } else {
+                await updateCodeMaster(data.code_type, {
+                    code_type_name: data.code_type_name,
+                    rmk: data.rmk
+                });
+            }
+            await loadMasters();
+        } catch (err) {
+            console.error('Failed to save master:', err);
+            alert('저장 중 오류가 발생했습니다.');
+            throw err; // Re-throw to keep dialog open or handle in dialog
+        }
     };
 
     if (error) {
@@ -116,6 +167,9 @@ export const CodeManagementPage: React.FC = () => {
                             masters={masters}
                             selectedCodeType={selectedMaster}
                             onSelect={handleMasterSelect}
+                            onAdd={handleAddMaster}
+                            onEdit={handleEditMaster}
+                            onDelete={handleDeleteMaster}
                         />
                     )}
                 </div>
@@ -144,6 +198,14 @@ export const CodeManagementPage: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            <CodeMasterDialog
+                isOpen={isDialogOpen}
+                mode={dialogMode}
+                initialData={editingMaster}
+                onClose={() => setIsDialogOpen(false)}
+                onSave={handleSaveMaster}
+            />
 
             {/* Animation Styles */}
             <style>{`

@@ -11,6 +11,18 @@ class CodeMasterBase(BaseModel):
     rmk: Optional[str] = Field(None, description="비고")
 
 
+class CodeMasterCreate(BaseModel):
+    code_type: str = Field(..., description="코드 타입")
+    code_type_name: str = Field(..., description="코드 타입명")
+    code_len: int = Field(0, description="코드 길이")
+    rmk: Optional[str] = Field(None, description="비고")
+
+
+class CodeMasterUpdate(BaseModel):
+    code_type_name: Optional[str] = Field(None, description="코드 타입명")
+    rmk: Optional[str] = Field(None, description="비고")
+
+
 class CodeMasterResponse(CodeMasterBase):
     in_user: Optional[str] = Field(None, description="등록자")
     in_date: datetime = Field(..., description="등록일시")
