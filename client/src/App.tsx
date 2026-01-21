@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { Toaster } from 'sonner';
 
 import { LoadingOverlay } from './core/loading';
 import { LoginPage } from './domains/auth';
@@ -57,6 +58,7 @@ function App() {
       {/* 라우팅: 로그인 vs 인증된 레이아웃 */}
       {isAuthenticated ? (
         <MainLayout onLogout={handleLogout}>
+          <Toaster richColors position="top-center" />
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/system/codes" element={<CodeManagementPage />} />

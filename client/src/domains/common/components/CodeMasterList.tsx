@@ -67,7 +67,7 @@ export const CodeMasterList: React.FC<CodeMasterListProps> = ({
                                     </td>
                                     <td className="px-4 py-3 text-gray-700">{master.code_type_name}</td>
                                     <td className="px-4 py-3 text-right">
-                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex justify-end gap-1 transition-opacity">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -81,9 +81,7 @@ export const CodeMasterList: React.FC<CodeMasterListProps> = ({
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (confirm(`'${master.code_type_name}' 마스터 코드를 삭제하시겠습니까?`)) {
-                                                        onDelete(master);
-                                                    }
+                                                    onDelete(master);
                                                 }}
                                                 className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-md transition-all"
                                                 title="삭제"

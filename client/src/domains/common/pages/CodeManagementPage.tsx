@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { AlertCircle, Database, Sparkles } from 'lucide-react';
-import { Breadcrumb } from '@/core/ui';
+import { Breadcrumb, ConfirmModal } from '@/core/ui';
 import { CodeMasterList } from '../components/CodeMasterList';
 import { CodeDetailList } from '../components/CodeDetailList';
 import { CodeMasterDialog } from '../components/CodeMasterDialog';
@@ -19,6 +20,10 @@ export const CodeManagementPage: React.FC = () => {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
     const [editingMaster, setEditingMaster] = useState<CodeMaster | null>(null);
+
+    // Delete Confirmation State
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [masterToDelete, setMasterToDelete] = useState<CodeMaster | null>(null);
 
     // 마스터 목록 조회
     const loadMasters = async () => {
@@ -85,16 +90,28 @@ export const CodeManagementPage: React.FC = () => {
         setIsDialogOpen(true);
     };
 
-    const handleDeleteMaster = async (master: CodeMaster) => {
+    const handleDeleteMaster = (master: CodeMaster) => {
+        setMasterToDelete(master);
+        setDeleteConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!masterToDelete) return;
+
         try {
-            await deleteCodeMaster(master.code_type);
+            await deleteCodeMaster(masterToDelete.code_type);
+            toast.success('마스터 코드가 삭제되었습니다.');
+
             const newMasters = await loadMasters();
-            if (selectedMaster === master.code_type) {
+            if (selectedMaster === masterToDelete.code_type) {
                 setSelectedMaster(newMasters.length > 0 ? newMasters[0].code_type : null);
             }
         } catch (err) {
             console.error('Failed to delete master:', err);
-            alert('삭제 중 오류가 발생했습니다.');
+            toast.error('삭제 중 오류가 발생했습니다.');
+        } finally {
+            setDeleteConfirmOpen(false);
+            setMasterToDelete(null);
         }
     };
 
@@ -102,16 +119,18 @@ export const CodeManagementPage: React.FC = () => {
         try {
             if (dialogMode === 'create') {
                 await createCodeMaster(data);
+                toast.success('마스터 코드가 등록되었습니다.');
             } else {
                 await updateCodeMaster(data.code_type, {
                     code_type_name: data.code_type_name,
                     rmk: data.rmk
                 });
+                toast.success('마스터 코드가 수정되었습니다.');
             }
             await loadMasters();
         } catch (err) {
             console.error('Failed to save master:', err);
-            alert('저장 중 오류가 발생했습니다.');
+            toast.error('저장 중 오류가 발생했습니다.');
             throw err; // Re-throw to keep dialog open or handle in dialog
         }
     };
@@ -207,7 +226,20 @@ export const CodeManagementPage: React.FC = () => {
                 onSave={handleSaveMaster}
             />
 
-            {/* Animation Styles */}
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={deleteConfirmOpen}
+                onClose={() => {
+                    setDeleteConfirmOpen(false);
+                    setMasterToDelete(null);
+                }}
+                onConfirm={handleConfirmDelete}
+                title="마스터 코드 삭제"
+                message={`'${masterToDelete?.code_type_name}' (${masterToDelete?.code_type}) 코드를 정말 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.`}
+                confirmText="삭제하기"
+                isDangerous
+            />
+
             <style>{`
         @keyframes fade-in-up {
           from { opacity: 0; transform: translateY(10px); }
@@ -217,6 +249,8 @@ export const CodeManagementPage: React.FC = () => {
           animation: fade-in-up 0.4s ease-out forwards;
         }
       `}</style>
+
+
         </div>
     );
 };

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { CodeMaster } from '../types';
 
@@ -64,21 +65,21 @@ export const CodeMasterDialog: React.FC<CodeMasterDialogProps> = ({
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all scale-100">
-                <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50/50">
+    return createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 border border-gray-100">
+                <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/80">
                     <h3 className="text-lg font-bold text-gray-900">
                         {mode === 'create' ? '공통코드 마스터 등록' : '공통코드 마스터 수정'}
                     </h3>
-                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors">
+                    <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200/50 transition-colors">
                         <X size={20} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-6 space-y-5">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                             코드 타입 <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -87,15 +88,15 @@ export const CodeMasterDialog: React.FC<CodeMasterDialogProps> = ({
                             disabled={mode === 'edit'}
                             value={formData.code_type}
                             onChange={(e) => setFormData(prev => ({ ...prev, code_type: e.target.value.toUpperCase() }))}
-                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${mode === 'edit' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white border-gray-300'
+                            className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none ${mode === 'edit' ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200' : 'bg-white border-gray-200 hover:border-indigo-300'
                                 }`}
                             placeholder="예: ROLE, POSITION"
                         />
-                        {mode === 'edit' && <p className="text-xs text-gray-400 mt-1">코드 타입은 수정할 수 없습니다.</p>}
+                        {mode === 'edit' && <p className="text-xs text-gray-400 mt-1.5 ml-1">코드 타입은 수정할 수 없습니다.</p>}
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                             코드 타입명 <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -103,41 +104,42 @@ export const CodeMasterDialog: React.FC<CodeMasterDialogProps> = ({
                             required
                             value={formData.code_type_name}
                             onChange={(e) => setFormData(prev => ({ ...prev, code_type_name: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none hover:border-indigo-300"
                             placeholder="예: 역할, 직급"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                             비고
                         </label>
                         <textarea
                             value={formData.rmk}
                             onChange={(e) => setFormData(prev => ({ ...prev, rmk: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all min-h-[80px]"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all min-h-[100px] outline-none hover:border-indigo-300 resize-none"
                             placeholder="설명을 입력하세요"
                         />
                     </div>
 
-                    <div className="flex justify-end gap-2 mt-6 pt-2">
+                    <div className="flex justify-end gap-3 mt-8 pt-2">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                            className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-all"
                         >
                             취소
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                            className="px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
                         >
-                            {isSubmitting ? '저장 중...' : '저장'}
+                            {isSubmitting ? '저장 중...' : '저장하기'}
                         </button>
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

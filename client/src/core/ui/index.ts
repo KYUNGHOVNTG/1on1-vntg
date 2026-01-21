@@ -39,4 +39,5 @@ export { Breadcrumb } from './Breadcrumb';
 export type { BreadcrumbItem } from './Breadcrumb';
 
 // Legacy components (for backward compatibility)
-export { Modal } from './Modal';
+// Modal & Feedback
+export * from './Modal/index';
