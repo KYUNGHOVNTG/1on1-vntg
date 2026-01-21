@@ -35,5 +35,8 @@ export type { CheckboxProps } from './Checkbox';
 export { Toggle } from './Toggle';
 export type { ToggleProps } from './Toggle';
 
+export { Breadcrumb } from './Breadcrumb';
+export type { BreadcrumbItem } from './Breadcrumb';
+
 // Legacy components (for backward compatibility)
 export { Modal } from './Modal';
