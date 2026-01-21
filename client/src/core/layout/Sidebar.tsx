@@ -305,7 +305,7 @@ const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu, level = 0, 
               : 'text-primary font-semibold bg-primary/5' // 2Depth Active
             : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50', // Default
 
-          !isLevel0 && !active && 'text-gray-500 font-medium text-[13px]' // 2Depth default style
+          !isLevel0 && !active && 'text-gray-500 font-medium text-sm' // 2Depth default style
         )}
         title={isCollapsed ? menu.menu_name : undefined}
       >
@@ -340,7 +340,7 @@ const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu, level = 0, 
           <>
             <span className={cn(
               "flex-1 text-left truncate",
-              isLevel0 ? "text-sm" : "text-[13px]"
+              isLevel0 ? "text-sm" : "text-sm"
             )}>
               {menu.menu_name}
             </span>
