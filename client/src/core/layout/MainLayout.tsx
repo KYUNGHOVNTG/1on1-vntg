@@ -22,14 +22,17 @@ interface MainLayoutProps {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children, onLogout }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // For Mobile
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // For Desktop
 
   return (
     <div className="flex min-h-screen bg-[#F9FAFB]">
       {/* Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
+        isCollapsed={isSidebarCollapsed}
         onClose={() => setIsSidebarOpen(false)}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onLogout={onLogout}
       />
 
