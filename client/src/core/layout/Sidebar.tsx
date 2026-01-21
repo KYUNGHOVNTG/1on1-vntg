@@ -18,6 +18,7 @@ import {
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/core/utils/cn';
 import { useAuthStore } from '@/core/store/useAuthStore';
 import { useMenuStore, type MenuHierarchy } from '@/domains/menu';
@@ -152,6 +153,7 @@ interface MenuItemComponentProps {
 
 const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu, level = 0 }) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const navigate = useNavigate();
   const hasChildren = menu.children && menu.children.length > 0;
 
   // TODO: 현재 활성화된 메뉴를 확인하여 active 상태 설정
@@ -161,8 +163,7 @@ const MenuItemComponent: React.FC<MenuItemComponentProps> = ({ menu, level = 0 }
     if (hasChildren) {
       setIsExpanded(!isExpanded);
     } else if (menu.menu_url) {
-      // TODO: 라우팅 처리
-      console.log('Navigate to:', menu.menu_url);
+      navigate(menu.menu_url);
     }
   };
 

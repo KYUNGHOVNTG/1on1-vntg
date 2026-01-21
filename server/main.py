@@ -3,7 +3,7 @@ FastAPI 애플리케이션 진입점
 
 AI 데이터 분석 웹 서비스의 메인 애플리케이션입니다.
 """
-
+import logging # [수정됨] logging 모듈 추가
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -11,17 +11,46 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from rich.logging import RichHandler  # [수정됨] RichHandler 추가
 
 from server.app.core.config import settings
 from server.app.core.database import DatabaseManager
 from server.app.core.routers import router as core_router
-from server.app.core.logging import setup_logging, get_logger
+# from server.app.core.logging import setup_logging, get_logger
 from server.app.core.middleware import RequestIDMiddleware, ExternalLoggingMiddleware
 from server.app.api.v1.router import api_router
 from server.app.shared.exceptions import ApplicationException
 
-# 로거 초기화
-logger = get_logger(__name__)
+# [수정됨] 기존 rich.traceback.install 제거하고 아래 설정으로 대체
+# Rich 로깅 핸들러 전역 설정 (FastAPI 실행 전에 적용되어야 함)
+logging.basicConfig(
+    level="INFO",  # 보고 싶은 로그 레벨 (DEBUG, INFO 등)
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[
+        RichHandler(
+            rich_tracebacks=True,          # 예외 발생 시 Rich 스타일 Traceback 출력
+            tracebacks_show_locals=False,   # 로컬 변수 값 표시 (디버깅 핵심)
+            markup=True
+        )
+    ]
+)
+
+# 2. Uvicorn의 중복/못생긴 로그 제거 및 Rich 적용
+uvicorn_error = logging.getLogger("uvicorn.error")
+uvicorn_error.handlers = [
+    RichHandler(rich_tracebacks=True, tracebacks_show_locals=False, markup=True)
+]
+uvicorn_error.propagate = False  # ✅ 중복 출력 방지
+
+uvicorn_access = logging.getLogger("uvicorn.access")
+uvicorn_access.handlers = [
+    RichHandler(rich_tracebacks=True, tracebacks_show_locals=False, markup=True)
+]
+uvicorn_access.propagate = False
+
+logger = logging.getLogger("uvicorn")
+
 
 
 # ====================
@@ -43,8 +72,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         - 리소스 정리
     """
     # 시작 시 실행
-    # 로깅 초기화 (가장 먼저!)
-    setup_logging()
 
     logger.info("🚀 Starting application...")
     logger.info(f"📦 Environment: {settings.ENVIRONMENT}")

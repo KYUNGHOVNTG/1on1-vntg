@@ -1,8 +1,11 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
+
 import { LoadingOverlay } from './core/loading';
 import { LoginPage } from './domains/auth';
 import { logout as logoutAPI } from './domains/auth/api';
 import { DashboardPage } from './domains/dashboard';
+import { CodeManagementPage } from './domains/common';
 import { MainLayout } from './core/layout';
 import { useAuthStore } from './core/store/useAuthStore';
 
@@ -47,19 +50,23 @@ function App() {
   };
 
   return (
-    <>
+    <Router>
       {/* 전역 로딩 오버레이 */}
       <LoadingOverlay />
 
-      {/* 라우팅: 로그인 vs 대시보드 */}
+      {/* 라우팅: 로그인 vs 인증된 레이아웃 */}
       {isAuthenticated ? (
         <MainLayout onLogout={handleLogout}>
-          <DashboardPage />
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/system/codes" element={<CodeManagementPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </MainLayout>
       ) : (
         <LoginPage onLoginSuccess={handleLoginSuccess} />
       )}
-    </>
+    </Router>
   );
 }
 

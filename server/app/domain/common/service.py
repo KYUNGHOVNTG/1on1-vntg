@@ -67,3 +67,33 @@ class CommonCodeService:
             str | None: 직급명 (TEAM_LEADER, MEMBER 등) 또는 None
         """
         return await self.get_code_name("POSITION", position_code)
+
+    async def get_all_masters(self) -> list[object]:
+        """
+        모든 공통코드 마스터 목록을 조회합니다.
+
+        Returns:
+            list[CodeMaster]: 마스터 코드 목록
+        """
+        from server.app.domain.common.models import CodeMaster
+
+        stmt = select(CodeMaster).order_by(CodeMaster.code_type)
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_details_by_master_id(self, code_type: str) -> list[object]:
+        """
+        특정 마스터 코드에 속한 상세 코드 목록을 조회합니다.
+
+        Args:
+            code_type: 마스터 코드 타입
+
+        Returns:
+            list[CodeDetail]: 상세 코드 목록
+        """
+        stmt = select(CodeDetail).where(
+            CodeDetail.code_type == code_type
+        ).order_by(CodeDetail.sort_seq, CodeDetail.code)
+        
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
