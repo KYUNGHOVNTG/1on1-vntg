@@ -339,6 +339,16 @@ client/src/
 **Card:** `bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow`
 **Badge Success:** `px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100`
 
+#### 폰트 크기 가이드 (필수)
+
+- 기본 본문(Body): `text-sm (14px)` — 일반 화면 기본값
+- 사이드바 / 폼 라벨 / 버튼 텍스트: `text-sm (14px)`
+- 테이블 헤더(th): `text-sm (14px)` 또는 최소 `text-[13px]`
+- 테이블 본문(td): `text-sm (14px)`
+- 보조 정보(Caption, 메타): `text-xs (12px)` 까지만 허용
+- **text-[10px] 사용 금지** (일반 화면, 테이블, 메뉴 전부 금지)
+- 중요 정보는 크기 축소 금지, 색상/굵기로만 강조
+
 #### AI 에이전트 필수 규칙
 1. 위 정의된 색상/클래스만 사용 (커스텀 색상 금지)
 2. 인라인 스타일 절대 금지
