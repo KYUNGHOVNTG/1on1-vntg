@@ -90,6 +90,7 @@
 | **Icons** | Lucide React 0.562.0 | 일관된 아이콘 시스템 |
 | **Error Handling** | ErrorBoundary + ApiErrorHandler | 전역 에러 처리 |
 | **Loading** | LoadingOverlay + LoadingManager | 전역 로딩 상태 관리 |
+| **Notifications** | 7가지 알림 패턴 (Toast, Modal 등) | 통합 알림 시스템 |
 
 ### 인프라 & DevOps
 
@@ -149,7 +150,15 @@ ai-worker-project/
 │   │   │   ├── 📁 hooks/               # 커스텀 훅 (useApi, useDebounce)
 │   │   │   ├── 📁 layout/              # 레이아웃 (Header, Sidebar, MainLayout)
 │   │   │   ├── 📁 store/               # 전역 상태 (useAuthStore)
-│   │   │   └── 📁 ui/                  # 재사용 UI 컴포넌트 (Button, Card, Input)
+│   │   │   └── 📁 ui/                  # 재사용 UI 컴포넌트
+│   │   │       ├── InlineMessage/      # 폼 필드 유효성 메시지
+│   │   │       ├── Toast/              # 우측 하단 알림 (자동 사라짐)
+│   │   │       ├── Snackbar/           # 하단 알림 (액션 포함)
+│   │   │       ├── Modal/              # 모달 다이얼로그
+│   │   │       ├── Banner/             # 페이지 상단 공지
+│   │   │       ├── EmptyState/         # 빈 상태 표시
+│   │   │       ├── NotificationCenter/ # 알림 센터 드롭다운
+│   │   │       └── ...                 # Button, Card, Input 등
 │   │   ├── 📁 domains/                 # 🎯 도메인별 기능 (백엔드 미러링)
 │   │   │   └── sample/                 # 샘플 도메인
 │   │   │       ├── api.ts              # API 호출 함수
@@ -394,6 +403,62 @@ touch client/src/domains/payment/types.ts
 - [ ] **4단계**: `components/` - UI 컴포넌트 작성
 - [ ] **5단계**: `pages/` - 페이지 컴포넌트 작성
 - [ ] **6단계**: 라우터에 페이지 등록
+
+---
+
+## 🔔 알림/메시지 시스템
+
+프로젝트는 7가지 알림 패턴을 제공합니다. **브라우저 기본 `alert()`, `confirm()` 사용 금지**
+
+### 컴포넌트 선택 가이드
+
+| 상황 | 컴포넌트 | 사용법 |
+|------|---------|--------|
+| 입력 오류 | InlineMessage | `<InlineMessage variant="error" message="이메일 형식이 올바르지 않습니다" />` |
+| 단순 성공/실패 | Toast | `toast.success('저장되었습니다')` |
+| 취소 가능 작업 | Snackbar | `snackbar.show('삭제됨', { label: '취소', onClick: undo })` |
+| 되돌릴 수 없는 작업 | Modal | `<ConfirmModal title="삭제 확인" isDangerous />` |
+| 전역 공지 | Banner | `<Banner variant="warning" title="점검 안내" dismissible />` |
+| 조회 결과 없음 | EmptyState | `<EmptyState icon={Inbox} title="데이터가 없습니다" />` |
+| 시스템 이벤트 | NotificationCenter | `notification.info('새 메시지', '내용')` |
+
+### 빠른 시작
+
+```tsx
+// 1. App.tsx에 컨테이너 추가 (필수)
+import { ToastContainer } from '@/core/ui/Toast';
+import { SnackbarContainer } from '@/core/ui/Snackbar';
+
+function App() {
+  return (
+    <>
+      <Routes>...</Routes>
+      <ToastContainer />
+      <SnackbarContainer />
+    </>
+  );
+}
+
+// 2. 컴포넌트에서 사용
+import { toast } from '@/core/ui/Toast';
+import { snackbar } from '@/core/ui/Snackbar';
+import { notification } from '@/core/ui/NotificationCenter';
+
+// 간단한 알림
+toast.success('저장되었습니다');
+toast.error('오류가 발생했습니다');
+
+// 되돌리기 가능한 작업
+snackbar.show('삭제되었습니다', {
+  label: '취소',
+  onClick: handleUndo
+});
+
+// 알림 센터에 추가
+notification.info('새 메시지', '새로운 메시지가 도착했습니다');
+```
+
+자세한 사용법은 [.cursorrules](./.cursorrules#알림메시지-컴포넌트-시스템)를 참조하세요.
 
 ---
 
