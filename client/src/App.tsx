@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 import { LoadingOverlay } from './core/loading';
 import { LoginPage } from './domains/auth';
@@ -15,7 +15,7 @@ function App() {
   // useAuthStore에서 인증 상태 가져오기
   const { isAuthenticated, logout: logoutStore } = useAuthStore();
 
-  // 로그인 상태 확인 (URL에서 code 파라미터가 있으면 콜백 처리 중)
+  // 로그인 상태 확인 및 세션 만료 알림
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -24,7 +24,17 @@ function App() {
     const token = localStorage.getItem('access_token');
 
     console.log('🔍 App 초기화:', { isAuthenticated, hasToken: !!token, hasCode: !!code });
-  }, [isAuthenticated]);
+
+    // 세션 만료로 인한 로그아웃인 경우 알림 표시
+    const sessionExpired = sessionStorage.getItem('session_expired');
+    if (sessionExpired === 'true') {
+      toast.error('세션이 만료되어 로그아웃되었습니다. 다시 로그인해주세요.');
+      sessionStorage.removeItem('session_expired');
+
+      // Zustand store도 초기화
+      logoutStore();
+    }
+  }, [isAuthenticated, logoutStore]);
 
   // 로그인 성공 핸들러
   const handleLoginSuccess = () => {
