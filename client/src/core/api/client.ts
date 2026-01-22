@@ -54,11 +54,11 @@ class ApiClient {
           LoadingManager.show();
         }
 
-        // TODO: 인증 토큰 추가
-        // const token = localStorage.getItem('auth_token');
-        // if (token) {
-        //   config.headers.Authorization = `Bearer ${token}`;
-        // }
+        // Authorization 헤더 자동 추가
+        const token = localStorage.getItem('access_token');
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
 
         return config;
       },
@@ -83,12 +83,22 @@ class ApiClient {
         // 에러 처리
         const errorData = ApiErrorHandler.handle(error);
 
-        // 특정 상태 코드별 추가 처리
+        // 401 인증 에러 자동 처리
         if (ApiErrorHandler.isAuthError(error)) {
-          // TODO: 인증 에러 처리
-          // - 로그인 페이지로 리다이렉트
-          // - 또는 토큰 갱신 시도
-          console.warn('🔐 인증 에러:', errorData.message);
+          // localStorage에서 토큰 삭제
+          localStorage.removeItem('access_token');
+
+          // Zustand store 초기화는 App.tsx에서 처리
+          // (순환 참조 방지)
+
+          // 현재 위치가 로그인 페이지가 아니면 리다이렉트
+          if (window.location.pathname !== '/') {
+            // 세션 만료 메시지 표시를 위한 플래그 설정
+            sessionStorage.setItem('session_expired', 'true');
+
+            // 로그인 페이지로 리다이렉트
+            window.location.href = '/';
+          }
         }
 
         // 변환된 에러 데이터 반환

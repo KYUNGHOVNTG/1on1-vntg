@@ -47,7 +47,8 @@ export class ApiErrorHandler {
     const responseData = error.response?.data as any;
 
     // 서버에서 제공한 에러 메시지가 있으면 우선 사용
-    let message = responseData?.error || responseData?.message;
+    // FastAPI는 detail 필드를 사용하므로 우선순위: detail > error > message
+    let message = responseData?.detail || responseData?.error || responseData?.message;
 
     // 없으면 HTTP 상태 코드별 기본 메시지 사용
     if (!message) {
