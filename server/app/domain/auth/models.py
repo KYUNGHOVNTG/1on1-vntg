@@ -4,10 +4,10 @@ Auth 도메인 ORM 모델
 인증 토큰 관리 테이블을 담당합니다.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import String, CHAR, DateTime
+from sqlalchemy import String, CHAR, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from server.app.core.database import Base
@@ -50,6 +50,26 @@ class RefreshToken(Base):
         comment="폐기여부"
     )
 
+    # 세션 관리
+    last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.now,
+        comment="마지막 활동 시간 (Idle Timeout 체크용)"
+    )
+
+    device_info: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="디바이스 정보 (User-Agent)"
+    )
+
+    ip_address: Mapped[Optional[str]] = mapped_column(
+        String(45),
+        nullable=True,
+        comment="로그인 IP 주소 (IPv6 지원)"
+    )
+
     # 이력 관리
     in_date: Mapped[datetime] = mapped_column(
         DateTime,
@@ -72,3 +92,47 @@ class RefreshToken(Base):
     def revoke(self) -> None:
         """토큰을 폐기"""
         self.revoked_yn = 'Y'
+
+    # 세션 관리 메서드
+    def is_active(self) -> bool:
+        """
+        세션이 활성 상태인지 확인
+
+        Returns:
+            bool: 세션이 활성 상태면 True (폐기되지 않았고, 만료되지 않음)
+        """
+        return self.revoked_yn == 'N' and not self.is_expired()
+
+    def is_idle(self, idle_minutes: int = 15) -> bool:
+        """
+        세션이 idle 상태인지 확인
+
+        Args:
+            idle_minutes: idle로 간주할 분 단위 (기본 15분)
+
+        Returns:
+            bool: 마지막 활동 이후 idle_minutes 이상 경과하면 True
+        """
+        idle_threshold = datetime.now() - timedelta(minutes=idle_minutes)
+        return self.last_activity_at < idle_threshold
+
+    def update_activity(self) -> None:
+        """
+        세션 활동 시간 업데이트
+        API 호출 시 호출하여 idle timeout 방지
+        """
+        self.last_activity_at = datetime.now()
+
+    def get_session_info(self) -> dict:
+        """
+        세션 정보 반환 (UX용)
+
+        Returns:
+            dict: 세션 정보 (device_info, ip_address, created_at, last_activity_at)
+        """
+        return {
+            "device_info": self.device_info,
+            "ip_address": self.ip_address,
+            "created_at": self.in_date.isoformat() if self.in_date else None,
+            "last_activity_at": self.last_activity_at.isoformat() if self.last_activity_at else None,
+        }
