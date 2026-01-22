@@ -7,10 +7,14 @@ FastAPI 공통 의존성 (Dependencies)
 from typing import Optional
 
 from fastapi import Depends, Header, HTTPException, status
+from jose import JWTError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.config import settings
 from server.app.core.database import get_db
+from server.app.core.security import decode_access_token
+from server.app.domain.auth.models import RefreshToken
 
 
 # ====================
@@ -36,49 +40,132 @@ async def get_database_session() -> AsyncSession:
 # ====================
 
 
+async def get_current_user_id(
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_database_session)
+) -> str:
+    """
+    JWT 토큰 및 세션을 검증하고 user_id를 반환합니다.
+
+    사용법:
+        @router.get("/protected")
+        async def protected_route(user_id: str = Depends(get_current_user_id)):
+            return {"user_id": user_id}
+
+    Args:
+        authorization: Authorization 헤더 (Bearer {token})
+        db: 데이터베이스 세션
+
+    Returns:
+        str: 검증된 사용자 ID
+
+    Raises:
+        HTTPException: 토큰이 유효하지 않은 경우
+    """
+    # 1. Authorization 헤더 확인
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 2. Bearer 스킴 확인
+    try:
+        scheme, token = authorization.split()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication scheme",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 3. JWT 디코딩 및 검증
+    try:
+        payload = decode_access_token(token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 4. user_id 추출
+    user_id: str = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token payload invalid",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 5. RefreshToken 테이블에서 세션 검증
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_yn == 'N'
+        )
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session not found or revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 6. 세션 만료 확인
+    if session.is_expired():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 7. Idle timeout 확인 (15분)
+    if session.is_idle(idle_minutes=15):
+        # 세션 폐기
+        session.revoke()
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session timed out due to inactivity",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 8. 세션 활동 시간 업데이트
+    session.update_activity()
+    await db.commit()
+
+    # 9. user_id 반환
+    return user_id
+
+
 class AuthenticationChecker:
     """
-    인증 검증 클래스
+    인증 검증 클래스 (Legacy, API 키 검증용으로만 사용)
 
-    JWT 토큰 검증, API 키 검증 등의 인증 로직을 구현합니다.
-    현재는 스텁으로 구현되어 있습니다.
+    JWT 토큰 검증은 get_current_user_id() 함수를 사용하세요.
     """
 
     async def verify_token(self, authorization: Optional[str] = Header(None)) -> dict:
         """
-        JWT 토큰을 검증합니다.
+        JWT 토큰을 검증합니다. (Deprecated)
 
-        Args:
-            authorization: Authorization 헤더 (Bearer {token})
-
-        Returns:
-            dict: 검증된 사용자 정보
-
-        Raises:
-            HTTPException: 토큰이 유효하지 않은 경우
-
-        TODO: 실제 JWT 토큰 검증 로직 구현
-            - JWT 디코딩
-            - 토큰 만료 확인
-            - 사용자 존재 여부 확인
-            - 토큰 블랙리스트 확인
+        대신 get_current_user_id()를 사용하세요.
         """
-        if not authorization:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authorization header missing",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # TODO: JWT 토큰 파싱 및 검증
-        # scheme, token = authorization.split()
-        # if scheme.lower() != "bearer":
-        #     raise HTTPException(...)
-        # payload = decode_jwt(token)
-        # return payload
-
-        # 스텁: 임시 사용자 정보 반환
-        return {"user_id": 1, "username": "test_user"}
+        # get_current_user_id 함수로 위임
+        db = next(get_db())
+        user_id = await get_current_user_id(authorization, db)
+        return {"user_id": user_id}
 
     async def verify_api_key(self, x_api_key: Optional[str] = Header(None)) -> dict:
         """

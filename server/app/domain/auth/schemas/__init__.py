@@ -42,9 +42,19 @@ class LogoutResponse(BaseModel):
     message: str = Field(default="로그아웃되었습니다", description="응답 메시지")
 
 
+class UserInfoResponse(BaseModel):
+    """현재 사용자 정보 응답"""
+
+    user_id: str = Field(..., description="사용자 ID")
+    email: str | None = Field(None, description="사용자 이메일")
+    name: str | None = Field(None, description="사용자 이름")
+    message: str = Field(default="인증 성공", description="응답 메시지")
+
+
 __all__ = [
     "GoogleAuthURLResponse",
     "GoogleAuthCallbackRequest",
     "GoogleAuthResponse",
     "LogoutResponse",
+    "UserInfoResponse",
 ]
