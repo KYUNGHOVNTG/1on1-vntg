@@ -98,7 +98,7 @@ async def get_current_user_id(
         )
 
     # 4. user_id 추출
-    user_id: str = payload.get("sub")
+    user_id: str = payload.get("user_id")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -24,6 +24,7 @@ class GoogleAuthResponse(BaseModel):
 
     success: bool = Field(..., description="로그인 성공 여부")
     access_token: str | None = Field(None, description="JWT Access Token")
+    refresh_token: str | None = Field(None, description="JWT Refresh Token")
     token_type: str = Field(default="bearer", description="토큰 타입")
     user_id: str | None = Field(None, description="사용자 ID")
     email: str | None = Field(None, description="사용자 이메일")

@@ -132,6 +132,10 @@ class Settings(BaseSettings):
         default=120,
         description="액세스 토큰 만료 시간 (분)"
     )
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = Field(
+        default=1440,
+        description="리프레시 토큰 만료 시간 (분)"
+    )
 
     # ====================
     # Logging Settings

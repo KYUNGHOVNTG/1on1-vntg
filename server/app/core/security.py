@@ -47,6 +47,37 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
     return encoded_jwt
 
 
+def create_refresh_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
+    """
+    JWT Refresh Token을 생성합니다.
+
+    Args:
+        data: JWT payload에 담을 데이터
+        expires_delta: 토큰 만료 시간 (기본값: settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+
+    Returns:
+        str: 생성된 JWT 토큰
+    """
+    to_encode = data.copy()
+
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(
+            minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES
+        )
+
+    to_encode.update({"exp": expire, "iat": datetime.utcnow(), "type": "refresh"})
+
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+    return encoded_jwt
+
+
 def decode_access_token(token: str) -> dict[str, Any]:
     """
     JWT Access Token을 검증하고 디코딩합니다.

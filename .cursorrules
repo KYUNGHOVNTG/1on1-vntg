@@ -185,6 +185,13 @@ server/app/domain/{domain_name}/
 │   └── __init__.py
 └── formatters/             # 응답 포맷팅
     └── __init__.py
+
+### 6. 시간 처리 규칙
+
+- **UTC 기준 사용**: 서버와 DB 간의 시간대 불일치를 방지하기 위해 모든 시간 데이터는 **UTC**를 기준으로 처리합니다.
+- **Python**: `datetime.now()` 대신 `datetime.utcnow()` 사용
+- **SQLAlchemy**: 모델의 default/onupdate 값 설정 시 `datetime.utcnow` (함수 참조) 사용
+- **대상 필드**: 특히 `expires_at`, `in_date`, `last_activity_at` 등 모든 타임스탬프 필드에 엄격히 적용
 ```
 
 ---

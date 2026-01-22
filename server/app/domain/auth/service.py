@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.config import settings
 from server.app.core.logging import get_logger
-from server.app.core.security import create_access_token
+from server.app.core.security import create_access_token, create_refresh_token
+from server.app.domain.auth.models import RefreshToken
+from datetime import datetime, timedelta
 from server.app.domain.auth.schemas import (
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
@@ -149,6 +151,25 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
             }
             access_token = create_access_token(data=jwt_payload)
 
+            # 5-1. DB에 세션 정보(RefreshToken) 저장
+            refresh_token_string = create_refresh_token(data={"user_id": user.user_id})
+            
+            # DB에 Refresh Token 정보 저장
+            expires_at = datetime.utcnow() + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+            
+            # 기존 토큰 무효화 (필요시) - 여기서는 단순히 새로운 토큰을 추가하거나 업데이트하는 방식으로 처리
+            # Multi-session 허용 여부에 따라 달라질 수 있으나, 일단 추가
+            db_refresh_token = RefreshToken(
+                refresh_token=refresh_token_string,
+                user_id=user.user_id,
+                expires_at=expires_at,
+                revoked_yn='N',
+                last_activity_at=datetime.utcnow(),
+                # IP 및 Device 정보는 현재 context에서 가져올 수 있다면 추가 (현재는 생략)
+            )
+            self.db.add(db_refresh_token)
+            await self.db.commit()
+
             # 6. 로그인 성공 로그 출력
             logger.info(
                 "로그인 성공",
@@ -161,11 +182,11 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 },
             )
 
-            # 7. 성공 응답 반환
             return ServiceResult.ok(
                 GoogleAuthResponse(
                     success=True,
                     access_token=access_token,
+                    refresh_token=refresh_token_string,
                     token_type="bearer",
                     user_id=user.user_id,
                     email=email,

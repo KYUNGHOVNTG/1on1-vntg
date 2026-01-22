@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 1
               </div>
               <h1 className="text-xl font-black bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent tracking-tight">
-                1on1-VNTG
+                1on1-Mirror
               </h1>
             </div>
           )}

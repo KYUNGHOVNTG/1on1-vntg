@@ -54,7 +54,7 @@ class RefreshToken(Base):
     last_activity_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.now,
+        default=datetime.utcnow,
         comment="마지막 활동 시간 (Idle Timeout 체크용)"
     )
 
@@ -74,7 +74,7 @@ class RefreshToken(Base):
     in_date: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.now,
+        default=datetime.utcnow,
         comment="등록일시"
     )
 
@@ -83,7 +83,7 @@ class RefreshToken(Base):
 
     def is_expired(self) -> bool:
         """토큰이 만료되었는지 확인"""
-        return datetime.now() > self.expires_at
+        return datetime.utcnow() > self.expires_at
 
     def is_valid(self) -> bool:
         """토큰이 유효한지 확인 (만료되지 않았고 폐기되지 않음)"""
@@ -113,7 +113,7 @@ class RefreshToken(Base):
         Returns:
             bool: 마지막 활동 이후 idle_minutes 이상 경과하면 True
         """
-        idle_threshold = datetime.now() - timedelta(minutes=idle_minutes)
+        idle_threshold = datetime.utcnow() - timedelta(minutes=idle_minutes)
         return self.last_activity_at < idle_threshold
 
     def update_activity(self) -> None:
@@ -121,7 +121,7 @@ class RefreshToken(Base):
         세션 활동 시간 업데이트
         API 호출 시 호출하여 idle timeout 방지
         """
-        self.last_activity_at = datetime.now()
+        self.last_activity_at = datetime.utcnow()
 
     def get_session_info(self) -> dict:
         """
