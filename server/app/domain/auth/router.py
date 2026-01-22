@@ -8,12 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.database import get_db
+from server.app.core.dependencies import get_current_user_id
 from server.app.core.logging import get_logger
 from server.app.domain.auth.schemas import (
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
     LogoutResponse,
+    UserInfoResponse,
 )
 from server.app.domain.auth.service import GoogleAuthService
 
@@ -103,3 +105,34 @@ async def logout() -> LogoutResponse:
     """
     logger.info("로그아웃 요청 처리")
     return LogoutResponse(success=True, message="로그아웃되었습니다")
+
+
+@router.get(
+    "/me",
+    response_model=UserInfoResponse,
+    summary="현재 사용자 정보 조회",
+    description="JWT 토큰을 검증하고 현재 로그인한 사용자 정보를 반환합니다.",
+)
+async def get_current_user_info(
+    user_id: str = Depends(get_current_user_id),
+) -> UserInfoResponse:
+    """
+    현재 인증된 사용자 정보를 조회합니다.
+
+    이 엔드포인트는 JWT 토큰 검증 및 세션 검증을 테스트하기 위한 용도입니다.
+
+    Args:
+        user_id: 검증된 사용자 ID (Dependency에서 자동 주입)
+
+    Returns:
+        UserInfoResponse: 사용자 정보
+
+    Raises:
+        HTTPException 401: 토큰이 유효하지 않거나 세션이 만료된 경우
+    """
+    logger.info(f"사용자 정보 조회: user_id={user_id}")
+
+    return UserInfoResponse(
+        user_id=user_id,
+        message="인증 성공"
+    )
