@@ -7,6 +7,7 @@
 ## 🎯 구현 방식
 **방법 2**: 기존 RefreshToken 테이블을 세션 관리에 활용 (PostgreSQL only)
 
+## 모든 작업은 .cursorrules를 기본적으로 100% 준수해야 합니다.
 ---
 
 ## 📊 전체 구조 (3 Phase)
