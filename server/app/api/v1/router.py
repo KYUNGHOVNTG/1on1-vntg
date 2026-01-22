@@ -7,7 +7,7 @@ API v1 라우터 통합
 from fastapi import APIRouter
 
 from server.app.api.v1.endpoints import sample, docs, system, menu, code
-from server.app.domain import auth
+from server.app.domain.auth.router import router as auth_router
 
 # v1 메인 라우터 생성
 api_router = APIRouter()
@@ -32,8 +32,8 @@ api_router.include_router(
 
 # Auth 도메인 라우터 (Google OAuth)
 api_router.include_router(
-    auth.router,
-    # prefix는 이미 auth.router에 정의되어 있음
+    auth_router,
+    # prefix는 이미 auth_router에 정의되어 있음
 )
 
 # Menu 도메인 라우터
