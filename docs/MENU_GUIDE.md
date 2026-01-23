@@ -1,5 +1,15 @@
 # 메뉴 권한 시스템 사용 가이드
 
+> **1on1-vntg 프로젝트의 동적 메뉴 및 권한 시스템 가이드**
+
+## 📖 관련 문서
+
+- **[README.md](../README.md)**: 프로젝트 개요 및 빠른 시작
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)**: 아키텍처 상세 설명
+- **[DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md)**: 도메인 추가 및 개발 가이드
+
+---
+
 ## 📋 개요
 
 사용자가 구글 로그인 후, 사용자의 직책(position_code)에 따라 접근 가능한 메뉴를 동적으로 조회하고 Sidebar에 렌더링하는 기능입니다.
