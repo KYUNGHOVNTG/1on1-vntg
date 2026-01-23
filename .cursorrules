@@ -720,13 +720,339 @@ describe('UserList', () => {
 
 ---
 
+## 🎯 Supabase PostgreSQL 활용 예시
+
+### ✅ 올바른 사용 (PostgreSQL 표준 SQL만 사용)
+
+```python
+# ✅ 권장: 표준 PostgreSQL 쿼리
+from sqlalchemy import select, insert, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# 일반 SELECT
+async def get_users(db: AsyncSession):
+    result = await db.execute(select(User))
+    return result.scalars().all()
+
+# JOIN 쿼리
+async def get_user_with_posts(db: AsyncSession, user_id: int):
+    result = await db.execute(
+        select(User, Post)
+        .join(Post, User.id == Post.user_id)
+        .where(User.id == user_id)
+    )
+    return result.all()
+
+# Transaction
+async def create_user_with_profile(db: AsyncSession, user_data: dict):
+    async with db.begin():
+        user = User(**user_data)
+        db.add(user)
+        await db.flush()  # user.id 획득
+
+        profile = UserProfile(user_id=user.id)
+        db.add(profile)
+    return user
+```
+
+### ❌ 금지된 사용 (Supabase 전용 기능)
+
+```python
+# ❌ 금지: Supabase Auth 사용
+from supabase import create_client
+supabase = create_client(url, key)
+user = supabase.auth.sign_up({"email": "...", "password": "..."})  # 절대 금지!
+
+# ❌ 금지: Supabase Storage 사용
+supabase.storage.from_("bucket").upload("file.jpg", file)  # 절대 금지!
+
+# ❌ 금지: Supabase Realtime 사용
+supabase.channel("room").subscribe()  # 절대 금지!
+
+# ✅ 대신 사용: JWT 직접 구현, S3/로컬 스토리지, WebSocket 직접 구현
+```
+
+### 환경 변수 설정 (.env)
+
+```bash
+# ✅ 올바른 Supabase PostgreSQL 연결
+DATABASE_URL=postgresql+asyncpg://postgres.xxx:password@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+
+# ❌ 금지: Supabase 클라이언트 키 (API 사용하지 않으므로 불필요)
+# SUPABASE_URL=...
+# SUPABASE_KEY=...
+```
+
+---
+
+## 🏢 도메인별 개발 가이드라인
+
+### 🔐 auth 도메인 (인증/인가)
+
+**목적**: JWT 기반 인증, Google OAuth 2.0 통합
+
+#### 핵심 규칙
+
+1. **JWT 토큰 관리**
+   ```python
+   # JWT 발급 시 필수 포함 정보
+   payload = {
+       "user_id": user.id,
+       "email": user.email,
+       "exp": datetime.utcnow() + timedelta(minutes=15),  # Access: 15분
+   }
+
+   # Refresh Token은 7일 만료
+   refresh_payload = {
+       "user_id": user.id,
+       "exp": datetime.utcnow() + timedelta(days=7),
+   }
+   ```
+
+2. **Google OAuth 흐름**
+   - Authorization Code Grant 방식 사용
+   - state 파라미터로 CSRF 방지 필수
+   - ID Token 검증 후 사용자 정보 추출
+
+3. **안티패턴**
+   ```python
+   # ❌ 금지: 토큰에 민감 정보 포함
+   payload = {"password": user.password}  # 절대 금지!
+
+   # ❌ 금지: 만료 시간 없는 토큰
+   payload = {"user_id": user.id}  # exp 필수!
+
+   # ✅ 권장: 필요한 정보만 포함, 만료 시간 설정
+   payload = {"user_id": user.id, "email": user.email, "exp": ...}
+   ```
+
+4. **보안 체크리스트**
+   - [ ] JWT 시크릿 키는 환경 변수에서 관리 (.env)
+   - [ ] Access Token 만료 시간: 15분 이하
+   - [ ] Refresh Token은 HttpOnly 쿠키로 전송
+   - [ ] CORS 설정 확인 (허용된 도메인만)
+
+---
+
+### 📋 menu 도메인 (메뉴 권한 시스템)
+
+**목적**: 직책 기반 동적 메뉴 권한 관리
+
+#### 핵심 규칙
+
+1. **메뉴 계층 구조**
+   - 최대 3depth까지만 허용 (Root → Parent → Child)
+   - `parent_id`로 계층 구성
+   - `display_order`로 순서 제어
+
+2. **권한 체크 로직**
+   ```python
+   # ✅ 권장: 직책 + 개인 권한 조합
+   async def get_user_menus(db: AsyncSession, user_id: int) -> list[Menu]:
+       # 1. 직책 기반 메뉴
+       position_menus = await get_position_menus(db, user.position_code)
+
+       # 2. 개인 추가 권한
+       user_menus = await get_user_specific_menus(db, user_id)
+
+       # 3. 병합 및 중복 제거
+       return merge_menus(position_menus, user_menus)
+   ```
+
+3. **안티패턴**
+   ```python
+   # ❌ 금지: 클라이언트에서만 권한 체크
+   # → 반드시 백엔드에서도 검증 필요
+
+   # ❌ 금지: 4depth 이상 메뉴
+   menu.parent.parent.parent  # 너무 깊음!
+
+   # ✅ 권장: 최대 3depth
+   menu.parent.parent  # OK
+   ```
+
+4. **메뉴 개발 체크리스트**
+   - [ ] menu_code는 유니크하게 설정 (예: DASH001, USER002)
+   - [ ] 새 메뉴 추가 시 migration SQL 작성
+   - [ ] position_menu 테이블에 기본 권한 설정
+   - [ ] 프론트엔드 Sidebar와 백엔드 권한 동기화
+
+---
+
+### 📊 common 도메인 (공통코드 관리)
+
+**목적**: 시스템 전역 공통코드 관리
+
+#### 핵심 규칙
+
+1. **공통코드 구조**
+   ```python
+   # code_type: 코드 그룹 (예: POSITION, MENU_TYPE, STATUS)
+   # code_value: 실제 코드 값 (예: CEO, MANAGER, USER)
+   # code_name: 화면 표시명 (예: "대표이사", "관리자", "사용자")
+   ```
+
+2. **사용 예시**
+   ```python
+   # ✅ 권장: Repository로 코드 조회
+   position_codes = await common_code_repo.get_by_type("POSITION")
+
+   # ✅ 권장: 캐싱 활용 (변경 빈도 낮음)
+   @lru_cache(maxsize=100)
+   async def get_code_list(code_type: str) -> list[CommonCode]:
+       return await repository.get_by_type(code_type)
+   ```
+
+3. **안티패턴**
+   ```python
+   # ❌ 금지: 하드코딩
+   if position == "CEO":  # 절대 금지!
+
+   # ✅ 권장: DB에서 조회
+   ceo_code = await common_code_repo.get_value("POSITION", "CEO")
+   if position == ceo_code.code_value:
+   ```
+
+4. **공통코드 관리 체크리스트**
+   - [ ] 새 코드 타입 추가 시 migration SQL 작성
+   - [ ] code_value는 영문 대문자 + 숫자 조합
+   - [ ] 삭제 대신 use_yn = 'N' 처리
+   - [ ] 순서는 display_order로 관리
+
+---
+
+### 📈 dashboard 도메인 (대시보드)
+
+**목적**: 사용자별 맞춤형 대시보드 표시
+
+#### 핵심 규칙
+
+1. **데이터 집계**
+   ```python
+   # ✅ 권장: Repository에서 집계 쿼리
+   class DashboardDataRepository(BaseRepository):
+       async def get_user_stats(self, user_id: int) -> dict:
+           result = await self.db.execute(
+               select(
+                   func.count(Task.id).label("total_tasks"),
+                   func.count(case((Task.status == "done", 1))).label("completed"),
+               )
+               .where(Task.user_id == user_id)
+           )
+           return result.one()._asdict()
+   ```
+
+2. **성능 최적화**
+   - 집계 쿼리는 인덱스 활용
+   - 큰 데이터는 페이지네이션 적용
+   - 실시간이 아닌 데이터는 캐싱 고려
+
+3. **안티패턴**
+   ```python
+   # ❌ 금지: 모든 데이터 조회 후 Python에서 집계
+   all_tasks = await get_all_tasks()
+   completed = len([t for t in all_tasks if t.status == "done"])  # 느림!
+
+   # ✅ 권장: DB에서 집계
+   result = await db.execute(
+       select(func.count()).where(Task.status == "done")
+   )
+   completed = result.scalar()
+   ```
+
+4. **대시보드 개발 체크리스트**
+   - [ ] 위젯별로 API 엔드포인트 분리 (로딩 속도)
+   - [ ] 에러 시 전체 대시보드가 아닌 해당 위젯만 에러 표시
+   - [ ] 차트 데이터는 최대 30일 이내로 제한 (성능)
+   - [ ] 디자인 시스템(1on1-Mirror) 색상 준수
+
+---
+
+### 👤 user 도메인 (사용자 관리)
+
+**목적**: 사용자 정보 관리 및 프로필 업데이트
+
+#### 핵심 규칙
+
+1. **사용자 생성/수정**
+   ```python
+   # ✅ 권장: 비밀번호 해싱 필수
+   from passlib.context import CryptContext
+   pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+   hashed_password = pwd_context.hash(plain_password)
+   ```
+
+2. **민감 정보 처리**
+   ```python
+   # ✅ 권장: Response에서 비밀번호 제외
+   class UserResponse(BaseModel):
+       id: int
+       email: str
+       username: str
+       # password 필드 없음!
+
+       model_config = ConfigDict(from_attributes=True)
+   ```
+
+3. **안티패턴**
+   ```python
+   # ❌ 금지: 평문 비밀번호 저장
+   user.password = request.password  # 절대 금지!
+
+   # ❌ 금지: Response에 비밀번호 포함
+   return {"password": user.password}  # 절대 금지!
+   ```
+
+4. **사용자 관리 체크리스트**
+   - [ ] 비밀번호는 bcrypt로 해싱
+   - [ ] 이메일 중복 체크 (유니크 제약조건)
+   - [ ] 삭제는 soft delete (use_yn = 'N')
+   - [ ] 로그에 민감 정보 제외
+
+---
+
+### 🔧 system 도메인 (시스템 설정)
+
+**목적**: 시스템 전역 설정 및 Health Check
+
+#### 핵심 규칙
+
+1. **Health Check**
+   ```python
+   # ✅ 권장: DB 연결 상태 확인
+   @router.get("/core/health")
+   async def health_check(db: AsyncSession = Depends(get_db)):
+       try:
+           await db.execute(select(1))
+           return {"status": "healthy", "database": "connected"}
+       except Exception as e:
+           raise HTTPException(status_code=503, detail="Database unavailable")
+   ```
+
+2. **Version 정보**
+   ```python
+   # ✅ 권장: 버전 정보 제공
+   @router.get("/core/version")
+   async def get_version():
+       return {
+           "version": "1.0.0",
+           "python": "3.12",
+           "fastapi": "0.109.0"
+       }
+   ```
+
+---
+
 ## 📚 추가 참고 자료
 
 - **[README.md](./README.md)**: 프로젝트 개요 및 빠른 시작
+- **[docs/SETUP_GUIDE.md](./docs/SETUP_GUIDE.md)**: 설치 및 실행 가이드
+- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)**: 아키텍처 상세 설명
+- **[docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md)**: 개발 가이드 및 체크리스트
+- **[docs/PROJECT_HANDOVER.md](./docs/PROJECT_HANDOVER.md)**: AI 개발자 인수인계 문서
 - **[server/README.md](./server/README.md)**: 백엔드 상세 가이드
 - **[client/README.md](./client/README.md)**: 프론트엔드 상세 가이드
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)**: 상세 아키텍처 문서
-- **[DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md)**: 개발 가이드 및 체크리스트
 
 ---
 
@@ -736,6 +1062,7 @@ describe('UserList', () => {
 2. **어디에 코드를 배치해야 하나요?** → 위 폴더 구조 섹션 참조
 3. **어떤 패턴을 사용해야 하나요?** → README 문서들의 예시 코드 참조
 4. **테스트는 어떻게 작성하나요?** → Testing Guidelines 섹션 참조
+5. **도메인별 규칙은?** → 위 "도메인별 개발 가이드라인" 섹션 참조
 
 ---
 
