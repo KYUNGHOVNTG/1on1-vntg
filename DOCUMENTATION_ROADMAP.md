@@ -2,7 +2,7 @@
 
 > **목적**: 프로젝트 문서 간 일관성 확보 및 AI 바이브코딩 환경 완성
 > **작성일**: 2026-01-23
-> **버전**: 1.0.0
+> **버전**: 2.0.0
 
 ---
 
@@ -10,7 +10,7 @@
 
 1. **문서 일관성 100%** - 모든 MD 파일 간 정보 통일
 2. **바이브코딩 규칙 완성** - AI 개발자가 길을 잃지 않는 명확한 가이드
-3. **누락 문서 보완** - 배포, 보안, 성능 가이드 추가
+3. **체계적 문서 구조** - docs/ 폴더로 목적별 문서 분리
 4. **중복 제거** - 효율적인 문서 구조 확립
 
 ---
@@ -25,20 +25,44 @@
 
 ### ⚠️ 개선 필요
 - **긴급**: 프로젝트 이름 불일치 (1on1-vntg vs ai-worker-project vs vibe-web-starter)
-- **긴급**: Supabase 정책 모순
+- **중요**: 문서 구조 정리 필요 (루트에 문서 분산, docs/ 폴더 미사용)
 - **중요**: 문서 중복 (도메인 추가, 아키텍처, 빠른 시작)
-- **중요**: 배포/보안 가이드 부족
+- **중요**: 보안 가이드 부족
 
 ---
 
-## 🗺️ 로드맵 (3단계)
+## 🗺️ 새로운 문서 구조
+
+```
+1on1-vntg/
+├── .cursorrules                    # AI 바이브코딩 규칙 (루트 유지)
+├── README.md                       # 프로젝트 개요, 빠른 시작 (간소화)
+├── docs/                           # 📁 모든 문서를 여기로 집중
+│   ├── SETUP_GUIDE.md             # 구동 방법 (신규 분리)
+│   ├── ARCHITECTURE.md            # 아키텍처 상세
+│   ├── DEVELOPMENT_GUIDE.md       # 개발 가이드
+│   ├── SECURITY.md                # 보안 구조 (신규)
+│   ├── TEST_GUIDE.md              # 테스트 가이드 (이동)
+│   ├── MENU_GUIDE.md              # 메뉴 권한 시스템 (이동)
+│   └── PROJECT_HANDOVER.md        # AI 개발자 인수인계 (이동)
+├── client/
+│   └── README.md                  # 클라이언트 개발 가이드 (업데이트)
+└── server/
+    └── README.md                  # 서버 개발 가이드 (업데이트)
+```
+
+---
+
+## 🗺️ 로드맵 (4단계)
 
 ```
 Phase 1: 긴급 수정 (1-2시간)
   ↓
-Phase 2: 문서 구조 개선 (2-3시간)
+Phase 2: 문서 구조 재구성 (2-3시간)
   ↓
-Phase 3: 누락 문서 추가 (3-4시간)
+Phase 3: 보안 문서 추가 (1시간)
+  ↓
+Phase 4: 바이브코딩 최적화 (2-3시간)
 ```
 
 ---
@@ -55,92 +79,129 @@ Phase 3: 누락 문서 추가 (3-4시간)
   - `ai-worker-project` (README.md)
   - `vibe-web-starter` (PROJECT_HANDOVER.md)
 - **작업**:
-  - [ ] README.md line 109 수정
-  - [ ] PROJECT_HANDOVER.md line 75 수정
+  - [ ] README.md의 모든 `ai-worker-project` → `1on1-vntg`
+  - [ ] PROJECT_HANDOVER.md의 모든 `vibe-web-starter` → `1on1-vntg`
   - [ ] 모든 경로 예시를 `1on1-vntg/`로 통일
 - **영향 파일**:
   - `/home/user/1on1-vntg/README.md`
   - `/home/user/1on1-vntg/PROJECT_HANDOVER.md`
+  - `/home/user/1on1-vntg/DEVELOPMENT_GUIDE.md`
+  - `/home/user/1on1-vntg/ARCHITECTURE.md`
 
-### Task 1.2: Supabase 정책 명확화
-- **문제**: .cursorrules는 "사용 금지", README.md는 "적극 권장"
+### Task 1.2: Supabase 적극 권장 정책 확립
+- **현재 정책**: Supabase를 PostgreSQL DB로 적극 활용
 - **작업**:
-  - [ ] .cursorrules line 17-19 수정:
+  - [ ] .cursorrules 수정 - Supabase 전면 권장 명시:
     ```
-    8. **SUPABASE 특수 기능 사용 제한**
-       - PostgreSQL 호환성을 위해 Supabase Auth, Storage, Realtime 등
-         Supabase 전용 기능 사용 금지
-       - PostgreSQL 데이터베이스로서의 Supabase 사용은 허용
-       - 이유: 향후 PostgreSQL 단독 환경으로 이관 가능성
+    8. **SUPABASE 적극 활용**
+       - ✅ Supabase를 개발 환경 PostgreSQL 데이터베이스로 적극 권장
+       - ✅ Supabase의 모든 기능 활용 가능 (Auth, Storage, Realtime 등)
+       - 장점: 빠른 개발, 무료 티어, 실시간 기능, 관리 편의성
+       - 로컬 개발: Supabase 무료 계정 사용 권장
     ```
-  - [ ] README.md에 동일한 정책 명시 (lines 292-322 부근)
+  - [ ] README.md 데이터베이스 섹션 강화:
+    - Supabase 사용의 장점 강조
+    - 빠른 시작 가이드 명확화
+    - 환경 설정 예시 추가
 - **영향 파일**:
   - `/home/user/1on1-vntg/.cursorrules`
   - `/home/user/1on1-vntg/README.md`
+  - `/home/user/1on1-vntg/TEST_GUIDE.md`
 
 ### Task 1.3: 폴더 구조 예시 통일
 - **작업**:
   - [ ] 모든 문서의 경로 예시를 실제 구조와 일치시킴
   - [ ] `ai-worker-project` → `1on1-vntg` 전역 치환
+  - [ ] `vibe-web-starter` → `1on1-vntg` 전역 치환
 - **영향 파일**:
   - README.md
   - PROJECT_HANDOVER.md
   - DEVELOPMENT_GUIDE.md
+  - ARCHITECTURE.md
 
 ---
 
-## 📍 Phase 2: 문서 구조 개선 (중요)
+## 📍 Phase 2: 문서 구조 재구성 (중요)
 
-> **목표**: 중복 제거 및 효율적 문서 체계 구축
+> **목표**: docs/ 폴더 중심의 체계적 문서 구조 확립
 > **소요**: 2-3시간
 > **우선순위**: 🟡 높음
 
-### Task 2.1: README.md 슬림화
+### Task 2.1: docs/ 폴더 생성 및 문서 이동
+- **작업**:
+  - [ ] `/home/user/1on1-vntg/docs/` 폴더 생성
+  - [ ] 다음 파일들을 docs/ 폴더로 이동:
+    - `ARCHITECTURE.md` → `docs/ARCHITECTURE.md`
+    - `DEVELOPMENT_GUIDE.md` → `docs/DEVELOPMENT_GUIDE.md`
+    - `PROJECT_HANDOVER.md` → `docs/PROJECT_HANDOVER.md`
+    - `TEST_GUIDE.md` → `docs/TEST_GUIDE.md`
+    - `MENU_GUIDE.md` → `docs/MENU_GUIDE.md`
+  - [ ] `.cursorrules`는 루트에 유지
+  - [ ] `README.md`는 루트에 유지 (간소화 예정)
+- **결과**: 깔끔한 루트 디렉토리, 문서는 docs/에 집중
+
+### Task 2.2: SETUP_GUIDE.md 신규 분리
+- **현재**: README.md에 구동 방법이 포함됨 (너무 길음)
+- **작업**:
+  - [ ] `docs/SETUP_GUIDE.md` 신규 생성
+  - [ ] README.md에서 구동 방법 섹션 추출:
+    - 환경 설정
+    - 데이터베이스 설정
+    - 로컬 실행 방법
+    - Docker Compose 사용법
+    - 트러블슈팅
+  - [ ] README.md에는 "빠른 시작" 요약만 남기고 상세 내용은 링크
+- **신규 파일**: `/home/user/1on1-vntg/docs/SETUP_GUIDE.md`
+
+### Task 2.3: README.md 슬림화
 - **현재 문제**: 652줄, 너무 많은 정보
 - **작업**:
-  - [ ] 아키텍처 상세 설명 제거 → `ARCHITECTURE.md` 링크로 대체
-  - [ ] 도메인 추가 상세 가이드 제거 → `DEVELOPMENT_GUIDE.md` 링크로 대체
-  - [ ] 목표 분량: 300-400줄
-  - [ ] 남길 내용:
-    - 프로젝트 개요
-    - 빠른 시작
-    - 기술 스택
-    - 트러블슈팅 기본
+  - [ ] 남길 내용만 유지:
+    - 프로젝트 개요 (3-5줄)
+    - 주요 기능
+    - 기술 스택 요약
+    - 빠른 시작 (5줄, 상세는 SETUP_GUIDE.md 링크)
+    - 문서 네비게이션 (docs/ 폴더 안내)
+  - [ ] 제거할 내용:
+    - 아키텍처 상세 → `docs/ARCHITECTURE.md` 링크
+    - 구동 방법 상세 → `docs/SETUP_GUIDE.md` 링크
+    - 개발 가이드 → `docs/DEVELOPMENT_GUIDE.md` 링크
+  - [ ] 목표 분량: 150-200줄
 - **영향 파일**: `/home/user/1on1-vntg/README.md`
 
-### Task 2.2: 중복 콘텐츠 정리
+### Task 2.4: 문서 상호 참조 강화
 - **작업**:
-  - [ ] **도메인 추가 가이드**:
-    - README.md: 개요만 (5줄)
-    - DEVELOPMENT_GUIDE.md: 전체 체크리스트 (유일한 소스)
-    - PROJECT_HANDOVER.md: 링크만
-  - [ ] **아키텍처 설명**:
-    - README.md: 다이어그램 1개 + 3줄 설명
-    - ARCHITECTURE.md: 전체 설명 (유일한 소스)
-    - PROJECT_HANDOVER.md: 핵심 원칙만 (5줄)
-  - [ ] **빠른 시작**:
-    - README.md: 전체 (유일한 소스)
-    - PROJECT_HANDOVER.md: 링크만
-- **영향 파일**:
-  - README.md
-  - DEVELOPMENT_GUIDE.md
-  - PROJECT_HANDOVER.md
-  - ARCHITECTURE.md
-
-### Task 2.3: 문서 상호 참조 강화
-- **작업**:
-  - [ ] 각 문서 상단에 "관련 문서" 섹션 추가
-  - [ ] 예시:
+  - [ ] 모든 docs/ 폴더 내 문서 상단에 "관련 문서" 섹션 추가:
     ```markdown
     ## 📚 관련 문서
-    - [전체 개요](./README.md) - 프로젝트 소개 및 빠른 시작
+    - [프로젝트 개요](../README.md) - 빠른 시작 및 기술 스택
+    - [구동 가이드](./SETUP_GUIDE.md) - 환경 설정 및 실행
     - [아키텍처](./ARCHITECTURE.md) - 상세 설계
-    - [개발 가이드](./DEVELOPMENT_GUIDE.md) - 도메인 추가 체크리스트
-    - [인수인계](./PROJECT_HANDOVER.md) - AI 개발자용 가이드
+    - [개발 가이드](./DEVELOPMENT_GUIDE.md) - 도메인 개발
+    - [보안 가이드](./SECURITY.md) - 인증/보안 구조
     ```
-- **영향 파일**: 모든 루트 레벨 MD 파일
+  - [ ] README.md에 docs/ 폴더 네비게이션 추가
+- **영향 파일**: docs/ 폴더 내 모든 MD 파일, README.md
 
-### Task 2.4: 문서 메타데이터 추가
+### Task 2.5: client/server README.md 업데이트
+- **작업**:
+  - [ ] `client/README.md` 업데이트:
+    - 프론트엔드 개발 환경 설정
+    - 도메인 구조 설명 강화
+    - 공통 컴포넌트 사용법
+    - 디자인 시스템 (1on1-Mirror) 링크
+    - 상위 문서 링크 (`../docs/` 참조)
+  - [ ] `server/README.md` 업데이트:
+    - 백엔드 개발 환경 설정
+    - API 개발 가이드
+    - 도메인 플러그인 구조
+    - 데이터베이스 마이그레이션
+    - 상위 문서 링크 (`../docs/` 참조)
+- **영향 파일**:
+  - `/home/user/1on1-vntg/client/README.md`
+  - `/home/user/1on1-vntg/server/README.md`
+
+### Task 2.6: 문서 메타데이터 추가
 - **작업**:
   - [ ] 모든 문서 하단에 메타 정보 추가:
     ```markdown
@@ -148,132 +209,59 @@ Phase 3: 누락 문서 추가 (3-4시간)
     **작성일**: 2026-01-23
     **최종 수정**: 2026-01-23
     **버전**: 1.0.0
-    **작성자**: AI 바이브코딩 팀
+    **다음 리뷰**: 2026-02-23
     ```
 - **영향 파일**: 모든 MD 파일
 
 ---
 
-## 📍 Phase 3: 누락 문서 추가 (권장)
+## 📍 Phase 3: 보안 문서 추가 (필수)
 
-> **목표**: 프로덕션 레디 문서 완성
-> **소요**: 3-4시간
-> **우선순위**: 🟢 보통
+> **목표**: 현재 보안 구조 문서화
+> **소요**: 1시간
+> **우선순위**: 🟡 높음
 
-### Task 3.1: DEPLOYMENT.md 생성
-- **내용**:
-  ```markdown
-  # 배포 가이드
-
-  ## 1. 개발 환경 배포
-  - Docker Compose 사용법
-  - 로컬 환경 설정
-
-  ## 2. 스테이징 배포
-  - CI/CD 파이프라인
-  - 환경 변수 설정
-
-  ## 3. 프로덕션 배포
-  - 체크리스트
-  - 롤백 절차
-  - 모니터링
-
-  ## 4. 인프라
-  - 아키텍처 다이어그램
-  - 스케일링 전략
-  ```
-- **신규 파일**: `/home/user/1on1-vntg/DEPLOYMENT.md`
-
-### Task 3.2: SECURITY.md 생성
+### Task 3.1: SECURITY.md 생성
 - **내용**:
   ```markdown
   # 보안 가이드
 
-  ## 1. 인증/인가
-  - JWT 토큰 관리
-  - OAuth 2.0 설정
-  - 권한 체크
+  ## 1. 인증/인가 구조
+  - JWT 토큰 기반 인증
+  - Google OAuth 2.0 통합
+  - 권한 체크 미들웨어
+  - 토큰 발급 및 검증 흐름
 
-  ## 2. 일반 보안
-  - SQL Injection 방지
-  - XSS 방지
-  - CSRF 방지
+  ## 2. 현재 보안 구현
+  - FastAPI 보안 헤더
   - CORS 설정
+  - SQL Injection 방지 (SQLAlchemy ORM)
+  - XSS 방지 (React 기본 보호)
 
   ## 3. 민감 정보 관리
-  - 환경 변수
-  - 시크릿 관리
-  - .env 파일 주의사항
+  - 환경 변수 (.env)
+  - Google OAuth 시크릿
+  - JWT 시크릿 키
+  - Supabase 접속 정보
 
-  ## 4. 의존성 보안
-  - 패키지 업데이트
-  - 취약점 스캔
+  ## 4. 보안 체크리스트
+  - [ ] .env 파일 .gitignore 등록 확인
+  - [ ] 프로덕션 환경 시크릿 분리
+  - [ ] HTTPS 사용 (프로덕션)
+  - [ ] CORS 도메인 제한
   ```
-- **신규 파일**: `/home/user/1on1-vntg/SECURITY.md`
+- **신규 파일**: `/home/user/1on1-vntg/docs/SECURITY.md`
 
-### Task 3.3: PERFORMANCE.md 생성
-- **내용**:
-  ```markdown
-  # 성능 최적화 가이드
-
-  ## 1. 백엔드 최적화
-  - 데이터베이스 쿼리 최적화
-  - N+1 문제 방지
-  - 인덱스 전략
-  - 캐싱 (Redis)
-
-  ## 2. 프론트엔드 최적화
-  - 번들 사이즈 최적화
-  - 코드 스플리팅
-  - 이미지 최적화
-  - React 렌더링 최적화
-
-  ## 3. API 최적화
-  - 페이지네이션
-  - Rate Limiting
-  - 압축 (gzip/brotli)
-
-  ## 4. 모니터링
-  - 성능 메트릭
-  - APM 도구
-  ```
-- **신규 파일**: `/home/user/1on1-vntg/PERFORMANCE.md`
-
-### Task 3.4: CONTRIBUTING.md 생성
-- **내용**:
-  ```markdown
-  # 기여 가이드
-
-  ## 1. 코드 컨벤션
-  - 명명 규칙
-  - 코드 스타일
-  - 커밋 메시지 규칙
-
-  ## 2. 브랜치 전략
-  - Git Flow
-  - 브랜치 명명
-
-  ## 3. Pull Request
-  - PR 템플릿
-  - 리뷰 프로세스
-
-  ## 4. 테스트
-  - 단위 테스트
-  - 통합 테스트
-  - 커버리지
-  ```
-- **신규 파일**: `/home/user/1on1-vntg/CONTRIBUTING.md`
-
-### Task 3.5: TEST_GUIDE.md 확장
+### Task 3.2: TEST_GUIDE.md 확장
 - **현재**: JWT 토큰 테스트만
 - **작업**:
-  - [ ] 이름 변경 고려: `JWT_TEST_GUIDE.md`
-  - [ ] 또는 전체 테스트 가이드로 확장:
-    - 단위 테스트 (pytest, Jest)
-    - 통합 테스트
-    - E2E 테스트
-    - API 테스트
-- **영향 파일**: `/home/user/1on1-vntg/TEST_GUIDE.md`
+  - [ ] 전체 테스트 가이드로 확장:
+    - JWT 토큰 발급 테스트 (현재 내용 유지)
+    - API 엔드포인트 테스트 방법
+    - 인증이 필요한 API 테스트
+    - 권한 체크 테스트
+  - [ ] docs/ 폴더로 이미 이동 완료 (Task 2.1)
+- **영향 파일**: `/home/user/1on1-vntg/docs/TEST_GUIDE.md`
 
 ---
 
@@ -281,13 +269,14 @@ Phase 3: 누락 문서 추가 (3-4시간)
 
 > **목표**: AI 개발자 경험 극대화
 > **소요**: 2-3시간
-> **우선순위**: 🔵 낮음
+> **우선순위**: 🔵 보통
 
 ### Task 4.1: .cursorrules 고도화
 - **작업**:
   - [ ] 구체적인 예시 코드 추가
   - [ ] 안티 패턴 예시 추가
   - [ ] 체크리스트 형식으로 재구성
+  - [ ] Supabase 활용 예시 추가
 - **영향 파일**: `/home/user/1on1-vntg/.cursorrules`
 
 ### Task 4.2: 도메인별 .cursorrules 생성
@@ -301,13 +290,13 @@ Phase 3: 누락 문서 추가 (3-4시간)
 
 ### Task 4.3: AI 개발자용 체크리스트
 - **작업**:
-  - [ ] `AI_DEVELOPER_CHECKLIST.md` 생성
+  - [ ] `docs/AI_DEVELOPER_CHECKLIST.md` 생성
   - [ ] 내용:
     - 새 기능 개발 시작 전 확인사항
     - 코드 작성 중 확인사항
     - PR 전 확인사항
-    - 배포 전 확인사항
-- **신규 파일**: `/home/user/1on1-vntg/AI_DEVELOPER_CHECKLIST.md`
+    - 문서 업데이트 체크리스트
+- **신규 파일**: `/home/user/1on1-vntg/docs/AI_DEVELOPER_CHECKLIST.md`
 
 ---
 
@@ -315,21 +304,20 @@ Phase 3: 누락 문서 추가 (3-4시간)
 
 ### Phase 1: 긴급 수정
 - [ ] Task 1.1: 프로젝트 이름 통일
-- [ ] Task 1.2: Supabase 정책 명확화
+- [ ] Task 1.2: Supabase 적극 권장 정책 확립
 - [ ] Task 1.3: 폴더 구조 예시 통일
 
-### Phase 2: 문서 구조 개선
-- [ ] Task 2.1: README.md 슬림화
-- [ ] Task 2.2: 중복 콘텐츠 정리
-- [ ] Task 2.3: 문서 상호 참조 강화
-- [ ] Task 2.4: 문서 메타데이터 추가
+### Phase 2: 문서 구조 재구성
+- [ ] Task 2.1: docs/ 폴더 생성 및 문서 이동
+- [ ] Task 2.2: SETUP_GUIDE.md 신규 분리
+- [ ] Task 2.3: README.md 슬림화
+- [ ] Task 2.4: 문서 상호 참조 강화
+- [ ] Task 2.5: client/server README.md 업데이트
+- [ ] Task 2.6: 문서 메타데이터 추가
 
-### Phase 3: 누락 문서 추가
-- [ ] Task 3.1: DEPLOYMENT.md 생성
-- [ ] Task 3.2: SECURITY.md 생성
-- [ ] Task 3.3: PERFORMANCE.md 생성
-- [ ] Task 3.4: CONTRIBUTING.md 생성
-- [ ] Task 3.5: TEST_GUIDE.md 확장
+### Phase 3: 보안 문서 추가
+- [ ] Task 3.1: SECURITY.md 생성
+- [ ] Task 3.2: TEST_GUIDE.md 확장
 
 ### Phase 4: 바이브코딩 최적화
 - [ ] Task 4.1: .cursorrules 고도화
@@ -342,21 +330,20 @@ Phase 3: 누락 문서 추가 (3-4시간)
 
 ### Phase 1 완료 조건
 ✅ 모든 문서에서 프로젝트 이름이 `1on1-vntg`로 통일
-✅ Supabase 정책이 명확히 정의되고 모순 없음
+✅ Supabase를 적극 권장하는 정책이 명확히 정의됨
 ✅ 경로 예시가 실제 구조와 일치
 
 ### Phase 2 완료 조건
-✅ README.md 300-400줄 이하
-✅ 중복 콘텐츠 0개 (모두 링크로 대체)
+✅ docs/ 폴더 생성 및 모든 문서 이동 완료
+✅ SETUP_GUIDE.md 분리 완료
+✅ README.md 150-200줄로 슬림화
 ✅ 모든 문서에 상호 참조 추가
+✅ client/server README.md 업데이트 완료
 ✅ 모든 문서에 메타데이터 추가
 
 ### Phase 3 완료 조건
-✅ 배포 가이드 완성
-✅ 보안 가이드 완성
-✅ 성능 최적화 가이드 완성
-✅ 기여 가이드 완성
-✅ 테스트 가이드 확장
+✅ SECURITY.md 생성 완료
+✅ TEST_GUIDE.md 확장 완료
 
 ### Phase 4 완료 조건
 ✅ .cursorrules에 예시 코드 추가
@@ -377,7 +364,7 @@ Phase 3: 누락 문서 추가 (3-4시간)
 ```
 "DOCUMENTATION_ROADMAP.md의 Phase 1 Task 1.1을 진행해줘"
 "Phase 2 전체를 진행해줘"
-"Task 3.2 보안 가이드를 작성해줘"
+"Task 3.1 보안 가이드를 작성해줘"
 ```
 
 ### 3. 진행 상황 확인
@@ -390,8 +377,8 @@ Phase 3: 누락 문서 추가 (3-4시간)
 ## 🚀 다음 단계
 
 1. **지금 바로**: Phase 1 긴급 수정 시작
-2. **오늘 내**: Phase 2 문서 구조 개선 완료
-3. **이번 주**: Phase 3 누락 문서 추가
+2. **오늘 내**: Phase 2 문서 구조 재구성 완료
+3. **이번 주**: Phase 3 보안 문서 추가
 4. **여유 있을 때**: Phase 4 바이브코딩 최적화
 
 ---
@@ -406,5 +393,5 @@ Phase 3: 누락 문서 추가 (3-4시간)
 
 **작성일**: 2026-01-23
 **최종 수정**: 2026-01-23
-**버전**: 1.0.0
+**버전**: 2.0.0
 **다음 리뷰**: 2026-01-30
