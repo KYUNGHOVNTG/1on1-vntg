@@ -88,21 +88,23 @@ Phase 4: 바이브코딩 최적화 (2-3시간)
   - `/home/user/1on1-vntg/DEVELOPMENT_GUIDE.md`
   - `/home/user/1on1-vntg/ARCHITECTURE.md`
 
-### Task 1.2: Supabase 적극 권장 정책 확립
-- **현재 정책**: Supabase를 PostgreSQL DB로 적극 활용
+### Task 1.2: Supabase 정책 명확화
+- **정책**: Supabase를 PostgreSQL DB로만 활용, 전용 기능 사용 금지
 - **작업**:
-  - [ ] .cursorrules 수정 - Supabase 전면 권장 명시:
+  - [ ] .cursorrules 수정 - 명확한 사용 정책 명시:
     ```
-    8. **SUPABASE 적극 활용**
-       - ✅ Supabase를 개발 환경 PostgreSQL 데이터베이스로 적극 권장
-       - ✅ Supabase의 모든 기능 활용 가능 (Auth, Storage, Realtime 등)
-       - 장점: 빠른 개발, 무료 티어, 실시간 기능, 관리 편의성
-       - 로컬 개발: Supabase 무료 계정 사용 권장
+    8. **SUPABASE 사용 정책**
+       - ✅ 권장: Supabase를 PostgreSQL 데이터베이스로 활용
+       - ❌ 금지: Supabase 전용 기능 사용 (Auth, Storage, Realtime, Edge Functions 등)
+       - 이유: 향후 순수 PostgreSQL 환경으로 쉬운 이관을 위해
+       - 장점: 무료 티어, 빠른 설정, 관리 UI, PostgreSQL 100% 호환
+       - 로컬 개발: Supabase 무료 계정으로 PostgreSQL DB 사용 권장
+       - 인증: JWT 직접 구현, 파일: S3/로컬, 실시간: WebSocket 직접 구현
     ```
-  - [ ] README.md 데이터베이스 섹션 강화:
-    - Supabase 사용의 장점 강조
-    - 빠른 시작 가이드 명확화
-    - 환경 설정 예시 추가
+  - [ ] README.md 데이터베이스 섹션 명확화:
+    - PostgreSQL DB로서의 Supabase 사용 안내
+    - 전용 기능 사용 금지 명시
+    - 이관 용이성 강조
 - **영향 파일**:
   - `/home/user/1on1-vntg/.cursorrules`
   - `/home/user/1on1-vntg/README.md`
@@ -330,7 +332,7 @@ Phase 4: 바이브코딩 최적화 (2-3시간)
 
 ### Phase 1 완료 조건
 ✅ 모든 문서에서 프로젝트 이름이 `1on1-vntg`로 통일
-✅ Supabase를 적극 권장하는 정책이 명확히 정의됨
+✅ Supabase 정책 명확화 (PostgreSQL만 사용, 전용 기능 금지)
 ✅ 경로 예시가 실제 구조와 일치
 
 ### Phase 2 완료 조건

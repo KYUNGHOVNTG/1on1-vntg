@@ -23,9 +23,9 @@
    - 문서: `ai-worker-project`, `vibe-web-starter` 혼용
    - 영향: 개발자 혼란, 경로 예시 불일치
 
-2. **Supabase 정책 수립 필요**
-   - 목표: Supabase를 개발 환경 DB로 적극 권장
-   - 장점: 빠른 개발, 무료 티어, 실시간 기능
+2. **Supabase 정책 명확화 필요**
+   - 목표: PostgreSQL DB로만 사용, 전용 기능 금지
+   - 이유: 향후 순수 PostgreSQL로 쉬운 이관
 
 #### 🟡 중요 (Phase 2)
 3. **문서 구조 정리 필요**
@@ -82,7 +82,7 @@
 ```
 Phase 1: 긴급 수정 (1-2시간)          [🔴 최고 우선순위]
   ├─ Task 1.1: 프로젝트 이름 통일 (1on1-vntg)
-  ├─ Task 1.2: Supabase 적극 권장 정책 확립
+  ├─ Task 1.2: Supabase 정책 명확화 (PostgreSQL만, 전용 기능 금지)
   └─ Task 1.3: 폴더 구조 예시 통일
 
 Phase 2: 문서 구조 재구성 (2-3시간)   [🟡 높은 우선순위]
@@ -193,7 +193,7 @@ cat /home/user/1on1-vntg/PHASE1_ACTION_PLAN.md
 
 ### Phase 1 완료 시
 ✅ 모든 문서에서 프로젝트 이름이 `1on1-vntg`
-✅ Supabase를 적극 권장하는 정책이 명확히 정의됨
+✅ Supabase 정책 명확화 (PostgreSQL만 사용, 전용 기능 금지)
 ✅ 경로 예시가 실제 구조와 일치
 
 ### Phase 2 완료 시
@@ -274,10 +274,11 @@ cat /home/user/1on1-vntg/PHASE1_ACTION_PLAN.md
 
 ## 🔑 핵심 변경사항 (v2.0)
 
-### 1. Supabase 정책 변경
-- **이전**: 사용 제한
-- **현재**: 적극 권장
-- **이유**: 빠른 개발, 무료 티어, 실시간 기능
+### 1. Supabase 정책 명확화
+- **정책**: PostgreSQL DB로만 사용, 전용 기능 금지
+- **권장**: Supabase PostgreSQL (무료 티어, 관리 UI)
+- **금지**: Auth, Storage, Realtime 등 전용 기능
+- **이유**: 향후 순수 PostgreSQL로 쉬운 이관
 
 ### 2. docs/ 폴더 도입
 - **이전**: 루트에 MD 파일 분산
@@ -296,14 +297,59 @@ cat /home/user/1on1-vntg/PHASE1_ACTION_PLAN.md
 
 ---
 
-**작성일**: 2026-01-23
-**최종 수정**: 2026-01-23
-**버전**: 2.0.0
-**다음 리뷰**: 2026-01-30
+## 🎬 작업 시작 방법
 
----
-
-**시작 명령어**:
+### Phase 1 시작하기
 ```
 "PHASE1_ACTION_PLAN.md를 보고 Phase 1을 시작해줘"
 ```
+또는 Task별로 진행:
+```
+"PHASE1_ACTION_PLAN.md의 Task 1.1부터 시작해줘"
+"Task 1.1이 끝났으니 Task 1.2를 진행해줘"
+"Task 1.2가 끝났으니 Task 1.3을 진행해줘"
+```
+
+### Phase 1 완료 후 Phase 2 시작
+```
+"Phase 1이 완료되었으니 Phase 2를 시작해줘"
+```
+또는
+```
+"DOCUMENTATION_ROADMAP.md의 Phase 2를 진행해줘"
+```
+
+### Phase 2 완료 후 Phase 3 시작
+```
+"Phase 2가 완료되었으니 Phase 3을 시작해줘"
+```
+
+### Phase 3 완료 후 Phase 4 시작
+```
+"Phase 3이 완료되었으니 Phase 4를 시작해줘"
+```
+
+### 전체 Phase 자동 진행 (권장하지 않음)
+```
+"DOCUMENTATION_ROADMAP.md의 Phase 1부터 4까지 순서대로 진행해줘"
+```
+**주의**: 각 Phase를 검토하며 진행하는 것을 권장합니다.
+
+### 진행 상황 확인
+```
+"DOCUMENTATION_ROADMAP.md의 진행 상황을 확인해줘"
+"현재 어느 Phase까지 완료되었는지 알려줘"
+```
+
+### 특정 Task만 진행
+```
+"Task 2.1 docs/ 폴더 생성을 진행해줘"
+"Task 3.1 SECURITY.md를 작성해줘"
+```
+
+---
+
+**작성일**: 2026-01-23
+**최종 수정**: 2026-01-23
+**버전**: 2.0.1
+**다음 리뷰**: 2026-01-30
