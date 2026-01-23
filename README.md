@@ -106,7 +106,7 @@
 ## 📂 프로젝트 구조
 
 ```
-ai-worker-project/
+1on1-vntg/
 ├── 📁 server/                          # 백엔드 (FastAPI)
 │   ├── main.py                         # FastAPI 애플리케이션 진입점
 │   └── app/
@@ -273,7 +273,7 @@ async def analyze_data(request: SampleAnalysisRequest, db: AsyncSession = Depend
 
 ```bash
 # 1. 프로젝트 루트로 이동
-cd ai-worker-project
+cd 1on1-vntg
 
 # 2. Python 가상환경 생성 & 활성화
 python3 -m venv .venv
@@ -289,7 +289,30 @@ pip install -r requirements.txt
 cp .env.example .env
 # .env 파일을 열어 데이터베이스 연결 정보 수정
 
-# 5. Supabase 데이터베이스 설정 (권장)
+# 5. 데이터베이스 설정
+```
+
+## 💾 데이터베이스 설정 (Supabase PostgreSQL 권장)
+
+### 🚀 Supabase 사용 정책
+- ✅ **권장**: Supabase를 PostgreSQL 데이터베이스로 활용
+- ❌ **금지**: Supabase 전용 기능 (Auth, Storage, Realtime 등)
+- 📌 **이유**: 향후 순수 PostgreSQL로 쉬운 이관
+
+### 왜 Supabase PostgreSQL인가?
+- ✅ **무료 티어**: 로컬 개발에 충분한 무료 PostgreSQL DB
+- ✅ **빠른 설정**: 클릭 몇 번으로 즉시 사용
+- ✅ **PostgreSQL 100% 호환**: 표준 SQL만 사용
+- ✅ **관리 UI**: 웹에서 테이블 관리, SQL 실행, 데이터 확인
+- ✅ **쉬운 이관**: 언제든 다른 PostgreSQL 서버로 이동 가능
+
+### Supabase 시작하기
+
+**중요**: Supabase Auth, Storage, Realtime 등 전용 기능은 사용하지 마세요.
+순수 PostgreSQL 데이터베이스로만 활용하세요.
+
+```bash
+# 5-1. Supabase 데이터베이스 설정 (권장)
 
 # 5-1. https://supabase.com 에서 새 프로젝트 생성
 #      - 프로젝트명, 데이터베이스 비밀번호, 리전 선택
