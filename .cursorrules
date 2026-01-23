@@ -14,7 +14,21 @@ Cursor나 Claude AI 에이전트와 협업할 때 다음 규칙을 **엄격히**
 5. **도메인 간 의존성 금지**: 한 도메인이 다른 도메인의 내부 구현에 의존하지 않도록
 6. **인라인 스타일 금지**: React 컴포넌트에서 `style={{ ... }}` 사용 금지 (Tailwind CSS 사용)
 7. **타입 힌트 생략 금지**: Python, TypeScript 모두 명시적 타입 선언 필수
-8. **SUPABASE 기능 사용 금지** : 추후 PostgreSQL로 이관 계획이 있으므로 Supabase Auth, Storage, Realtime 기능 사용 금지
+8. **SUPABASE 사용 정책**
+   - ✅ 권장: Supabase를 PostgreSQL 데이터베이스로 활용
+   - ❌ 금지: Supabase 전용 기능 사용 (Auth, Storage, Realtime, Edge Functions 등)
+   - 이유: 향후 순수 PostgreSQL 환경으로 쉬운 이관을 위해
+   - 장점:
+     * 무료 티어로 빠른 개발 환경 구축
+     * PostgreSQL 100% 호환 (표준 SQL만 사용)
+     * 관리 UI 제공 (테이블 관리, SQL Editor)
+     * 로컬 개발에 최적
+   - 로컬 개발: Supabase 무료 계정으로 PostgreSQL DB 사용 권장
+   - 프로덕션: Supabase 또는 자체 PostgreSQL 서버로 쉽게 이관 가능
+   - 대안 구현:
+     * 인증: JWT 직접 구현 (현재 구현됨)
+     * 파일 저장: S3 또는 로컬 스토리지
+     * 실시간: WebSocket 직접 구현
 ---
 
 ## 📐 General Principles
