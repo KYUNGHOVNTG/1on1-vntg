@@ -5,8 +5,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getGoogleAuthURL, handleGoogleCallback } from '../api';
+import { getGoogleAuthURL, handleGoogleCallback, revokeSession } from '../api';
 import { useAuthStore } from '@/core/store/useAuthStore';
+import { SessionConflictModal } from '../components/SessionConflictModal';
+import type { SessionInfo } from '../types';
 
 interface LoginPageProps {
   /** 로그인 성공 시 콜백 */
@@ -19,6 +21,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [userInfo, setUserInfo] = useState<{ email?: string; name?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessingCallback, setIsProcessingCallback] = useState(false);
+
+  // 동시접속 제어
+  const [showSessionConflict, setShowSessionConflict] = useState(false);
+  const [existingSession, setExistingSession] = useState<SessionInfo | undefined>();
+  const [pendingUserId, setPendingUserId] = useState<string | undefined>();
+  const [pendingCode, setPendingCode] = useState<string | undefined>();
 
   // useAuthStore에서 setUser 가져오기
   const { setUser } = useAuthStore();
@@ -50,6 +58,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
     try {
       const response = await handleGoogleCallback({ code });
+
+      // 동시접속 감지
+      if (response.has_active_session && response.existing_session_info) {
+        console.log('🔒 기존 활성 세션 감지:', response.existing_session_info);
+
+        // 모달 표시를 위한 상태 설정
+        setExistingSession(response.existing_session_info);
+        setPendingUserId(response.user_id);
+        setPendingCode(code);
+        setShowSessionConflict(true);
+        setIsLoading(false);
+        return;
+      }
 
       if (response.success && response.access_token) {
         setLoginSuccess(true);
@@ -134,6 +155,87 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  /**
+   * 기존 세션 종료 후 강제 로그인
+   */
+  const handleForceLogin = async () => {
+    if (!pendingUserId || !pendingCode) {
+      setError('로그인 정보가 없습니다.');
+      setShowSessionConflict(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setShowSessionConflict(false);
+
+    try {
+      // 1. 기존 세션 폐기
+      console.log('🔄 기존 세션 폐기 시작:', pendingUserId);
+      const revokeResult = await revokeSession({
+        user_id: pendingUserId,
+        revoke_previous: true,
+      });
+
+      if (!revokeResult.success) {
+        throw new Error('세션 폐기에 실패했습니다.');
+      }
+
+      console.log('✅ 기존 세션 폐기 완료:', revokeResult.message);
+
+      // 2. 다시 로그인 시도
+      console.log('🔄 재로그인 시도');
+      const response = await handleGoogleCallback({ code: pendingCode });
+
+      if (response.success && response.access_token) {
+        // 로그인 성공 처리 (기존 로직과 동일)
+        setLoginSuccess(true);
+        setUserInfo({
+          email: response.email,
+          name: response.name,
+        });
+
+        console.log('✅ 강제 로그인 성공:', response);
+        localStorage.setItem('access_token', response.access_token);
+
+        if (response.user_id && response.email && response.name) {
+          const positionCode = response.position_code;
+          setUser({
+            id: response.user_id,
+            email: response.email,
+            name: response.name,
+            position_code: positionCode || response.position || 'P005',
+          });
+        }
+
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess();
+          }
+        }, 2000);
+      } else {
+        setError('재로그인에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('강제 로그인 오류:', err);
+      setError('기존 세션 종료 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+      setPendingUserId(undefined);
+      setPendingCode(undefined);
+      setExistingSession(undefined);
+    }
+  };
+
+  /**
+   * 세션 충돌 모달 닫기
+   */
+  const handleCancelSessionConflict = () => {
+    setShowSessionConflict(false);
+    setPendingUserId(undefined);
+    setPendingCode(undefined);
+    setExistingSession(undefined);
+  };
+
   // 로그인 성공 화면
   if (loginSuccess && userInfo) {
     return (
@@ -181,7 +283,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   // 로그인 화면
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+    <>
+      {/* 동시접속 확인 모달 */}
+      <SessionConflictModal
+        isOpen={showSessionConflict}
+        onClose={handleCancelSessionConflict}
+        onForceLogin={handleForceLogin}
+        sessionInfo={existingSession}
+      />
+
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
       {/* 상단 제목 영역 */}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">1on1-Mirror</h1>
@@ -271,6 +382,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           도움말
         </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 };

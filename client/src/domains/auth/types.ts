@@ -19,6 +19,16 @@ export interface GoogleAuthCallbackRequest {
 }
 
 /**
+ * 세션 정보
+ */
+export interface SessionInfo {
+  device_info?: string;
+  ip_address?: string;
+  created_at?: string;
+  last_activity_at?: string;
+}
+
+/**
  * Google OAuth 로그인 응답
  */
 export interface GoogleAuthResponse {
@@ -30,14 +40,47 @@ export interface GoogleAuthResponse {
   name?: string;
   role?: string;
   position?: string;
-  role_code?: string; // 역할 코드 (R001, R002 등)
-  position_code?: string; // 메뉴 권한 조회를 위한 직책 코드 (P001, P002 등)
+  role_code?: string;
+  position_code?: string;
+  has_active_session?: boolean; // 기존 활성 세션 존재 여부
+  existing_session_info?: SessionInfo; // 기존 세션 정보
 }
 
 /**
  * 로그아웃 응답
  */
 export interface LogoutResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * 활성 세션 확인 요청
+ */
+export interface CheckActiveSessionRequest {
+  user_id: string;
+}
+
+/**
+ * 활성 세션 확인 응답
+ */
+export interface CheckActiveSessionResponse {
+  has_active_session: boolean;
+  session_info?: SessionInfo;
+}
+
+/**
+ * 세션 폐기 요청
+ */
+export interface RevokeSessionRequest {
+  user_id: string;
+  revoke_previous?: boolean;
+}
+
+/**
+ * 세션 폐기 응답
+ */
+export interface RevokeSessionResponse {
   success: boolean;
   message: string;
 }

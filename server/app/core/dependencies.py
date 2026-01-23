@@ -116,17 +116,44 @@ async def get_current_user_id(
     session = result.scalar_one_or_none()
 
     if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session not found or revoked",
-            headers={"WWW-Authenticate": "Bearer"},
+        # 세션이 없는 경우, revoked되었는지 확인
+        revoked_result = await db.execute(
+            select(RefreshToken).where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_yn == 'Y'
+            ).order_by(RefreshToken.in_date.desc()).limit(1)
         )
+        revoked_session = revoked_result.scalar_one_or_none()
+
+        if revoked_session:
+            # 세션이 폐기됨 (다른 곳에서 로그인)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error_code": "SESSION_REVOKED",
+                    "message": "다른 기기에서 로그인하여 현재 세션이 종료되었습니다"
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        else:
+            # 세션이 없음 (최초 로그인 필요)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error_code": "SESSION_NOT_FOUND",
+                    "message": "세션을 찾을 수 없습니다"
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     # 6. 세션 만료 확인
     if session.is_expired():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired",
+            detail={
+                "error_code": "SESSION_EXPIRED",
+                "message": "세션이 만료되었습니다"
+            },
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -137,7 +164,10 @@ async def get_current_user_id(
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session timed out due to inactivity",
+            detail={
+                "error_code": "SESSION_IDLE_TIMEOUT",
+                "message": "장시간 사용하지 않아 세션이 만료되었습니다"
+            },
             headers={"WWW-Authenticate": "Bearer"},
         )
 

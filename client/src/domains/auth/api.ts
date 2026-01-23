@@ -6,10 +6,14 @@
 
 import { apiClient } from '@/core/api/client';
 import type {
-  GoogleAuthURLResponse,
+  CheckActiveSessionRequest,
+  CheckActiveSessionResponse,
   GoogleAuthCallbackRequest,
   GoogleAuthResponse,
+  GoogleAuthURLResponse,
   LogoutResponse,
+  RevokeSessionRequest,
+  RevokeSessionResponse,
 } from './types';
 
 /**
@@ -38,5 +42,31 @@ export async function handleGoogleCallback(
  */
 export async function logout(): Promise<LogoutResponse> {
   const response = await apiClient.post<LogoutResponse>('/v1/auth/logout');
+  return response.data;
+}
+
+/**
+ * 활성 세션을 확인합니다.
+ */
+export async function checkActiveSession(
+  request: CheckActiveSessionRequest
+): Promise<CheckActiveSessionResponse> {
+  const response = await apiClient.post<CheckActiveSessionResponse>(
+    '/v1/auth/check-active-session',
+    request
+  );
+  return response.data;
+}
+
+/**
+ * 세션을 폐기합니다. (동시접속 제어용)
+ */
+export async function revokeSession(
+  request: RevokeSessionRequest
+): Promise<RevokeSessionResponse> {
+  const response = await apiClient.post<RevokeSessionResponse>(
+    '/v1/auth/revoke-session',
+    request
+  );
   return response.data;
 }
