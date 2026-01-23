@@ -1,7 +1,20 @@
-# Cursor Rules for AI Worker Project
+# Cursor Rules for 1on1-vntg Project
 
 이 프로젝트는 **"유지보수성 최우선" 및 "모듈화"**를 핵심 가치로 하는 FastAPI + React 19 풀스택 웹 애플리케이션입니다.
 Cursor나 Claude AI 에이전트와 협업할 때 다음 규칙을 **엄격히** 준수해야 합니다.
+
+---
+
+## ⭐ 작업 시작 전 필수 확인
+
+**중요**: 코드 작업을 시작하기 전에 반드시 **[docs/AI_DEVELOPER_CHECKLIST.md](./docs/AI_DEVELOPER_CHECKLIST.md)**를 확인하세요.
+
+이 체크리스트는 다음을 포함합니다:
+- **작업 시작 전 체크리스트**: 문서 확인, 요구사항 분석, 영향 범위 평가
+- **코드 작성 중 체크리스트**: Backend/Frontend별 상세 가이드
+- **코드 작성 완료 후 체크리스트**: 품질 검증, 기능 테스트, Git 커밋
+
+체크리스트를 따르면 일관된 코드 품질과 아키텍처 준수가 보장됩니다.
 
 ---
 
@@ -1046,6 +1059,7 @@ DATABASE_URL=postgresql+asyncpg://postgres.xxx:password@aws-0-ap-northeast-2.poo
 
 ## 📚 추가 참고 자료
 
+- **[docs/AI_DEVELOPER_CHECKLIST.md](./docs/AI_DEVELOPER_CHECKLIST.md)**: ⭐ **AI 개발자 필수 체크리스트** (작업 전/중/후)
 - **[README.md](./README.md)**: 프로젝트 개요 및 빠른 시작
 - **[docs/SETUP_GUIDE.md](./docs/SETUP_GUIDE.md)**: 설치 및 실행 가이드
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)**: 아키텍처 상세 설명
