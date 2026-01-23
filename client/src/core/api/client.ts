@@ -12,6 +12,7 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, AxiosError } from 'axios';
 import { LoadingManager } from '../loading/LoadingManager';
 import { ApiErrorHandler } from '../errors/ApiErrorHandler';
+import { toast } from '../ui/Toast';
 
 class ApiClient {
   private instance: AxiosInstance;
@@ -85,6 +86,11 @@ class ApiClient {
 
         // 401 인증 에러 자동 처리
         if (ApiErrorHandler.isAuthError(error)) {
+          // 에러 응답에서 error_code 추출
+          const errorDetail = error.response?.data?.detail;
+          const errorCode = typeof errorDetail === 'object' ? errorDetail.error_code : null;
+          const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : '인증이 만료되었습니다';
+
           // localStorage에서 토큰 삭제
           localStorage.removeItem('access_token');
 
@@ -93,11 +99,25 @@ class ApiClient {
 
           // 현재 위치가 로그인 페이지가 아니면 리다이렉트
           if (window.location.pathname !== '/') {
-            // 세션 만료 메시지 표시를 위한 플래그 설정
-            sessionStorage.setItem('session_expired', 'true');
+            // error_code에 따라 다른 메시지 표시
+            if (errorCode === 'SESSION_REVOKED') {
+              // 다른 곳에서 로그인됨
+              toast.warning('다른 기기에서 로그인하여 현재 세션이 종료되었습니다');
+            } else if (errorCode === 'SESSION_IDLE_TIMEOUT') {
+              // Idle timeout
+              toast.warning('장시간 사용하지 않아 자동 로그아웃되었습니다');
+            } else if (errorCode === 'SESSION_EXPIRED') {
+              // 일반 세션 만료
+              toast.warning('세션이 만료되었습니다');
+            } else {
+              // 기타 인증 오류
+              toast.warning(errorMessage);
+            }
 
-            // 로그인 페이지로 리다이렉트
-            window.location.href = '/';
+            // 2초 후 로그인 페이지로 리다이렉트
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 2000);
           }
         }
 

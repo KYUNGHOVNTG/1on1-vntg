@@ -4,20 +4,24 @@ Auth API 라우터
 Google OAuth 로그인 엔드포인트를 제공합니다.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.database import get_db
 from server.app.core.dependencies import get_current_user_id
 from server.app.core.logging import get_logger
 from server.app.domain.auth.schemas import (
+    CheckActiveSessionRequest,
+    CheckActiveSessionResponse,
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
     LogoutResponse,
+    RevokeSessionRequest,
+    RevokeSessionResponse,
     UserInfoResponse,
 )
-from server.app.domain.auth.service import GoogleAuthService
+from server.app.domain.auth.service import GoogleAuthService, SessionService
 
 logger = get_logger(__name__)
 
@@ -56,24 +60,49 @@ async def get_google_auth_url(
     "/google/callback",
     response_model=GoogleAuthResponse,
     summary="Google OAuth 콜백 처리",
-    description="Google OAuth 인증 후 콜백을 처리하고 로그인을 완료합니다.",
+    description="Google OAuth 인증 후 콜백을 처리하고 로그인을 완료합니다. 기존 활성 세션이 있으면 세션 정보를 반환합니다.",
 )
 async def google_auth_callback(
-    request: GoogleAuthCallbackRequest,
+    callback_request: GoogleAuthCallbackRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> GoogleAuthResponse:
     """
     Google OAuth 콜백을 처리합니다.
 
     Args:
-        request: Google OAuth 콜백 요청 (authorization code 포함)
+        callback_request: Google OAuth 콜백 요청 (authorization code 포함)
+        request: FastAPI Request 객체 (헤더 정보 추출용)
         db: 데이터베이스 세션
 
     Returns:
         GoogleAuthResponse: 로그인 결과
+            - has_active_session=True인 경우: 기존 세션 정보 반환, 토큰 없음
+            - has_active_session=False인 경우: 새로운 토큰 생성 및 세션 생성
     """
+    # Request에서 device_info (User-Agent)와 ip_address 추출
+    device_info = request.headers.get("user-agent")
+    ip_address = request.client.host if request.client else None
+
+    # X-Forwarded-For 헤더 확인 (프록시 경유 시)
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        ip_address = x_forwarded_for.split(",")[0].strip()
+
+    logger.info(
+        "Google OAuth 콜백 수신",
+        extra={
+            "device_info": device_info,
+            "ip_address": ip_address
+        }
+    )
+
     service = GoogleAuthService(db)
-    result = await service.execute(request)
+    result = await service.execute(
+        callback_request,
+        device_info=device_info,
+        ip_address=ip_address
+    )
 
     if not result.success:
         logger.error(f"Google OAuth 로그인 실패: {result.error}")
@@ -136,3 +165,69 @@ async def get_current_user_info(
         user_id=user_id,
         message="인증 성공"
     )
+
+
+@router.post(
+    "/check-active-session",
+    response_model=CheckActiveSessionResponse,
+    summary="활성 세션 확인",
+    description="사용자의 활성 세션이 있는지 확인합니다.",
+)
+async def check_active_session(
+    request: CheckActiveSessionRequest,
+    db: AsyncSession = Depends(get_db),
+) -> CheckActiveSessionResponse:
+    """
+    사용자의 활성 세션을 확인합니다.
+
+    Args:
+        request: 활성 세션 확인 요청
+        db: 데이터베이스 세션
+
+    Returns:
+        CheckActiveSessionResponse: 활성 세션 정보
+    """
+    service = SessionService(db)
+    result = await service.check_active_session(request.user_id)
+
+    logger.info(
+        f"활성 세션 확인 완료: user_id={request.user_id}, has_active={result.has_active_session}"
+    )
+
+    return result
+
+
+@router.post(
+    "/revoke-session",
+    response_model=RevokeSessionResponse,
+    summary="세션 폐기",
+    description="사용자의 모든 활성 세션을 폐기합니다. (동시접속 제어용)",
+)
+async def revoke_session(
+    request: RevokeSessionRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RevokeSessionResponse:
+    """
+    사용자의 모든 활성 세션을 폐기합니다.
+
+    Args:
+        request: 세션 폐기 요청
+        db: 데이터베이스 세션
+
+    Returns:
+        RevokeSessionResponse: 폐기 결과
+    """
+    if not request.revoke_previous:
+        return RevokeSessionResponse(
+            success=True,
+            message="세션 폐기가 요청되지 않았습니다"
+        )
+
+    service = SessionService(db)
+    result = await service.revoke_previous_sessions(request.user_id)
+
+    logger.info(
+        f"세션 폐기 완료: user_id={request.user_id}, success={result.success}"
+    )
+
+    return result

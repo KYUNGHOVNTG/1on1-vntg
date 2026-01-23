@@ -17,9 +17,12 @@ from server.app.core.security import create_access_token, create_refresh_token
 from server.app.domain.auth.models import RefreshToken
 from datetime import datetime, timedelta
 from server.app.domain.auth.schemas import (
+    CheckActiveSessionResponse,
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
+    RevokeSessionResponse,
+    SessionInfo,
 )
 from server.app.domain.common.service import CommonCodeService
 from server.app.domain.user.models import User
@@ -31,6 +34,174 @@ from server.app.shared.exceptions import (
 from server.app.shared.types import ServiceResult
 
 logger = get_logger(__name__)
+
+
+class SessionService:
+    """
+    세션 관리 서비스
+
+    책임:
+        - 세션 생성 및 검증
+        - 활성 세션 확인
+        - 세션 폐기 (동시접속 제어)
+    """
+
+    def __init__(self, db: AsyncSession):
+        """
+        Args:
+            db: 데이터베이스 세션
+        """
+        self.db = db
+
+    async def check_active_session(self, user_id: str) -> CheckActiveSessionResponse:
+        """
+        사용자의 활성 세션이 있는지 확인합니다.
+
+        Args:
+            user_id: 사용자 ID
+
+        Returns:
+            CheckActiveSessionResponse: 활성 세션 정보
+        """
+        try:
+            # 활성 세션 조회 (revoked_yn='N', 만료되지 않음)
+            stmt = select(RefreshToken).where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_yn == 'N',
+                RefreshToken.expires_at > datetime.utcnow()
+            ).order_by(RefreshToken.in_date.desc())
+
+            result = await self.db.execute(stmt)
+            active_session = result.scalar_one_or_none()
+
+            if active_session:
+                session_info = SessionInfo(
+                    device_info=active_session.device_info,
+                    ip_address=active_session.ip_address,
+                    created_at=active_session.in_date.isoformat() if active_session.in_date else None,
+                    last_activity_at=active_session.last_activity_at.isoformat() if active_session.last_activity_at else None,
+                )
+
+                logger.info(
+                    f"활성 세션 발견: user_id={user_id}",
+                    extra={"session_info": session_info.model_dump()}
+                )
+
+                return CheckActiveSessionResponse(
+                    has_active_session=True,
+                    session_info=session_info
+                )
+            else:
+                logger.info(f"활성 세션 없음: user_id={user_id}")
+                return CheckActiveSessionResponse(
+                    has_active_session=False,
+                    session_info=None
+                )
+
+        except Exception as e:
+            logger.error(f"활성 세션 확인 중 오류: {str(e)}", extra={"user_id": user_id})
+            # 오류 시 안전하게 세션 없음으로 처리
+            return CheckActiveSessionResponse(
+                has_active_session=False,
+                session_info=None
+            )
+
+    async def revoke_previous_sessions(self, user_id: str) -> RevokeSessionResponse:
+        """
+        사용자의 모든 기존 활성 세션을 폐기합니다.
+
+        Args:
+            user_id: 사용자 ID
+
+        Returns:
+            RevokeSessionResponse: 폐기 결과
+        """
+        try:
+            # 모든 활성 세션 조회
+            stmt = select(RefreshToken).where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_yn == 'N'
+            )
+
+            result = await self.db.execute(stmt)
+            active_sessions = result.scalars().all()
+
+            # 세션 폐기
+            revoked_count = 0
+            for session in active_sessions:
+                session.revoke()
+                revoked_count += 1
+
+            await self.db.commit()
+
+            logger.info(
+                f"세션 폐기 완료: user_id={user_id}, count={revoked_count}",
+                extra={"user_id": user_id, "revoked_count": revoked_count}
+            )
+
+            return RevokeSessionResponse(
+                success=True,
+                message=f"{revoked_count}개의 세션이 폐기되었습니다"
+            )
+
+        except Exception as e:
+            logger.error(f"세션 폐기 중 오류: {str(e)}", extra={"user_id": user_id})
+            await self.db.rollback()
+            return RevokeSessionResponse(
+                success=False,
+                message=f"세션 폐기 실패: {str(e)}"
+            )
+
+    async def create_session(
+        self,
+        user_id: str,
+        refresh_token: str,
+        device_info: Optional[str] = None,
+        ip_address: Optional[str] = None
+    ) -> RefreshToken:
+        """
+        새로운 세션을 생성합니다.
+
+        Args:
+            user_id: 사용자 ID
+            refresh_token: Refresh Token 문자열
+            device_info: 디바이스 정보 (User-Agent)
+            ip_address: 로그인 IP 주소
+
+        Returns:
+            RefreshToken: 생성된 세션 객체
+        """
+        try:
+            expires_at = datetime.utcnow() + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+
+            db_refresh_token = RefreshToken(
+                refresh_token=refresh_token,
+                user_id=user_id,
+                expires_at=expires_at,
+                revoked_yn='N',
+                last_activity_at=datetime.utcnow(),
+                device_info=device_info,
+                ip_address=ip_address,
+            )
+
+            self.db.add(db_refresh_token)
+            await self.db.commit()
+
+            logger.info(
+                f"세션 생성 완료: user_id={user_id}",
+                extra={
+                    "user_id": user_id,
+                    "device_info": device_info,
+                    "ip_address": ip_address
+                }
+            )
+
+            return db_refresh_token
+
+        except Exception as e:
+            logger.error(f"세션 생성 중 오류: {str(e)}", extra={"user_id": user_id})
+            await self.db.rollback()
+            raise
 
 
 class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthResponse]):
@@ -92,11 +263,13 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
             1. Authorization Code를 Access Token으로 교환
             2. Access Token으로 사용자 정보 조회
             3. CM_USER 테이블에서 사용자 검증 (존재 여부, use_yn 확인)
-            4. 검증 성공 시 로그인 성공 처리
+            4. 기존 활성 세션 확인 (동시접속 제어)
+            5. 활성 세션이 있으면 세션 정보 반환 (토큰 생성 안 함)
+            6. 활성 세션이 없으면 JWT 토큰 생성 및 세션 생성
 
         Args:
             request: Google OAuth 콜백 요청 (authorization code 포함)
-            **kwargs: 추가 컨텍스트 정보
+            **kwargs: 추가 컨텍스트 정보 (device_info, ip_address)
 
         Returns:
             ServiceResult[GoogleAuthResponse]: 로그인 결과
@@ -122,7 +295,31 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 )
                 return ServiceResult.fail("등록되지 않은 사용자이거나 비활성화된 계정입니다")
 
-            # 4. 공통코드 조회 - role_code, position_code를 의미값으로 변환
+            # 4. 기존 활성 세션 확인 (동시접속 제어)
+            session_service = SessionService(self.db)
+            active_session_check = await session_service.check_active_session(user.user_id)
+
+            if active_session_check.has_active_session:
+                # 활성 세션이 있으면 세션 정보만 반환 (토큰 생성 안 함)
+                logger.info(
+                    "기존 활성 세션 발견 - 동시접속 제어",
+                    extra={
+                        "user_id": user.user_id,
+                        "existing_session": active_session_check.session_info.model_dump() if active_session_check.session_info else None
+                    }
+                )
+
+                return ServiceResult.ok(
+                    GoogleAuthResponse(
+                        success=False,  # 로그인 미완료 상태
+                        has_active_session=True,
+                        existing_session_info=active_session_check.session_info,
+                        user_id=user.user_id,
+                        email=email,
+                    )
+                )
+
+            # 5. 공통코드 조회 - role_code, position_code를 의미값으로 변환
             code_service = CommonCodeService(self.db)
             role_name = await code_service.get_role_name(user.role_code)
             position_name = await code_service.get_position_name(user.position_code)
@@ -142,7 +339,7 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 )
                 position_name = user.position_code  # fallback to code itself
 
-            # 5. JWT 토큰 생성
+            # 6. JWT 토큰 생성
             jwt_payload = {
                 "user_id": user.user_id,
                 "email": email,
@@ -150,27 +347,20 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 "position": position_name,
             }
             access_token = create_access_token(data=jwt_payload)
-
-            # 5-1. DB에 세션 정보(RefreshToken) 저장
             refresh_token_string = create_refresh_token(data={"user_id": user.user_id})
-            
-            # DB에 Refresh Token 정보 저장
-            expires_at = datetime.utcnow() + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
-            
-            # 기존 토큰 무효화 (필요시) - 여기서는 단순히 새로운 토큰을 추가하거나 업데이트하는 방식으로 처리
-            # Multi-session 허용 여부에 따라 달라질 수 있으나, 일단 추가
-            db_refresh_token = RefreshToken(
-                refresh_token=refresh_token_string,
-                user_id=user.user_id,
-                expires_at=expires_at,
-                revoked_yn='N',
-                last_activity_at=datetime.utcnow(),
-                # IP 및 Device 정보는 현재 context에서 가져올 수 있다면 추가 (현재는 생략)
-            )
-            self.db.add(db_refresh_token)
-            await self.db.commit()
 
-            # 6. 로그인 성공 로그 출력
+            # 7. 세션 생성 (device_info, ip_address 포함)
+            device_info = kwargs.get("device_info")
+            ip_address = kwargs.get("ip_address")
+
+            await session_service.create_session(
+                user_id=user.user_id,
+                refresh_token=refresh_token_string,
+                device_info=device_info,
+                ip_address=ip_address
+            )
+
+            # 8. 로그인 성공 로그 출력
             logger.info(
                 "로그인 성공",
                 extra={
@@ -193,9 +383,10 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                     name=user_info.get("name"),
                     role=role_name,
                     position=position_name,
-                    # 메뉴 권한 조회를 위한 코드 추가
                     role_code=user.role_code,
                     position_code=user.position_code,
+                    has_active_session=False,  # 새로 생성된 세션
+                    existing_session_info=None,
                 )
             )
 
