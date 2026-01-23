@@ -1,5 +1,16 @@
 # JWT 토큰 발급 테스트 가이드
 
+> **1on1-vntg 프로젝트의 JWT 인증 및 Google OAuth 테스트 가이드**
+
+## 📖 관련 문서
+
+- **[README.md](../README.md)**: 프로젝트 개요 및 빠른 시작
+- **[SETUP_GUIDE.md](./SETUP_GUIDE.md)**: 설치 및 실행 가이드
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)**: 아키텍처 상세 설명
+- **[DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md)**: 도메인 추가 및 개발 가이드
+
+---
+
 ## 사전 준비사항
 
 ### 1. 환경 설정 (.env 파일)
