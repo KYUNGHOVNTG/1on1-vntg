@@ -58,19 +58,19 @@ grep -c "1on1-vntg" /home/user/1on1-vntg/README.md      # 여러 건 나와야 �
 
 ---
 
-## Task 1.2: Supabase 적극 권장 정책 확립
+## Task 1.2: Supabase 정책 명확화
 
 ### 현재 상황
 ```
-현재: 문서 간 Supabase 언급이 일관되지 않음
-목표: Supabase를 개발 환경 DB로 적극 권장하는 명확한 정책
+현재: 문서 간 Supabase 정책이 명확하지 않음
+목표: PostgreSQL DB로만 사용, 전용 기능 금지 명확화
 ```
 
 ### 정책 방향
 ```
-✅ Supabase를 로컬 개발 환경 PostgreSQL DB로 적극 권장
-✅ Supabase의 모든 기능 활용 가능 (Auth, Storage, Realtime 등)
-✅ 빠른 개발, 무료 티어, 실시간 기능, 관리 편의성 강조
+✅ Supabase를 PostgreSQL 데이터베이스로 활용 (권장)
+❌ Supabase 전용 기능 사용 금지 (Auth, Storage, Realtime 등)
+📌 이유: 향후 순수 PostgreSQL로 쉬운 이관
 ```
 
 ### 수정 대상 1: .cursorrules
@@ -84,17 +84,21 @@ grep -c "1on1-vntg" /home/user/1on1-vntg/README.md      # 여러 건 나와야 �
 
 **수정 후**:
 ```
-8. **SUPABASE 적극 활용**
-   - ✅ Supabase를 개발 환경 PostgreSQL 데이터베이스로 적극 권장
-   - ✅ Supabase의 모든 기능 활용 가능 (Auth, Storage, Realtime, Edge Functions 등)
+8. **SUPABASE 사용 정책**
+   - ✅ 권장: Supabase를 PostgreSQL 데이터베이스로 활용
+   - ❌ 금지: Supabase 전용 기능 사용 (Auth, Storage, Realtime, Edge Functions 등)
+   - 이유: 향후 순수 PostgreSQL 환경으로 쉬운 이관을 위해
    - 장점:
-     * 빠른 개발 환경 구축 (무료 티어)
-     * 실시간 기능 (Realtime Subscriptions)
-     * 인증/권한 관리 용이 (Supabase Auth)
-     * 파일 저장소 (Supabase Storage)
+     * 무료 티어로 빠른 개발 환경 구축
+     * PostgreSQL 100% 호환 (표준 SQL만 사용)
      * 관리 UI 제공 (테이블 관리, SQL Editor)
-   - 로컬 개발: Supabase 무료 계정 사용 권장
-   - 프로덕션: Supabase 유료 플랜 또는 자체 PostgreSQL 선택 가능
+     * 로컬 개발에 최적
+   - 로컬 개발: Supabase 무료 계정으로 PostgreSQL DB 사용 권장
+   - 프로덕션: Supabase 또는 자체 PostgreSQL 서버로 쉽게 이관 가능
+   - 대안 구현:
+     * 인증: JWT 직접 구현 (현재 구현됨)
+     * 파일 저장: S3 또는 로컬 스토리지
+     * 실시간: WebSocket 직접 구현
 ```
 
 ### 수정 대상 2: README.md
@@ -104,20 +108,24 @@ grep -c "1on1-vntg" /home/user/1on1-vntg/README.md      # 여러 건 나와야 �
 
 **추가/강화 내용**:
 ```markdown
-## 데이터베이스 설정 (Supabase 권장)
+## 데이터베이스 설정 (Supabase PostgreSQL 권장)
 
-### 🚀 왜 Supabase인가?
-- ✅ **무료 티어**: 로컬 개발에 충분한 무료 계정 제공
-- ✅ **빠른 설정**: 클릭 몇 번으로 PostgreSQL DB 즉시 사용
-- ✅ **실시간 기능**: Realtime Subscriptions으로 실시간 업데이트 가능
-- ✅ **인증 내장**: Google OAuth, JWT 토큰 등 인증 기능 제공
-- ✅ **파일 저장소**: 프로필 이미지, 첨부 파일 등 저장 가능
+### 🚀 Supabase 사용 정책
+- ✅ **권장**: Supabase를 PostgreSQL 데이터베이스로 활용
+- ❌ **금지**: Supabase 전용 기능 (Auth, Storage, Realtime 등)
+- 📌 **이유**: 향후 순수 PostgreSQL로 쉬운 이관
+
+### 왜 Supabase PostgreSQL인가?
+- ✅ **무료 티어**: 로컬 개발에 충분한 무료 PostgreSQL DB
+- ✅ **빠른 설정**: 클릭 몇 번으로 즉시 사용
+- ✅ **PostgreSQL 100% 호환**: 표준 SQL만 사용
 - ✅ **관리 UI**: 웹에서 테이블 관리, SQL 실행, 데이터 확인
+- ✅ **쉬운 이관**: 언제든 다른 PostgreSQL 서버로 이동 가능
 
 ### Supabase 시작하기
 1. [Supabase](https://supabase.com) 가입
 2. 새 프로젝트 생성
-3. Settings → Database에서 연결 정보 확인
+3. Settings → Database에서 PostgreSQL 연결 정보 확인
 4. `.env` 파일에 `DATABASE_URL` 입력
 5. 바로 개발 시작!
 
@@ -126,33 +134,36 @@ grep -c "1on1-vntg" /home/user/1on1-vntg/README.md      # 여러 건 나와야 �
 DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
 ```
 
+**중요**: Supabase Auth, Storage, Realtime 등 전용 기능은 사용하지 마세요.
+순수 PostgreSQL 데이터베이스로만 활용하세요.
+
 자세한 설정은 [SETUP_GUIDE.md](./docs/SETUP_GUIDE.md)를 참조하세요.
 ```
 
 ### 수정 대상 3: TEST_GUIDE.md (또는 docs/TEST_GUIDE.md)
 
 **작업**:
-- [ ] Supabase 사용 전제로 작성된 내용 유지
-- [ ] "Supabase를 사용하는 경우" 조건문 제거 (기본값으로 간주)
-- [ ] Supabase Auth 사용 예시 추가 (선택사항)
+- [ ] Supabase PostgreSQL 사용 전제 유지
+- [ ] Supabase 전용 기능 사용 안 함 명시
+- [ ] 순수 PostgreSQL 연결 방식만 사용
 
 ### 실행 명령
 ```bash
 # AI 개발자에게 요청
-".cursorrules의 8번 항목을 Supabase 적극 권장 정책으로 수정해줘.
-README.md의 데이터베이스 섹션에 Supabase 장점을 강조하는 내용을 추가해줘."
+".cursorrules의 8번 항목을 Supabase 정책(PostgreSQL만 사용, 전용 기능 금지)으로 수정해줘.
+README.md의 데이터베이스 섹션에도 동일한 정책을 명확히 추가해줘."
 ```
 
 ### 검증 방법
 ```bash
 # 1. .cursorrules 확인
-cat /home/user/1on1-vntg/.cursorrules | grep -A10 "SUPABASE"
+cat /home/user/1on1-vntg/.cursorrules | grep -A15 "SUPABASE"
 
 # 2. README.md 확인
-cat /home/user/1on1-vntg/README.md | grep -A20 "데이터베이스 설정"
+cat /home/user/1on1-vntg/README.md | grep -A25 "데이터베이스 설정"
 
 # 3. 일관성 확인 (육안)
-# .cursorrules와 README.md의 Supabase 정책이 "적극 권장"으로 일치하는지
+# .cursorrules와 README.md의 Supabase 정책이 "PostgreSQL만 사용, 전용 기능 금지"로 일치하는지
 ```
 
 ---
@@ -217,11 +228,11 @@ grep "1on1-vntg/" /home/user/1on1-vntg/PROJECT_HANDOVER.md | head -3
 - [ ] 기타 문서에서 잘못된 프로젝트명 검색 및 치환
 - [ ] 검증: `grep -r "ai-worker-project\|vibe-web-starter" *.md` 결과 없음
 
-### Task 1.2: Supabase 적극 권장 정책 확립
-- [ ] .cursorrules의 8번 항목을 Supabase 적극 권장으로 수정
-- [ ] README.md 데이터베이스 섹션에 Supabase 장점 추가
-- [ ] TEST_GUIDE.md에서 Supabase 기본값으로 간주
-- [ ] 검증: 3개 문서의 정책이 "적극 권장"으로 일치함
+### Task 1.2: Supabase 정책 명확화
+- [ ] .cursorrules의 8번 항목을 명확한 정책으로 수정 (PostgreSQL만 사용, 전용 기능 금지)
+- [ ] README.md 데이터베이스 섹션에 정책 명시 및 주의사항 추가
+- [ ] TEST_GUIDE.md에서 Supabase PostgreSQL 사용 명시
+- [ ] 검증: 3개 문서의 정책이 일치함 (PostgreSQL OK, 전용 기능 금지)
 
 ### Task 1.3: 폴더 구조 예시 통일
 - [ ] 모든 MD 파일에서 경로 예시 치환
@@ -232,16 +243,21 @@ grep "1on1-vntg/" /home/user/1on1-vntg/PROJECT_HANDOVER.md | head -3
 - [ ] Git diff로 변경사항 확인
 - [ ] 커밋 메시지 작성:
   ```
-  docs: Phase 1 긴급 수정 - 프로젝트명 통일 및 Supabase 정책 확립
+  docs: Phase 1 긴급 수정 - 프로젝트명 통일 및 Supabase 정책 명확화
 
   - 모든 문서에서 프로젝트명을 1on1-vntg로 통일
-  - Supabase를 개발 환경 DB로 적극 권장하는 정책 확립
+  - Supabase 정책 명확화: PostgreSQL DB로만 사용, 전용 기능 금지
   - 경로 예시 통일
 
   주요 변경:
-  - .cursorrules: Supabase 적극 활용 권장
-  - README.md: Supabase 장점 강조, 프로젝트명 통일
+  - .cursorrules: Supabase 정책 (PostgreSQL 권장, 전용 기능 금지)
+  - README.md: Supabase 정책 명시, 프로젝트명 통일
   - 모든 문서: 경로 예시를 1on1-vntg/로 통일
+
+  Supabase 정책:
+  - ✅ PostgreSQL 데이터베이스로 활용
+  - ❌ Auth, Storage, Realtime 등 전용 기능 사용 금지
+  - 이유: 향후 순수 PostgreSQL로 쉬운 이관
 
   Ref: DOCUMENTATION_ROADMAP.md Phase 1
   ```
