@@ -402,14 +402,16 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                     position_name = user.position_code
 
                 # JWT 토큰 미리 생성
+                # refresh_token을 먼저 생성하여 session_id로 사용
+                pending_refresh_token = create_refresh_token(data={"user_id": user.user_id})
                 jwt_payload = {
                     "user_id": user.user_id,
                     "email": email,
                     "role": role_name,
                     "position": position_name,
+                    "session_id": pending_refresh_token,  # 세션 식별용
                 }
                 pending_access_token = create_access_token(data=jwt_payload)
-                pending_refresh_token = create_refresh_token(data={"user_id": user.user_id})
 
                 # device_info, ip_address 추출
                 device_info = kwargs.get("device_info")
@@ -473,14 +475,16 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 position_name = user.position_code  # fallback to code itself
 
             # 6. JWT 토큰 생성
+            # refresh_token을 먼저 생성하여 session_id로 사용
+            refresh_token_string = create_refresh_token(data={"user_id": user.user_id})
             jwt_payload = {
                 "user_id": user.user_id,
                 "email": email,
                 "role": role_name,
                 "position": position_name,
+                "session_id": refresh_token_string,  # 세션 식별용
             }
             access_token = create_access_token(data=jwt_payload)
-            refresh_token_string = create_refresh_token(data={"user_id": user.user_id})
 
             # 7. 세션 생성 (device_info, ip_address 포함)
             device_info = kwargs.get("device_info")
