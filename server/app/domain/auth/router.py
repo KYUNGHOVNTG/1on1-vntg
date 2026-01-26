@@ -8,18 +8,21 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.database import get_db
-from server.app.core.dependencies import get_current_user_id
+from server.app.core.dependencies import get_current_user_id, get_current_session_id
 from server.app.core.logging import get_logger
 from server.app.domain.auth.schemas import (
     CheckActiveSessionRequest,
     CheckActiveSessionResponse,
+    CleanupExpiredSessionsResponse,
     CompleteForceLoginRequest,
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
+    HeartbeatResponse,
     LogoutResponse,
     RevokeSessionRequest,
     RevokeSessionResponse,
+    SessionStatsResponse,
     UserInfoResponse,
 )
 from server.app.domain.auth.service import GoogleAuthService, SessionService
@@ -276,3 +279,102 @@ async def complete_force_login(
 
     logger.info(f"강제 로그인 성공: user_id={request.user_id}")
     return result.data
+
+
+@router.post(
+    "/session/heartbeat",
+    response_model=HeartbeatResponse,
+    summary="Heartbeat (세션 활성 유지)",
+    description="세션의 마지막 활동 시간을 업데이트하여 Idle Timeout을 방지합니다. 1분 이내 중복 요청은 무시됩니다.",
+)
+async def session_heartbeat(
+    session_id: str = Depends(get_current_session_id),
+    db: AsyncSession = Depends(get_db),
+) -> HeartbeatResponse:
+    """
+    Heartbeat를 처리하여 세션을 활성 상태로 유지합니다.
+
+    Args:
+        session_id: 현재 세션 ID (JWT에서 자동 추출)
+        db: 데이터베이스 세션
+
+    Returns:
+        HeartbeatResponse: Heartbeat 처리 결과
+    """
+    service = SessionService(db)
+    result = await service.update_heartbeat(session_id)
+
+    logger.info(
+        f"Heartbeat 처리: success={result['success']}",
+        extra={"last_activity_at": result.get("last_activity_at")}
+    )
+
+    return HeartbeatResponse(
+        success=result["success"],
+        last_activity_at=result.get("last_activity_at"),
+        message=result.get("message", ""),
+    )
+
+
+@router.get(
+    "/session/stats",
+    response_model=SessionStatsResponse,
+    summary="세션 통계 조회",
+    description="현재 활성 세션, Idle 세션, 전체 세션 수를 조회합니다. (관리자용)",
+)
+async def get_session_stats(
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> SessionStatsResponse:
+    """
+    세션 통계를 조회합니다.
+
+    Args:
+        user_id: 검증된 사용자 ID (Dependency에서 자동 주입)
+        db: 데이터베이스 세션
+
+    Returns:
+        SessionStatsResponse: 세션 통계 정보
+    """
+    service = SessionService(db)
+    stats = await service.get_session_stats()
+
+    return SessionStatsResponse(
+        active_sessions=stats["active_sessions"],
+        idle_sessions=stats["idle_sessions"],
+        total_sessions=stats["total_sessions"],
+    )
+
+
+@router.post(
+    "/session/cleanup",
+    response_model=CleanupExpiredSessionsResponse,
+    summary="만료 세션 정리",
+    description="Idle 상태인 세션을 정리합니다. 기본적으로 15분 이상 비활동 세션을 폐기합니다. (관리자용)",
+)
+async def cleanup_expired_sessions(
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> CleanupExpiredSessionsResponse:
+    """
+    만료된 세션을 수동으로 정리합니다.
+
+    Args:
+        user_id: 검증된 사용자 ID (Dependency에서 자동 주입)
+        db: 데이터베이스 세션
+
+    Returns:
+        CleanupExpiredSessionsResponse: 정리 결과
+    """
+    service = SessionService(db)
+    result = await service.cleanup_expired_sessions()
+
+    logger.info(
+        f"만료 세션 정리 요청 by user_id={user_id}: cleaned_count={result['cleaned_count']}"
+    )
+
+    return CleanupExpiredSessionsResponse(
+        success=result["success"],
+        cleaned_count=result["cleaned_count"],
+        message=result.get("message", ""),
+    )

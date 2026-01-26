@@ -65,17 +65,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     시작 시:
         - 데이터베이스 연결 확인
+        - 세션 정리 스케줄러 시작
         - 필요한 초기화 작업 수행
 
     종료 시:
+        - 스케줄러 중지
         - 데이터베이스 연결 종료
         - 리소스 정리
     """
     # 시작 시 실행
+    from server.app.core.scheduler import start_scheduler, stop_scheduler
 
     logger.info("🚀 Starting application...")
     logger.info(f"📦 Environment: {settings.ENVIRONMENT}")
     logger.info(f"🗄️  Database: {settings.POSTGRES_DB}")
+
+    # 세션 정리 스케줄러 시작
+    try:
+        start_scheduler()
+        logger.info("⏰ Session cleanup scheduler started")
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to start scheduler: {e}")
 
     # TODO: 필요한 초기화 작업
     # - 데이터베이스 마이그레이션 확인
@@ -91,6 +101,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     # 종료 시 실행
     logger.info("👋 Shutting down application...")
+
+    # 스케줄러 중지
+    try:
+        stop_scheduler()
+        logger.info("⏰ Session cleanup scheduler stopped")
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to stop scheduler: {e}")
+
     await DatabaseManager.close_connections()
     logger.info("✅ Application shutdown complete")
 

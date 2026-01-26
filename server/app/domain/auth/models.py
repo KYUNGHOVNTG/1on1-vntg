@@ -7,7 +7,7 @@ Auth 도메인 ORM 모델
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import String, CHAR, DateTime, Text
+from sqlalchemy import String, CHAR, DateTime, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from server.app.core.database import Base
@@ -22,6 +22,21 @@ class RefreshToken(Base):
     """
 
     __tablename__ = "auth_refresh_token"
+    
+    __table_args__ = (
+        # 1. 활성 세션 조회 및 동시접속 체크 최적화
+        Index(
+            'idx_refresh_token_user_active',
+            'user_id', 'revoked_yn', 'last_activity_at',
+            postgresql_where='revoked_yn = \'N\''
+        ),
+        # 2. 만료 세션 정리 크론잡 최적화
+        Index(
+            'idx_refresh_token_cleanup',
+            'last_activity_at',
+            postgresql_where='revoked_yn = \'N\''
+        ),
+    )
 
     # Primary Key
     refresh_token: Mapped[str] = mapped_column(

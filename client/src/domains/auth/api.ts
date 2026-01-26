@@ -12,6 +12,7 @@ import type {
   GoogleAuthCallbackRequest,
   GoogleAuthResponse,
   GoogleAuthURLResponse,
+  HeartbeatResponse,
   LogoutResponse,
   RevokeSessionRequest,
   RevokeSessionResponse,
@@ -92,6 +93,19 @@ export async function completeForceLogin(
   const response = await apiClient.post<GoogleAuthResponse>(
     '/v1/auth/complete-force-login',
     request
+  );
+  return response.data;
+}
+
+/**
+ * Heartbeat를 전송하여 세션을 활성 상태로 유지합니다.
+ * 백그라운드에서 조용히 실행됩니다 (로딩 표시 없음).
+ */
+export async function sendHeartbeat(): Promise<HeartbeatResponse> {
+  const response = await apiClient.post<HeartbeatResponse>(
+    '/v1/auth/session/heartbeat',
+    {},
+    { skipLoading: true } as any // skipLoading 옵션 전달
   );
   return response.data;
 }

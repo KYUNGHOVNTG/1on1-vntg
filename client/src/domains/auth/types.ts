@@ -99,3 +99,12 @@ export interface UserInfoResponse {
   user_id: string;
   message: string;
 }
+
+/**
+ * Heartbeat 응답
+ */
+export interface HeartbeatResponse {
+  success: boolean;
+  last_activity_at?: string;
+  message: string;
+}

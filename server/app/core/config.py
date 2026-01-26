@@ -91,11 +91,11 @@ class Settings(BaseSettings):
         description="SQLAlchemy SQL 로깅 활성화"
     )
     DB_POOL_SIZE: int = Field(
-        default=5,
+        default=10,
         description="데이터베이스 커넥션 풀 크기"
     )
     DB_MAX_OVERFLOW: int = Field(
-        default=10,
+        default=20,
         description="데이터베이스 커넥션 풀 최대 오버플로우"
     )
 

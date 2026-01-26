@@ -10,6 +10,8 @@ import { CodeManagementPage } from './domains/common';
 import { ComponentShowcasePage } from './domains/system/pages/ComponentShowcasePage';
 import { MainLayout } from './core/layout';
 import { useAuthStore } from './core/store/useAuthStore';
+import { useActivityTracker } from './core/hooks';
+import { IdleTimeoutModal } from './core/components/IdleTimeoutModal';
 
 function App() {
   // useAuthStore에서 인증 상태 가져오기
@@ -20,6 +22,9 @@ function App() {
 
   // 검증 완료 여부 (초기 로드 시 한 번만 실행)
   const validationDone = useRef(false);
+
+  // Idle timeout 경고 모달 상태
+  const [showIdleWarning, setShowIdleWarning] = useState(false);
 
   /**
    * 세션 유효성 검증
@@ -48,6 +53,49 @@ function App() {
       setIsValidatingSession(false);
     }
   }, []);
+
+  // 로그아웃 핸들러
+  const handleLogout = useCallback(async () => {
+    try {
+      // 서버에 로그아웃 요청 (선택적)
+      await logoutAPI();
+    } catch (error) {
+      console.error('로그아웃 API 호출 실패:', error);
+      // API 실패해도 클라이언트 측 로그아웃은 진행
+    } finally {
+      // localStorage에서 토큰 제거
+      localStorage.removeItem('access_token');
+
+      // useAuthStore 상태 초기화
+      logoutStore();
+
+      // 다음 로그인 시 검증 다시 수행할 수 있도록 리셋
+      validationDone.current = false;
+
+      console.log('✅ 로그아웃 완료');
+    }
+  }, [logoutStore]);
+
+  // Activity Tracker 설정
+  const { keepAlive } = useActivityTracker({
+    enabled: isAuthenticated,
+    onIdleWarning: () => {
+      console.log('⚠️ Idle warning - 모달 표시');
+      setShowIdleWarning(true);
+    },
+    onIdleTimeout: () => {
+      console.log('⏰ Idle timeout - 자동 로그아웃');
+      setShowIdleWarning(false);
+      handleLogout();
+    },
+  });
+
+  // "계속 사용" 버튼 핸들러
+  const handleKeepAlive = useCallback(() => {
+    console.log('✅ 계속 사용 - Heartbeat 전송');
+    setShowIdleWarning(false);
+    keepAlive();
+  }, [keepAlive]);
 
   // 앱 초기화 시 세션 검증
   useEffect(() => {
@@ -94,28 +142,6 @@ function App() {
     setIsValidatingSession(false);
   };
 
-  // 로그아웃 핸들러
-  const handleLogout = async () => {
-    try {
-      // 서버에 로그아웃 요청 (선택적)
-      await logoutAPI();
-    } catch (error) {
-      console.error('로그아웃 API 호출 실패:', error);
-      // API 실패해도 클라이언트 측 로그아웃은 진행
-    } finally {
-      // localStorage에서 토큰 제거
-      localStorage.removeItem('access_token');
-
-      // useAuthStore 상태 초기화
-      logoutStore();
-
-      // 다음 로그인 시 검증 다시 수행할 수 있도록 리셋
-      validationDone.current = false;
-
-      console.log('✅ 로그아웃 완료');
-    }
-  };
-
   // 세션 검증 중일 때는 로딩 표시
   if (isValidatingSession && isAuthenticated) {
     return (
@@ -130,6 +156,13 @@ function App() {
     <Router>
       {/* 전역 로딩 오버레이 */}
       <LoadingOverlay />
+
+      {/* Idle Timeout 경고 모달 */}
+      <IdleTimeoutModal
+        isOpen={showIdleWarning}
+        onKeepAlive={handleKeepAlive}
+        remainingSeconds={60}
+      />
 
       {/* 라우팅: 로그인 vs 인증된 레이아웃 */}
       {isAuthenticated ? (

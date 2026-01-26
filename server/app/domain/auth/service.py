@@ -284,6 +284,186 @@ class SessionService:
             await self.db.rollback()
             raise
 
+    async def update_heartbeat(self, session_id: str) -> dict:
+        """
+        세션의 last_activity_at을 업데이트합니다 (Heartbeat).
+
+        쓰로틀링: 마지막 업데이트 이후 1분 이내면 업데이트를 건너뜁니다.
+
+        Args:
+            session_id: 세션 식별자 (refresh_token)
+
+        Returns:
+            dict: 업데이트 결과 (success, last_activity_at, message)
+        """
+        try:
+            # 세션 조회
+            stmt = select(RefreshToken).where(
+                RefreshToken.refresh_token == session_id,
+                RefreshToken.revoked_yn == 'N'
+            )
+            result = await self.db.execute(stmt)
+            session = result.scalar_one_or_none()
+
+            if not session:
+                logger.warning(f"Heartbeat 실패: 세션을 찾을 수 없음 (session_id={session_id[:20]}...)")
+                return {
+                    "success": False,
+                    "last_activity_at": None,
+                    "message": "세션을 찾을 수 없거나 이미 폐기되었습니다"
+                }
+
+            # 쓰로틀링 체크: 마지막 업데이트 이후 1분 이상 경과했는지 확인
+            throttle_threshold = datetime.utcnow() - timedelta(minutes=1)
+            if session.last_activity_at and session.last_activity_at > throttle_threshold:
+                # 1분 이내 중복 요청 - 업데이트 건너뜀
+                logger.debug(
+                    f"Heartbeat 쓰로틀링: user_id={session.user_id}",
+                    extra={"last_activity_at": session.last_activity_at.isoformat()}
+                )
+                return {
+                    "success": True,
+                    "last_activity_at": session.last_activity_at.isoformat(),
+                    "message": "이미 최근에 업데이트됨 (쓰로틀링)"
+                }
+
+            # last_activity_at 업데이트
+            session.update_activity()
+            await self.db.commit()
+
+            logger.info(
+                f"Heartbeat 업데이트: user_id={session.user_id}",
+                extra={"last_activity_at": session.last_activity_at.isoformat()}
+            )
+
+            return {
+                "success": True,
+                "last_activity_at": session.last_activity_at.isoformat(),
+                "message": "Heartbeat 처리 완료"
+            }
+
+        except Exception as e:
+            logger.error(f"Heartbeat 처리 중 오류: {str(e)}")
+            await self.db.rollback()
+            return {
+                "success": False,
+                "last_activity_at": None,
+                "message": f"Heartbeat 처리 실패: {str(e)}"
+            }
+
+    async def cleanup_expired_sessions(self, idle_minutes: int = 15) -> dict:
+        """
+        Idle 상태인 세션을 폐기합니다.
+
+        Args:
+            idle_minutes: idle로 간주할 분 단위 (기본 15분)
+
+        Returns:
+            dict: 정리 결과 (success, cleaned_count, message)
+        """
+        try:
+            # Idle 기준 시간 계산
+            idle_threshold = datetime.utcnow() - timedelta(minutes=idle_minutes)
+
+            # Idle 상태 세션 조회 (last_activity_at이 기준 시간보다 이전)
+            stmt = select(RefreshToken).where(
+                RefreshToken.revoked_yn == 'N',
+                RefreshToken.last_activity_at < idle_threshold
+            )
+
+            result = await self.db.execute(stmt)
+            idle_sessions = result.scalars().all()
+
+            # 세션 폐기
+            cleaned_count = 0
+            for session in idle_sessions:
+                session.revoke()
+                cleaned_count += 1
+
+            await self.db.commit()
+
+            if cleaned_count > 0:
+                logger.info(
+                    f"만료 세션 정리 완료: {cleaned_count}개 폐기됨",
+                    extra={"cleaned_count": cleaned_count, "idle_minutes": idle_minutes}
+                )
+            else:
+                logger.debug("만료 세션 없음")
+
+            return {
+                "success": True,
+                "cleaned_count": cleaned_count,
+                "message": f"{cleaned_count}개의 만료 세션이 정리되었습니다"
+            }
+
+        except Exception as e:
+            logger.error(f"만료 세션 정리 중 오류: {str(e)}")
+            await self.db.rollback()
+            return {
+                "success": False,
+                "cleaned_count": 0,
+                "message": f"만료 세션 정리 실패: {str(e)}"
+            }
+
+    async def get_session_stats(self, idle_minutes: int = 15) -> dict:
+        """
+        세션 통계를 조회합니다.
+
+        Args:
+            idle_minutes: idle로 간주할 분 단위 (기본 15분)
+
+        Returns:
+            dict: 통계 정보 (active_sessions, idle_sessions, total_sessions)
+        """
+        try:
+            # 전체 세션 수 (revoked 포함 안 함)
+            stmt = select(RefreshToken).where(
+                RefreshToken.revoked_yn == 'N',
+                RefreshToken.expires_at > datetime.utcnow()
+            )
+            result = await self.db.execute(stmt)
+            all_active = result.scalars().all()
+
+            # Idle 기준 시간 계산
+            idle_threshold = datetime.utcnow() - timedelta(minutes=idle_minutes)
+
+            active_count = 0
+            idle_count = 0
+
+            for session in all_active:
+                if session.last_activity_at and session.last_activity_at < idle_threshold:
+                    idle_count += 1
+                else:
+                    active_count += 1
+
+            # 전체 세션 수 (revoked 포함)
+            total_stmt = select(RefreshToken)
+            total_result = await self.db.execute(total_stmt)
+            total_count = len(total_result.scalars().all())
+
+            logger.info(
+                f"세션 통계 조회: active={active_count}, idle={idle_count}, total={total_count}",
+                extra={
+                    "active_sessions": active_count,
+                    "idle_sessions": idle_count,
+                    "total_sessions": total_count
+                }
+            )
+
+            return {
+                "active_sessions": active_count,
+                "idle_sessions": idle_count,
+                "total_sessions": total_count
+            }
+
+        except Exception as e:
+            logger.error(f"세션 통계 조회 중 오류: {str(e)}")
+            return {
+                "active_sessions": 0,
+                "idle_sessions": 0,
+                "total_sessions": 0
+            }
+
 
 class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthResponse]):
     """

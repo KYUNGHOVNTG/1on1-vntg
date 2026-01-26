@@ -29,6 +29,9 @@ python-dateutil==2.8.2
 # 환경 변수 로딩
 python-dotenv==1.0.0
 
+# 스케줄러 (세션 정리 크론잡)
+apscheduler==3.10.4
+
 # 개발 도구
 # ============
 
@@ -50,3 +53,5 @@ httpx==0.26.0  # 테스트용 HTTP 클라이언트
 watchfiles==0.21.0
 
 psycopg2==2.9.11
+
+apscheduler==3.10.4

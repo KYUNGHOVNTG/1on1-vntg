@@ -214,6 +214,107 @@ async def get_current_user_id(
     return user_id
 
 
+async def get_current_session_id(
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_database_session)
+) -> str:
+    """
+    JWT 토큰에서 session_id(refresh_token)를 추출합니다.
+
+    Heartbeat API에서 세션 ID만 필요할 때 사용합니다.
+    세션 활동 시간 업데이트는 별도로 처리되므로 여기서는 업데이트하지 않습니다.
+
+    사용법:
+        @router.post("/heartbeat")
+        async def heartbeat(session_id: str = Depends(get_current_session_id)):
+            return {"session_id": session_id}
+
+    Args:
+        authorization: Authorization 헤더 (Bearer {token})
+        db: 데이터베이스 세션
+
+    Returns:
+        str: 세션 ID (refresh_token 문자열)
+
+    Raises:
+        HTTPException: 토큰이 유효하지 않은 경우
+    """
+    # 1. Authorization 헤더 확인
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 2. Bearer 스킴 확인
+    try:
+        scheme, token = authorization.split()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication scheme",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 3. JWT 디코딩 및 검증
+    try:
+        payload = decode_access_token(token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 4. session_id 추출
+    session_id: str = payload.get("session_id")
+
+    if not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session ID not found in token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 5. 세션 존재 확인만 수행 (활동 시간 업데이트는 Heartbeat 서비스에서 처리)
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.refresh_token == session_id
+        )
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error_code": "SESSION_NOT_FOUND",
+                "message": "세션을 찾을 수 없습니다"
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if session.revoked_yn == 'Y':
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error_code": "SESSION_REVOKED",
+                "message": "다른 기기에서 로그인하여 현재 세션이 종료되었습니다"
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return session_id
+
+
 class AuthenticationChecker:
     """
     인증 검증 클래스 (Legacy, API 키 검증용으로만 사용)

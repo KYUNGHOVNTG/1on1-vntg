@@ -96,6 +96,30 @@ class CompleteForceLoginRequest(BaseModel):
     user_id: str = Field(..., description="사용자 ID")
 
 
+class HeartbeatResponse(BaseModel):
+    """Heartbeat 응답"""
+
+    success: bool = Field(..., description="Heartbeat 처리 성공 여부")
+    last_activity_at: str | None = Field(None, description="마지막 활동 시간 (ISO 8601)")
+    message: str = Field(default="Heartbeat 수신", description="응답 메시지")
+
+
+class SessionStatsResponse(BaseModel):
+    """세션 통계 응답"""
+
+    active_sessions: int = Field(..., description="활성 세션 수")
+    idle_sessions: int = Field(..., description="Idle 상태 세션 수 (15분 이상 비활동)")
+    total_sessions: int = Field(..., description="전체 세션 수 (revoked 포함)")
+
+
+class CleanupExpiredSessionsResponse(BaseModel):
+    """만료 세션 정리 응답"""
+
+    success: bool = Field(..., description="정리 성공 여부")
+    cleaned_count: int = Field(..., description="정리된 세션 수")
+    message: str = Field(default="", description="응답 메시지")
+
+
 __all__ = [
     "GoogleAuthURLResponse",
     "GoogleAuthCallbackRequest",
@@ -108,4 +132,7 @@ __all__ = [
     "RevokeSessionRequest",
     "RevokeSessionResponse",
     "CompleteForceLoginRequest",
+    "HeartbeatResponse",
+    "SessionStatsResponse",
+    "CleanupExpiredSessionsResponse",
 ]
