@@ -12,7 +12,7 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, AxiosError } from 'axios';
 import { LoadingManager } from '../loading/LoadingManager';
 import { ApiErrorHandler } from '../errors/ApiErrorHandler';
-import { toast } from '../ui/Toast';
+import { toast } from 'sonner';
 
 class ApiClient {
   private instance: AxiosInstance;
