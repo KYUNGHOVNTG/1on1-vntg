@@ -90,6 +90,12 @@ class RevokeSessionResponse(BaseModel):
     message: str = Field(default="세션이 폐기되었습니다", description="응답 메시지")
 
 
+class CompleteForceLoginRequest(BaseModel):
+    """강제 로그인 완료 요청"""
+
+    user_id: str = Field(..., description="사용자 ID")
+
+
 __all__ = [
     "GoogleAuthURLResponse",
     "GoogleAuthCallbackRequest",
@@ -101,4 +107,5 @@ __all__ = [
     "CheckActiveSessionResponse",
     "RevokeSessionRequest",
     "RevokeSessionResponse",
+    "CompleteForceLoginRequest",
 ]

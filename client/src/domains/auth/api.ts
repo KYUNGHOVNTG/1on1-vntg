@@ -8,6 +8,7 @@ import { apiClient } from '@/core/api/client';
 import type {
   CheckActiveSessionRequest,
   CheckActiveSessionResponse,
+  CompleteForceLoginRequest,
   GoogleAuthCallbackRequest,
   GoogleAuthResponse,
   GoogleAuthURLResponse,
@@ -66,6 +67,20 @@ export async function revokeSession(
 ): Promise<RevokeSessionResponse> {
   const response = await apiClient.post<RevokeSessionResponse>(
     '/v1/auth/revoke-session',
+    request
+  );
+  return response.data;
+}
+
+/**
+ * 강제 로그인을 완료합니다.
+ * 기존 세션 폐기 후 임시 저장된 토큰으로 로그인을 완료합니다.
+ */
+export async function completeForceLogin(
+  request: CompleteForceLoginRequest
+): Promise<GoogleAuthResponse> {
+  const response = await apiClient.post<GoogleAuthResponse>(
+    '/v1/auth/complete-force-login',
     request
   );
   return response.data;

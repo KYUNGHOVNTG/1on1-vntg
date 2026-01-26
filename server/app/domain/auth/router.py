@@ -13,6 +13,7 @@ from server.app.core.logging import get_logger
 from server.app.domain.auth.schemas import (
     CheckActiveSessionRequest,
     CheckActiveSessionResponse,
+    CompleteForceLoginRequest,
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
@@ -231,3 +232,47 @@ async def revoke_session(
     )
 
     return result
+
+
+@router.post(
+    "/complete-force-login",
+    response_model=GoogleAuthResponse,
+    summary="강제 로그인 완료",
+    description="기존 세션을 폐기하고 임시 저장된 토큰으로 로그인을 완료합니다.",
+)
+async def complete_force_login(
+    request: CompleteForceLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GoogleAuthResponse:
+    """
+    강제 로그인을 완료합니다.
+
+    동시접속 감지 후 사용자가 "기존 세션 종료하고 로그인"을 선택했을 때 호출됩니다.
+    1. 기존 세션 폐기
+    2. 임시 저장된 토큰으로 새 세션 생성
+    3. 토큰 반환
+
+    Args:
+        request: 강제 로그인 요청 (user_id 포함)
+        db: 데이터베이스 세션
+
+    Returns:
+        GoogleAuthResponse: 로그인 결과
+
+    Raises:
+        HTTPException 401: 임시 저장된 토큰이 없거나 만료된 경우
+    """
+    logger.info(f"강제 로그인 요청: user_id={request.user_id}")
+
+    service = SessionService(db)
+    result = await service.complete_force_login(request.user_id)
+
+    if not result.success:
+        logger.error(f"강제 로그인 실패: {result.error}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=result.error,
+        )
+
+    logger.info(f"강제 로그인 성공: user_id={request.user_id}")
+    return result.data

@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getGoogleAuthURL, handleGoogleCallback, revokeSession } from '../api';
+import { getGoogleAuthURL, handleGoogleCallback, completeForceLogin } from '../api';
 import { useAuthStore } from '@/core/store/useAuthStore';
 import { SessionConflictModal } from '../components/SessionConflictModal';
 import type { SessionInfo } from '../types';
@@ -155,8 +155,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   /**
    * 기존 세션 종료 후 강제 로그인
-   * - 세션 폐기 후 새로운 Google OAuth 플로우를 시작합니다.
-   * - Google OAuth authorization code는 일회용이므로 재사용할 수 없습니다.
+   * - 백엔드에서 임시 저장된 토큰으로 세션 폐기 후 즉시 로그인 완료
+   * - 사용자가 다시 Google 로그인 화면을 거치지 않아도 됨
    */
   const handleForceLogin = async () => {
     if (!pendingUserId) {
@@ -169,31 +169,52 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setShowSessionConflict(false);
 
     try {
-      // 1. 기존 세션 폐기
-      console.log('🔄 기존 세션 폐기 시작:', pendingUserId);
-      const revokeResult = await revokeSession({
-        user_id: pendingUserId,
-        revoke_previous: true,
-      });
+      // 기존 세션 폐기 + 임시 저장된 토큰으로 로그인 완료 (단일 API 호출)
+      console.log('🔄 강제 로그인 시작:', pendingUserId);
+      const response = await completeForceLogin({ user_id: pendingUserId });
 
-      if (!revokeResult.success) {
-        throw new Error('세션 폐기에 실패했습니다.');
+      if (response.success && response.access_token) {
+        // 로그인 성공 처리
+        setLoginSuccess(true);
+        setUserInfo({
+          email: response.email,
+          name: response.name,
+        });
+
+        console.log('✅ 강제 로그인 성공:', response);
+        localStorage.setItem('access_token', response.access_token);
+
+        if (response.user_id && response.email && response.name) {
+          const positionCode = response.position_code;
+          setUser({
+            id: response.user_id,
+            email: response.email,
+            name: response.name,
+            position_code: positionCode || response.position || 'P005',
+          });
+
+          console.log('✅ useAuthStore에 사용자 정보 저장:', {
+            id: response.user_id,
+            email: response.email,
+            name: response.name,
+            position_code: positionCode || response.position || 'P005',
+          });
+        }
+
+        // 로그인 성공 콜백 호출 (2초 후 대시보드로 이동)
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess();
+          }
+        }, 2000);
+      } else {
+        setError('강제 로그인에 실패했습니다.');
       }
-
-      console.log('✅ 기존 세션 폐기 완료:', revokeResult.message);
-
-      // 2. 새로운 Google OAuth 플로우 시작 (새 authorization code 획득)
-      // Google OAuth authorization code는 일회용이므로 재사용 불가
-      console.log('🔄 새로운 Google 로그인 플로우 시작');
-      setPendingUserId(undefined);
-      setExistingSession(undefined);
-
-      // handleGoogleLogin()은 Google OAuth 페이지로 리다이렉트
-      handleGoogleLogin();
     } catch (err) {
       console.error('강제 로그인 오류:', err);
-      setError('기존 세션 종료 중 오류가 발생했습니다.');
+      setError('기존 세션 종료 중 오류가 발생했습니다. 다시 로그인해 주세요.');
       setIsLoading(false);
+    } finally {
       setPendingUserId(undefined);
       setExistingSession(undefined);
     }

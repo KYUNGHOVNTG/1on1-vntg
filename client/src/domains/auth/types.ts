@@ -84,3 +84,10 @@ export interface RevokeSessionResponse {
   success: boolean;
   message: string;
 }
+
+/**
+ * 강제 로그인 완료 요청
+ */
+export interface CompleteForceLoginRequest {
+  user_id: string;
+}
