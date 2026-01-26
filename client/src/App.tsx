@@ -1,10 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Toaster, toast } from 'sonner';
 
 import { LoadingOverlay } from './core/loading';
 import { LoginPage } from './domains/auth';
-import { logout as logoutAPI } from './domains/auth/api';
+import { logout as logoutAPI, getCurrentUser } from './domains/auth/api';
 import { DashboardPage } from './domains/dashboard';
 import { CodeManagementPage } from './domains/common';
 import { ComponentShowcasePage } from './domains/system/pages/ComponentShowcasePage';
@@ -15,7 +15,41 @@ function App() {
   // useAuthStore에서 인증 상태 가져오기
   const { isAuthenticated, logout: logoutStore } = useAuthStore();
 
-  // 로그인 상태 확인 및 세션 만료 알림
+  // 세션 검증 중 상태
+  const [isValidatingSession, setIsValidatingSession] = useState(true);
+
+  // 검증 완료 여부 (초기 로드 시 한 번만 실행)
+  const validationDone = useRef(false);
+
+  /**
+   * 세션 유효성 검증
+   * 서버에 /auth/me API를 호출하여 현재 세션이 유효한지 확인합니다.
+   * 세션이 폐기되었으면 401 에러가 발생하고 client.ts의 interceptor에서 로그아웃 처리됩니다.
+   */
+  const validateSession = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+
+    // 토큰이 없으면 검증 불필요
+    if (!token) {
+      console.log('🔍 토큰 없음 - 세션 검증 스킵');
+      setIsValidatingSession(false);
+      return;
+    }
+
+    try {
+      console.log('🔄 세션 유효성 검증 중...');
+      await getCurrentUser();
+      console.log('✅ 세션 유효성 검증 완료 - 세션 유효');
+    } catch (error: any) {
+      // 401 에러는 client.ts의 interceptor에서 이미 처리됨 (toast + redirect)
+      // 여기서는 추가 처리 불필요
+      console.log('❌ 세션 유효성 검증 실패:', error);
+    } finally {
+      setIsValidatingSession(false);
+    }
+  }, []);
+
+  // 앱 초기화 시 세션 검증
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -34,18 +68,30 @@ function App() {
       toast.error('다른 기기에서 로그인하여 로그아웃되었습니다.');
       sessionStorage.removeItem('session_revoked');
       logoutStore();
+      setIsValidatingSession(false);
     } else if (sessionExpired === 'true') {
       // 일반 세션 만료
       toast.error('세션이 만료되어 로그아웃되었습니다. 다시 로그인해주세요.');
       sessionStorage.removeItem('session_expired');
       logoutStore();
+      setIsValidatingSession(false);
+    } else if (isAuthenticated && token && !validationDone.current && !code) {
+      // 인증된 상태이고 토큰이 있으면 서버에서 세션 유효성 검증
+      // OAuth 콜백 처리 중(code가 있는 경우)에는 스킵
+      validationDone.current = true;
+      validateSession();
+    } else {
+      // 인증되지 않았거나 OAuth 콜백 처리 중이면 검증 스킵
+      setIsValidatingSession(false);
     }
-  }, [isAuthenticated, logoutStore]);
+  }, [isAuthenticated, logoutStore, validateSession]);
 
   // 로그인 성공 핸들러
   const handleLoginSuccess = () => {
     console.log('✅ 로그인 성공! 대시보드로 이동');
     // useAuthStore에서 이미 상태가 변경되어 자동으로 리렌더링됨
+    validationDone.current = true; // 로그인 직후에는 검증 스킵
+    setIsValidatingSession(false);
   };
 
   // 로그아웃 핸들러
@@ -63,9 +109,22 @@ function App() {
       // useAuthStore 상태 초기화
       logoutStore();
 
+      // 다음 로그인 시 검증 다시 수행할 수 있도록 리셋
+      validationDone.current = false;
+
       console.log('✅ 로그아웃 완료');
     }
   };
+
+  // 세션 검증 중일 때는 로딩 표시
+  if (isValidatingSession && isAuthenticated) {
+    return (
+      <>
+        <LoadingOverlay />
+        <Toaster richColors position="top-center" />
+      </>
+    );
+  }
 
   return (
     <Router>

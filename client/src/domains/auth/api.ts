@@ -15,6 +15,7 @@ import type {
   LogoutResponse,
   RevokeSessionRequest,
   RevokeSessionResponse,
+  UserInfoResponse,
 } from './types';
 
 /**
@@ -43,6 +44,15 @@ export async function handleGoogleCallback(
  */
 export async function logout(): Promise<LogoutResponse> {
   const response = await apiClient.post<LogoutResponse>('/v1/auth/logout');
+  return response.data;
+}
+
+/**
+ * 현재 로그인한 사용자 정보를 조회합니다.
+ * 세션 유효성 검증에 사용됩니다.
+ */
+export async function getCurrentUser(): Promise<UserInfoResponse> {
+  const response = await apiClient.get<UserInfoResponse>('/v1/auth/me');
   return response.data;
 }
 

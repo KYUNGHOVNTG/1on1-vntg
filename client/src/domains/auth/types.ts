@@ -91,3 +91,11 @@ export interface RevokeSessionResponse {
 export interface CompleteForceLoginRequest {
   user_id: string;
 }
+
+/**
+ * 현재 사용자 정보 응답 (/auth/me)
+ */
+export interface UserInfoResponse {
+  user_id: string;
+  message: string;
+}
