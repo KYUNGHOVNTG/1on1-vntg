@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.database import get_db
+from server.app.core.dependencies import get_current_user_id
 from server.app.core.logging import get_logger
 from server.app.domain.menu.schemas import (
     MenuHierarchyResponse,
@@ -32,6 +33,7 @@ async def get_user_menus(
     user_id: str,
     position_code: str = Query(..., description="직책 코드 (예: P001)"),
     db: AsyncSession = Depends(get_db),
+    current_user_id: str = Depends(get_current_user_id),  # 세션 검증
 ) -> UserMenuResponse:
     """
     사용자별 메뉴 조회
