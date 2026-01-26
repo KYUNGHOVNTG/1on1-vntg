@@ -97,8 +97,10 @@ async def get_current_user_id(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 4. user_id 추출
+    # 4. user_id 및 session_id 추출
     user_id: str = payload.get("user_id")
+    session_id: str = payload.get("session_id")  # refresh_token 문자열
+
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -106,27 +108,19 @@ async def get_current_user_id(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 5. RefreshToken 테이블에서 세션 검증
-    result = await db.execute(
-        select(RefreshToken).where(
-            RefreshToken.user_id == user_id,
-            RefreshToken.revoked_yn == 'N'
-        )
-    )
-    session = result.scalar_one_or_none()
-
-    if not session:
-        # 세션이 없는 경우, revoked되었는지 확인
-        revoked_result = await db.execute(
+    # 5. RefreshToken 테이블에서 세션 검증 (session_id로 정확히 매칭)
+    if session_id:
+        # session_id(refresh_token)로 정확한 세션 조회
+        result = await db.execute(
             select(RefreshToken).where(
-                RefreshToken.user_id == user_id,
-                RefreshToken.revoked_yn == 'Y'
-            ).order_by(RefreshToken.in_date.desc()).limit(1)
+                RefreshToken.refresh_token == session_id,
+                RefreshToken.user_id == user_id
+            )
         )
-        revoked_session = revoked_result.scalar_one_or_none()
+        session = result.scalar_one_or_none()
 
-        if revoked_session:
-            # 세션이 폐기됨 (다른 곳에서 로그인)
+        if session and session.revoked_yn == 'Y':
+            # 해당 세션이 폐기됨 (다른 곳에서 로그인)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -135,8 +129,9 @@ async def get_current_user_id(
                 },
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        else:
-            # 세션이 없음 (최초 로그인 필요)
+
+        if not session:
+            # 세션을 찾을 수 없음
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -145,6 +140,46 @@ async def get_current_user_id(
                 },
                 headers={"WWW-Authenticate": "Bearer"},
             )
+    else:
+        # session_id가 없는 레거시 토큰 - user_id로 검증 (하위 호환)
+        result = await db.execute(
+            select(RefreshToken).where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_yn == 'N'
+            )
+        )
+        session = result.scalar_one_or_none()
+
+        if not session:
+            # 세션이 없는 경우, revoked되었는지 확인
+            revoked_result = await db.execute(
+                select(RefreshToken).where(
+                    RefreshToken.user_id == user_id,
+                    RefreshToken.revoked_yn == 'Y'
+                ).order_by(RefreshToken.in_date.desc()).limit(1)
+            )
+            revoked_session = revoked_result.scalar_one_or_none()
+
+            if revoked_session:
+                # 세션이 폐기됨 (다른 곳에서 로그인)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "error_code": "SESSION_REVOKED",
+                        "message": "다른 기기에서 로그인하여 현재 세션이 종료되었습니다"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            else:
+                # 세션이 없음 (최초 로그인 필요)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "error_code": "SESSION_NOT_FOUND",
+                        "message": "세션을 찾을 수 없습니다"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
 
     # 6. 세션 만료 확인
     if session.is_expired():
