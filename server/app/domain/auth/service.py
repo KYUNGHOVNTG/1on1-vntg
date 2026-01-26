@@ -4,6 +4,7 @@ Google OAuth 인증 서비스
 Google OAuth 2.0 Authorization Code Flow를 구현합니다.
 """
 
+import time
 import urllib.parse
 from typing import Any, Optional
 
@@ -16,6 +17,10 @@ from server.app.core.logging import get_logger
 from server.app.core.security import create_access_token, create_refresh_token
 from server.app.domain.auth.models import RefreshToken
 from datetime import datetime, timedelta
+from server.app.domain.auth.pending_login_store import (
+    PendingLoginData,
+    pending_login_store,
+)
 from server.app.domain.auth.schemas import (
     CheckActiveSessionResponse,
     GoogleAuthCallbackRequest,
@@ -151,6 +156,82 @@ class SessionService:
                 success=False,
                 message=f"세션 폐기 실패: {str(e)}"
             )
+
+    async def complete_force_login(
+        self, user_id: str
+    ) -> ServiceResult[GoogleAuthResponse]:
+        """
+        강제 로그인을 완료합니다.
+
+        1. 기존 세션 폐기
+        2. 임시 저장된 토큰 조회
+        3. 새 세션 생성
+        4. 토큰 반환
+
+        Args:
+            user_id: 사용자 ID
+
+        Returns:
+            ServiceResult[GoogleAuthResponse]: 로그인 결과
+        """
+        try:
+            # 1. 임시 저장된 토큰 조회
+            pending_data = pending_login_store.get(user_id)
+            if pending_data is None:
+                logger.warning(
+                    f"Pending login 없음 또는 만료됨: user_id={user_id}"
+                )
+                return ServiceResult.fail(
+                    "로그인 정보가 만료되었습니다. 다시 로그인해 주세요."
+                )
+
+            # 2. 기존 세션 폐기
+            revoke_result = await self.revoke_previous_sessions(user_id)
+            if not revoke_result.success:
+                logger.error(f"세션 폐기 실패: {revoke_result.message}")
+                return ServiceResult.fail(revoke_result.message)
+
+            # 3. 새 세션 생성
+            await self.create_session(
+                user_id=user_id,
+                refresh_token=pending_data.refresh_token,
+                device_info=pending_data.device_info,
+                ip_address=pending_data.ip_address,
+            )
+
+            # 4. 임시 저장소에서 삭제
+            pending_login_store.remove(user_id)
+
+            logger.info(
+                "강제 로그인 완료",
+                extra={
+                    "user_id": user_id,
+                    "email": pending_data.email,
+                }
+            )
+
+            # 5. 로그인 응답 반환
+            return ServiceResult.ok(
+                GoogleAuthResponse(
+                    success=True,
+                    access_token=pending_data.access_token,
+                    refresh_token=pending_data.refresh_token,
+                    token_type="bearer",
+                    user_id=pending_data.user_id,
+                    email=pending_data.email,
+                    name=pending_data.name,
+                    role=pending_data.role,
+                    position=pending_data.position,
+                    role_code=pending_data.role_code,
+                    position_code=pending_data.position_code,
+                    has_active_session=False,
+                    existing_session_info=None,
+                )
+            )
+
+        except Exception as e:
+            logger.error(f"강제 로그인 처리 중 오류: {str(e)}")
+            return ServiceResult.fail(f"강제 로그인 실패: {str(e)}")
 
     async def create_session(
         self,
@@ -300,13 +381,60 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
             active_session_check = await session_service.check_active_session(user.user_id)
 
             if active_session_check.has_active_session:
-                # 활성 세션이 있으면 세션 정보만 반환 (토큰 생성 안 함)
+                # 활성 세션이 있으면 토큰을 미리 생성하여 임시 저장
+                # (사용자가 "기존 세션 종료하고 로그인" 선택 시 사용)
                 logger.info(
                     "기존 활성 세션 발견 - 동시접속 제어",
                     extra={
                         "user_id": user.user_id,
                         "existing_session": active_session_check.session_info.model_dump() if active_session_check.session_info else None
                     }
+                )
+
+                # 공통코드 조회 - role_code, position_code를 의미값으로 변환
+                code_service = CommonCodeService(self.db)
+                role_name = await code_service.get_role_name(user.role_code)
+                position_name = await code_service.get_position_name(user.position_code)
+
+                if not role_name:
+                    role_name = user.role_code
+                if not position_name:
+                    position_name = user.position_code
+
+                # JWT 토큰 미리 생성
+                jwt_payload = {
+                    "user_id": user.user_id,
+                    "email": email,
+                    "role": role_name,
+                    "position": position_name,
+                }
+                pending_access_token = create_access_token(data=jwt_payload)
+                pending_refresh_token = create_refresh_token(data={"user_id": user.user_id})
+
+                # device_info, ip_address 추출
+                device_info = kwargs.get("device_info")
+                ip_address = kwargs.get("ip_address")
+
+                # 임시 저장소에 저장
+                pending_data = PendingLoginData(
+                    user_id=user.user_id,
+                    email=email,
+                    name=user_info.get("name"),
+                    role=role_name,
+                    position=position_name,
+                    role_code=user.role_code,
+                    position_code=user.position_code,
+                    access_token=pending_access_token,
+                    refresh_token=pending_refresh_token,
+                    device_info=device_info,
+                    ip_address=ip_address,
+                    created_at=time.time(),
+                )
+                pending_login_store.save(user.user_id, pending_data)
+
+                logger.info(
+                    "Pending login 토큰 생성 및 저장 완료",
+                    extra={"user_id": user.user_id}
                 )
 
                 return ServiceResult.ok(
@@ -316,6 +444,11 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                         existing_session_info=active_session_check.session_info,
                         user_id=user.user_id,
                         email=email,
+                        name=user_info.get("name"),
+                        role=role_name,
+                        position=position_name,
+                        role_code=user.role_code,
+                        position_code=user.position_code,
                     )
                 )
 
