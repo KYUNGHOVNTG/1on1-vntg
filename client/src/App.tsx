@@ -25,13 +25,19 @@ function App() {
 
     console.log('🔍 App 초기화:', { isAuthenticated, hasToken: !!token, hasCode: !!code });
 
-    // 세션 만료로 인한 로그아웃인 경우 알림 표시
+    // 세션 만료/폐기로 인한 로그아웃인 경우 알림 표시
+    const sessionRevoked = sessionStorage.getItem('session_revoked');
     const sessionExpired = sessionStorage.getItem('session_expired');
-    if (sessionExpired === 'true') {
+
+    if (sessionRevoked === 'true') {
+      // 다른 기기에서 로그인하여 세션이 종료된 경우
+      toast.error('다른 기기에서 로그인하여 로그아웃되었습니다.');
+      sessionStorage.removeItem('session_revoked');
+      logoutStore();
+    } else if (sessionExpired === 'true') {
+      // 일반 세션 만료
       toast.error('세션이 만료되어 로그아웃되었습니다. 다시 로그인해주세요.');
       sessionStorage.removeItem('session_expired');
-
-      // Zustand store도 초기화
       logoutStore();
     }
   }, [isAuthenticated, logoutStore]);

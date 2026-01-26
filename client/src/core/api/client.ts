@@ -94,8 +94,13 @@ class ApiClient {
           // localStorage에서 토큰 삭제
           localStorage.removeItem('access_token');
 
-          // Zustand store 초기화는 App.tsx에서 처리
-          // (순환 참조 방지)
+          // 세션 만료 플래그 설정 (App.tsx에서 Zustand store 초기화에 사용)
+          // error_code에 따라 다른 플래그 설정
+          if (errorCode === 'SESSION_REVOKED') {
+            sessionStorage.setItem('session_revoked', 'true');
+          } else {
+            sessionStorage.setItem('session_expired', 'true');
+          }
 
           // 현재 위치가 로그인 페이지가 아니면 리다이렉트
           if (window.location.pathname !== '/') {
@@ -114,10 +119,10 @@ class ApiClient {
               toast.warning(errorMessage);
             }
 
-            // 2초 후 로그인 페이지로 리다이렉트
+            // 3초 후 로그인 페이지로 리다이렉트 (토스트 메시지 확인 시간 확보)
             setTimeout(() => {
               window.location.href = '/';
-            }, 2000);
+            }, 3000);
           }
         }
 
