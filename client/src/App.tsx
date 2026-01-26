@@ -26,34 +26,6 @@ function App() {
   // Idle timeout 경고 모달 상태
   const [showIdleWarning, setShowIdleWarning] = useState(false);
 
-  /**
-   * 세션 유효성 검증
-   * 서버에 /auth/me API를 호출하여 현재 세션이 유효한지 확인합니다.
-   * 세션이 폐기되었으면 401 에러가 발생하고 client.ts의 interceptor에서 로그아웃 처리됩니다.
-   */
-  const validateSession = useCallback(async () => {
-    const token = localStorage.getItem('access_token');
-
-    // 토큰이 없으면 검증 불필요
-    if (!token) {
-      console.log('🔍 토큰 없음 - 세션 검증 스킵');
-      setIsValidatingSession(false);
-      return;
-    }
-
-    try {
-      console.log('🔄 세션 유효성 검증 중...');
-      await getCurrentUser();
-      console.log('✅ 세션 유효성 검증 완료 - 세션 유효');
-    } catch (error: any) {
-      // 401 에러는 client.ts의 interceptor에서 이미 처리됨 (toast + redirect)
-      // 여기서는 추가 처리 불필요
-      console.log('❌ 세션 유효성 검증 실패:', error);
-    } finally {
-      setIsValidatingSession(false);
-    }
-  }, []);
-
   // 로그아웃 핸들러
   const handleLogout = useCallback(async () => {
     try {
@@ -75,6 +47,39 @@ function App() {
       console.log('✅ 로그아웃 완료');
     }
   }, [logoutStore]);
+
+  /**
+   * 세션 유효성 검증
+   * 서버에 /auth/me API를 호출하여 현재 세션이 유효한지 확인합니다.
+   * 세션이 폐기되었으면 401 에러가 발생하고 client.ts의 interceptor에서 로그아웃 처리됩니다.
+   */
+  const validateSession = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+
+    // 토큰이 없으면 검증 불필요
+    if (!token) {
+      console.log('🔍 토큰 없음 - 세션 검증 스킵');
+      setIsValidatingSession(false);
+      return;
+    }
+
+    try {
+      console.log('🔄 세션 유효성 검증 중...');
+      await getCurrentUser();
+      console.log('✅ 세션 유효성 검증 완료 - 세션 유효');
+    } catch (error: any) {
+      // 401 에러는 client.ts의 interceptor에서 이미 처리됨 (toast + redirect)
+      // 하지만 네트워크 오류 등 401이 아닌 에러가 발생한 경우 여기서 로그아웃 처리
+      console.log('❌ 세션 유효성 검증 실패 (강제 로그아웃):', error);
+
+      // 네트워크 에러 등 401 외의 에러 발생 시에도 안전하게 로그아웃 처리
+      // (인터셉터에서 처리되지 않은 경우를 대비)
+      toast.error('세션 검증에 실패하여 로그아웃됩니다.');
+      handleLogout();
+    } finally {
+      setIsValidatingSession(false);
+    }
+  }, [handleLogout]);
 
   // Activity Tracker 설정
   const { keepAlive } = useActivityTracker({
