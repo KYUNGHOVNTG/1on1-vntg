@@ -26,7 +26,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [showSessionConflict, setShowSessionConflict] = useState(false);
   const [existingSession, setExistingSession] = useState<SessionInfo | undefined>();
   const [pendingUserId, setPendingUserId] = useState<string | undefined>();
-  const [pendingCode, setPendingCode] = useState<string | undefined>();
 
   // useAuthStore에서 setUser 가져오기
   const { setUser } = useAuthStore();
@@ -66,7 +65,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         // 모달 표시를 위한 상태 설정
         setExistingSession(response.existing_session_info);
         setPendingUserId(response.user_id);
-        setPendingCode(code);
         setShowSessionConflict(true);
         setIsLoading(false);
         return;
@@ -157,9 +155,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   /**
    * 기존 세션 종료 후 강제 로그인
+   * - 세션 폐기 후 새로운 Google OAuth 플로우를 시작합니다.
+   * - Google OAuth authorization code는 일회용이므로 재사용할 수 없습니다.
    */
   const handleForceLogin = async () => {
-    if (!pendingUserId || !pendingCode) {
+    if (!pendingUserId) {
       setError('로그인 정보가 없습니다.');
       setShowSessionConflict(false);
       return;
@@ -182,46 +182,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
       console.log('✅ 기존 세션 폐기 완료:', revokeResult.message);
 
-      // 2. 다시 로그인 시도
-      console.log('🔄 재로그인 시도');
-      const response = await handleGoogleCallback({ code: pendingCode });
+      // 2. 새로운 Google OAuth 플로우 시작 (새 authorization code 획득)
+      // Google OAuth authorization code는 일회용이므로 재사용 불가
+      console.log('🔄 새로운 Google 로그인 플로우 시작');
+      setPendingUserId(undefined);
+      setExistingSession(undefined);
 
-      if (response.success && response.access_token) {
-        // 로그인 성공 처리 (기존 로직과 동일)
-        setLoginSuccess(true);
-        setUserInfo({
-          email: response.email,
-          name: response.name,
-        });
-
-        console.log('✅ 강제 로그인 성공:', response);
-        localStorage.setItem('access_token', response.access_token);
-
-        if (response.user_id && response.email && response.name) {
-          const positionCode = response.position_code;
-          setUser({
-            id: response.user_id,
-            email: response.email,
-            name: response.name,
-            position_code: positionCode || response.position || 'P005',
-          });
-        }
-
-        setTimeout(() => {
-          if (onLoginSuccess) {
-            onLoginSuccess();
-          }
-        }, 2000);
-      } else {
-        setError('재로그인에 실패했습니다.');
-      }
+      // handleGoogleLogin()은 Google OAuth 페이지로 리다이렉트
+      handleGoogleLogin();
     } catch (err) {
       console.error('강제 로그인 오류:', err);
       setError('기존 세션 종료 중 오류가 발생했습니다.');
-    } finally {
       setIsLoading(false);
       setPendingUserId(undefined);
-      setPendingCode(undefined);
       setExistingSession(undefined);
     }
   };
@@ -232,7 +205,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const handleCancelSessionConflict = () => {
     setShowSessionConflict(false);
     setPendingUserId(undefined);
-    setPendingCode(undefined);
     setExistingSession(undefined);
   };
 
