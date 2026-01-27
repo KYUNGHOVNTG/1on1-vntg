@@ -2,18 +2,32 @@
 공통코드 서비스
 
 공통코드 조회 및 변환 기능을 제공합니다.
+
+아키텍처:
+    - Service: 흐름 제어 및 트랜잭션 관리
+    - Repository: DB 조회 로직
 """
 
 from typing import Optional
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from server.app.domain.common.models import CodeDetail
+from server.app.domain.common.repositories import CommonCodeRepository
 
 
 class CommonCodeService:
-    """공통코드 조회 서비스"""
+    """
+    공통코드 조회 서비스
+    
+    책임:
+        - 공통코드 조회 흐름 제어
+        - 트랜잭션 관리
+        - Repository 조율
+        
+    원칙:
+        - Repository에 DB 조회 로직 위임
+        - 비즈니스 로직은 최소화 (단순 CRUD)
+    """
 
     def __init__(self, db: AsyncSession):
         """
@@ -21,6 +35,7 @@ class CommonCodeService:
             db: 비동기 데이터베이스 세션
         """
         self.db = db
+        self.repository = CommonCodeRepository(db)
 
     async def get_code_name(self, code_type: str, code: str) -> Optional[str]:
         """
@@ -33,15 +48,7 @@ class CommonCodeService:
         Returns:
             str | None: 코드명 (HR, TEAM_LEADER 등) 또는 None
         """
-        stmt = select(CodeDetail).where(
-            CodeDetail.code_type == code_type,
-            CodeDetail.code == code,
-            CodeDetail.use_yn == 'Y'
-        )
-
-        result = await self.db.execute(stmt)
-        code_detail = result.scalar_one_or_none()
-
+        code_detail = await self.repository.get_code_by_type_and_code(code_type, code)
         return code_detail.code_name if code_detail else None
 
     async def get_role_name(self, role_code: str) -> Optional[str]:
@@ -75,11 +82,7 @@ class CommonCodeService:
         Returns:
             list[CodeMaster]: 마스터 코드 목록
         """
-        from server.app.domain.common.models import CodeMaster
-
-        stmt = select(CodeMaster).order_by(CodeMaster.code_type)
-        result = await self.db.execute(stmt)
-        return result.scalars().all()
+        return await self.repository.get_all_masters()
 
     async def get_details_by_master_id(self, code_type: str) -> list[object]:
         """
@@ -91,126 +94,80 @@ class CommonCodeService:
         Returns:
             list[CodeDetail]: 상세 코드 목록
         """
-        stmt = select(CodeDetail).where(
-            CodeDetail.code_type == code_type
-        ).order_by(CodeDetail.sort_seq, CodeDetail.code)
-        
-        result = await self.db.execute(stmt)
-        return result.scalars().all()
+        return await self.repository.get_details_by_type(code_type)
 
     async def create_master(self, full_data) -> object:
         """
         공통코드 마스터를 생성합니다.
-        """
-        from server.app.domain.common.models import CodeMaster
         
-        # Check duplication
-        stmt = select(CodeMaster).where(CodeMaster.code_type == full_data.code_type)
-        result = await self.db.execute(stmt)
-        if result.scalar_one_or_none():
-            raise ValueError(f"Code Type '{full_data.code_type}' already exists.")
-
-        new_master = CodeMaster(**full_data.model_dump())
-        self.db.add(new_master)
-        await self.db.commit()
-        await self.db.refresh(new_master)
-        return new_master
+        Args:
+            full_data: 마스터 생성 데이터
+            
+        Returns:
+            CodeMaster: 생성된 마스터
+        """
+        return await self.repository.create_master(full_data)
 
     async def update_master(self, code_type: str, update_data) -> Optional[object]:
         """
         공통코드 마스터를 수정합니다.
-        """
-        from server.app.domain.common.models import CodeMaster
-
-        stmt = select(CodeMaster).where(CodeMaster.code_type == code_type)
-        result = await self.db.execute(stmt)
-        master = result.scalar_one_or_none()
         
-        if not master:
-            return None
-
-        # Update fields
-        update_dict = update_data.model_dump(exclude_unset=True)
-        for key, value in update_dict.items():
-            setattr(master, key, value)
-
-        await self.db.commit()
-        await self.db.refresh(master)
-        return master
+        Args:
+            code_type: 코드 타입
+            update_data: 수정 데이터
+            
+        Returns:
+            Optional[CodeMaster]: 수정된 마스터 또는 None
+        """
+        return await self.repository.update_master(code_type, update_data)
 
     async def delete_master(self, code_type: str) -> bool:
         """
         공통코드 마스터를 삭제합니다.
-        """
-        from server.app.domain.common.models import CodeMaster
-
-        stmt = select(CodeMaster).where(CodeMaster.code_type == code_type)
-        result = await self.db.execute(stmt)
-        master = result.scalar_one_or_none()
         
-        if not master:
-            return False
-
-        await self.db.delete(master)
-        await self.db.commit()
-        return True
+        Args:
+            code_type: 코드 타입
+            
+        Returns:
+            bool: 삭제 성공 여부
+        """
+        return await self.repository.delete_master(code_type)
 
     async def create_detail(self, full_data) -> object:
         """
         공통코드 상세를 생성합니다.
+        
+        Args:
+            full_data: 상세 생성 데이터
+            
+        Returns:
+            CodeDetail: 생성된 상세 코드
         """
-        # Check duplication
-        stmt = select(CodeDetail).where(
-            CodeDetail.code_type == full_data.code_type,
-            CodeDetail.code == full_data.code
-        )
-        result = await self.db.execute(stmt)
-        if result.scalar_one_or_none():
-            raise ValueError(f"Code '{full_data.code}' already exists in '{full_data.code_type}'.")
-
-        new_detail = CodeDetail(**full_data.model_dump())
-        self.db.add(new_detail)
-        await self.db.commit()
-        await self.db.refresh(new_detail)
-        return new_detail
+        return await self.repository.create_detail(full_data)
 
     async def update_detail(self, code_type: str, code: str, update_data) -> Optional[object]:
         """
         공통코드 상세를 수정합니다.
-        """
-        stmt = select(CodeDetail).where(
-            CodeDetail.code_type == code_type,
-            CodeDetail.code == code
-        )
-        result = await self.db.execute(stmt)
-        detail = result.scalar_one_or_none()
         
-        if not detail:
-            return None
-
-        # Update fields
-        update_dict = update_data.model_dump(exclude_unset=True)
-        for key, value in update_dict.items():
-            setattr(detail, key, value)
-
-        await self.db.commit()
-        await self.db.refresh(detail)
-        return detail
+        Args:
+            code_type: 코드 타입
+            code: 코드
+            update_data: 수정 데이터
+            
+        Returns:
+            Optional[CodeDetail]: 수정된 상세 코드 또는 None
+        """
+        return await self.repository.update_detail(code_type, code, update_data)
 
     async def delete_detail(self, code_type: str, code: str) -> bool:
         """
         공통코드 상세를 삭제합니다.
-        """
-        stmt = select(CodeDetail).where(
-            CodeDetail.code_type == code_type,
-            CodeDetail.code == code
-        )
-        result = await self.db.execute(stmt)
-        detail = result.scalar_one_or_none()
         
-        if not detail:
-            return False
-
-        await self.db.delete(detail)
-        await self.db.commit()
-        return True
+        Args:
+            code_type: 코드 타입
+            code: 코드
+            
+        Returns:
+            bool: 삭제 성공 여부
+        """
+        return await self.repository.delete_detail(code_type, code)

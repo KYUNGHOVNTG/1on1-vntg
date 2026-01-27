@@ -62,7 +62,13 @@
 │   └── app/
 │       ├── core/                # 핵심 인프라 (DB, Auth, Logging)
 │       ├── shared/              # 공유 컴포넌트 (Base 클래스, 예외)
+│       ├── examples/            # 🎯 완벽한 예제 코드 (새 개발 시 참고!)
+│       │   └── sample_domain/   # Repository-Calculator-Formatter 표준 패턴
 │       ├── domain/              # 🎯 비즈니스 도메인 (여기에 새 기능 추가!)
+│       │   ├── common/          # ✅ Repository 패턴 (단순 CRUD 참고)
+│       │   ├── auth/            # ⚠️ 레거시 (예시로 사용 금지)
+│       │   ├── menu/
+│       │   └── ...
 │       └── api/v1/              # API 엔드포인트
 │
 ├── 📁 client/                   # 프론트엔드 (React + Vite)
@@ -75,6 +81,20 @@
 ```
 
 자세한 폴더 구조와 각 파일의 역할은 [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)를 참조하세요.
+
+### 🎯 아키텍처 핵심
+
+**새 도메인 개발 시 반드시 참고**:
+1. **완벽한 예제**: `server/app/examples/sample_domain/` 
+   - Repository, Calculator, Formatter, Service 모두 구현됨
+2. **실제 적용 예제**: `server/app/domain/common/`
+   - 단순 CRUD 도메인의 Repository 패턴 적용 사례
+
+**절대 규칙**:
+- ✅ 새 도메인 추가 시 → `examples/sample_domain` 복사하여 시작
+- ✅ 단순 CRUD → `domain/common` 참고
+- ❌ `domain/auth`를 예시로 사용 금지 (레거시 패턴)
+
 
 ---
 
@@ -108,18 +128,50 @@ npm run dev                # → http://localhost:3000
 
 새로운 비즈니스 기능을 추가하는 표준 절차:
 
-### 백엔드 (예: payment 도메인)
+### 🚀 가장 빠른 방법: 예제 복사
 
 ```bash
-mkdir -p server/app/domain/payment/{models,schemas,repositories,calculators,formatters}
+# 1. 예제 도메인 복사하여 시작 (권장!)
+cp -r server/app/examples/sample_domain server/app/domain/payment
+
+# 2. 불필요한 파일 정리
+# - models/, schemas/, service.py만 필수 수정
+# - repositories/, calculators/, formatters/는 필요에 따라
+
+# 3. import 경로 수정
+# server.app.examples.sample_domain → server.app.domain.payment
 ```
 
+### 백엔드 (예: payment 도메인)
+
+**옵션 A: 복잡한 비즈니스 로직** (`examples/sample_domain` 복사)
+```bash
+server/app/domain/payment/
+├── models/         # SQLAlchemy DB 모델
+├── schemas/        # Pydantic Request/Response
+├── repositories/   # 데이터 조회 (DB, API, 파일)
+├── calculators/    # 비즈니스 로직 (순수 함수)
+├── formatters/     # 응답 포맷팅
+└── service.py      # 도메인 서비스
+```
+
+**옵션 B: 단순 CRUD** (`domain/common` 참고)
+```bash
+server/app/domain/payment/
+├── models/         # SQLAlchemy DB 모델
+├── schemas/        # Pydantic Request/Response
+├── repositories/   # ✅ 필수: 데이터 조회만
+└── service.py      # Repository 사용
+# calculators/, formatters/는 생략
+```
+
+**다음 단계**:
 1. `models/` - SQLAlchemy DB 모델
 2. `schemas/` - Pydantic Request/Response
 3. `repositories/` - 데이터 조회 (BaseRepository 상속)
-4. `calculators/` - 비즈니스 로직 (BaseCalculator 상속)
-5. `formatters/` - 응답 포맷팅 (BaseFormatter 상속)
-6. `service.py` - 도메인 서비스 (BaseService 상속)
+4. `calculators/` - 비즈니스 로직 (BaseCalculator 상속) - 필요 시만
+5. `formatters/` - 응답 포맷팅 (BaseFormatter 상속) - 필요 시만
+6. `service.py` - 도메인 서비스 (BaseService 상속 또는 일반 클래스)
 7. `api/v1/endpoints/payment.py` - FastAPI 라우터
 8. `api/v1/router.py`에 라우터 등록
 

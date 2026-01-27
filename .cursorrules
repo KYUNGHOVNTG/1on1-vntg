@@ -113,7 +113,33 @@ Cursor나 Claude AI 에이전트와 협업할 때 다음 규칙을 **엄격히**
 
 ## 🐍 Backend (Python) Rules
 
-### 1. 클래스 기반 설계
+### 📌 **필수**: Repository-Calculator-Formatter 패턴 사용
+
+**중요**: 이 프로젝트는 계층화된 아키텍처를 엄격히 준수합니다.
+
+#### 🎯 완벽한 예제 위치
+- **표준 템플릿**: `server/app/examples/sample_domain/`
+  - ✅ `repositories/__init__.py` - Repository 3종 구현
+  - ✅ `calculators/__init__.py` - Calculator 3종 구현
+  - ✅ `formatters/__init__.py` - Formatter 5종 구현
+  - ✅ `service.py` - Service 2종 구현 (Template Method 패턴)
+
+- **실제 적용 예제**:
+  - ✅ `server/app/domain/common/` - Repository 패턴 적용 (리팩토링 완료)
+  - ⚠️ `server/app/domain/auth/` - 레거시 (점진적 리팩토링 중)
+
+#### 🚨 도메인 개발 시 절대 규칙
+
+**새 도메인 추가 시**:
+1. ✅ **`examples/sample_domain`을 복사하여 시작** (권장)
+2. ✅ **`domain/common`을 참고** (단순 CRUD 도메인)
+3. ❌ **`domain/auth`는 예시로 사용 금지** (레거시 패턴)
+
+**기존 코드 수정 시**:
+- `common` 도메인: Repository 패턴 따르기 ✅
+- `auth` 도메인: 기존 패턴 유지 (리팩토링 예정) ⚠️
+
+### 1. 클래스 기반 설계 (필수)
 
 ```python
 # ❌ 금지: 절차지향 함수
@@ -122,18 +148,47 @@ async def process_payment(db: AsyncSession, request: PaymentRequest):
     # ... 비즈니스 로직 ...
     return PaymentResponse(...)
 
-# ✅ 권장: 클래스 기반 Service
+# ✅ 권장: Repository-Service 패턴 (단순 CRUD)
+class PaymentRepository(BaseRepository):
+    async def get_payment_by_id(self, payment_id: int):
+        # DB 조회 로직
+        ...
+
+class PaymentService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.repository = PaymentRepository(db)  # Repository 의존성 주입
+
+    async def get_payment(self, payment_id: int):
+        # Repository → 반환
+        return await self.repository.get_payment_by_id(payment_id)
+
+# ✅ 권장: Repository-Calculator-Formatter 패턴 (복잡한 로직)
 class PaymentService(BaseService[PaymentRequest, PaymentResponse]):
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.repository = PaymentDataRepository(db)
-        self.calculator = PaymentCalculator()
-        self.formatter = PaymentResponseFormatter()
+        self.repository = PaymentRepository(db)      # 데이터 조회
+        self.calculator = PaymentCalculator()        # 계산 로직 (순수 함수)
+        self.formatter = PaymentResponseFormatter()  # 응답 포맷팅
 
     async def execute(self, request: PaymentRequest) -> ServiceResult[PaymentResponse]:
-        # Repository → Calculator → Formatter 흐름
-        ...
+        # 1. Repository: 데이터 조회
+        payment_data = await self.repository.get_payment_data(request.payment_id)
+        
+        # 2. Calculator: 수수료 계산 (순수 함수, DB 접근 금지)
+        calculation_result = await self.calculator.calculate_fee(payment_data)
+        
+        # 3. Formatter: API 응답 형식으로 변환
+        response = await self.formatter.format(calculation_result)
+        
+        return ServiceResult.ok(response)
 ```
+
+**핵심 원칙**:
+- **Service**: 흐름만 제어, 실제 로직은 Repository/Calculator/Formatter에 위임
+- **Repository**: DB/API/파일 접근 (Side Effect 허용)
+- **Calculator**: 순수 계산 로직 (Side Effect 절대 금지, DB 접근 금지)
+- **Formatter**: 데이터 변환 (비즈니스 로직 없음)
 
 ### 2. Pydantic v2 & SQLAlchemy 2.0 비동기 패턴
 
@@ -147,13 +202,20 @@ class UserCreate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-# SQLAlchemy 2.0 비동기 쿼리
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+# ✅ Repository에서만 DB 접근
+class UserRepository(BaseRepository):
+    async def get_user_by_id(self, user_id: int) -> User | None:
+        result = await self.db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
 
-async def get_user(db: AsyncSession, user_id: int) -> User | None:
-    result = await db.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
+# ❌ Service에서 직접 DB 접근 금지
+class UserService:
+    async def get_user(self, user_id: int):
+        # ❌ 금지
+        result = await self.db.execute(select(User).where(User.id == user_id))
+        
+        # ✅ 권장
+        return await self.repository.get_user_by_id(user_id)
 ```
 
 ### 3. 예외 처리
@@ -171,13 +233,50 @@ raise NotFoundException(
 )
 ```
 
-### 4. 레이어별 책임
+### 4. 레이어별 책임 (절대 준수)
 
-- **Router**: HTTP 요청/응답만 처리, 비즈니스 로직 금지
-- **Service**: Repository/Calculator/Formatter 조율, 트랜잭션 관리
-- **Repository**: 데이터 조회 (DB, API, 파일), Side Effect 허용
-- **Calculator**: 순수 계산 로직, Side Effect 절대 금지 (DB 접근 불가)
-- **Formatter**: 내부 데이터 → API 응답 변환
+| 레이어 | 책임 | 허용 | 금지 |
+|--------|------|------|------|
+| **Router** | HTTP 요청/응답 처리 | Service 호출 | 비즈니스 로직, DB 접근 |
+| **Service** | 흐름 제어, 트랜잭션 관리 | Repository/Calculator/Formatter 조율 | 직접 DB 조회, 계산 로직 |
+| **Repository** | 데이터 조회 | DB/API/파일 접근, Side Effect | 계산 로직, 포맷팅 |
+| **Calculator** | 순수 계산 로직 | 계산, 검증 | DB 접근, Side Effect, API 호출 |
+| **Formatter** | 응답 변환 | 데이터 변환 | 비즈니스 로직, DB 접근 |
+
+**예시 (잘못된 vs 올바른)**:
+```python
+# ❌ 잘못된 예: Service에 모든 로직
+class PaymentService:
+    async def process(self, request):
+        # ❌ Service에서 직접 DB 조회
+        payment = await self.db.execute(select(Payment).where(...))
+        
+        # ❌ Service에서 계산 로직
+        fee = payment.amount * 0.03
+        
+        # ❌ Service에서 포맷팅
+        return {"payment_id": payment.id, "fee": f"${fee:.2f}"}
+
+# ✅ 올바른 예: 각 레이어 분리
+class PaymentRepository(BaseRepository):
+    async def get_payment(self, payment_id: int):
+        result = await self.db.execute(select(Payment).where(...))
+        return result.scalar_one()
+
+class PaymentCalculator(BaseCalculator):
+    async def calculate_fee(self, amount: float) -> float:
+        return amount * 0.03  # 순수 계산
+
+class PaymentFormatter(BaseFormatter):
+    async def format(self, payment, fee):
+        return {"payment_id": payment.id, "fee": f"${fee:.2f}"}
+
+class PaymentService:
+    async def process(self, request):
+        payment = await self.repository.get_payment(request.payment_id)
+        fee = await self.calculator.calculate_fee(payment.amount)
+        return await self.formatter.format(payment, fee)
+```
 
 ### 5. 로깅 규칙
 
@@ -196,30 +295,34 @@ raise NotFoundException(
   })
   ```
 
-### 5. 파일 배치 규칙
+### 6. 파일 배치 규칙
 
 ```
 server/app/domain/{domain_name}/
 ├── __init__.py
-├── service.py              # 도메인 서비스 (BaseService 상속)
+├── service.py              # 도메인 서비스
 ├── models/                 # SQLAlchemy 모델
 │   └── __init__.py
 ├── schemas/                # Pydantic 스키마
 │   └── __init__.py
-├── repositories/              # 데이터 조회
+├── repositories/           # 데이터 조회 (DB, API, 파일)
 │   └── __init__.py
-├── calculators/            # 비즈니스 로직
-│   └── __init__.py
+├── calculators/            # 비즈니스 로직 (순수 함수)
+│   └── __init__.py         # 복잡한 계산이 필요한 경우에만
 └── formatters/             # 응답 포맷팅
-    └── __init__.py
+    └── __init__.py         # 복잡한 변환이 필요한 경우에만
+```
 
-### 6. 시간 처리 규칙
+**참고**:
+- 단순 CRUD 도메인: `repositories/`만 필수, `calculators/`, `formatters/`는 선택
+- 복잡한 비즈니스 로직: 3개 폴더 모두 사용 (`examples/sample_domain` 참고)
+
+### 7. 시간 처리 규칙
 
 - **UTC 기준 사용**: 서버와 DB 간의 시간대 불일치를 방지하기 위해 모든 시간 데이터는 **UTC**를 기준으로 처리합니다.
 - **Python**: `datetime.now()` 대신 `datetime.utcnow()` 사용
 - **SQLAlchemy**: 모델의 default/onupdate 값 설정 시 `datetime.utcnow` (함수 참조) 사용
 - **대상 필드**: 특히 `expires_at`, `in_date`, `last_activity_at` 등 모든 타임스탬프 필드에 엄격히 적용
-```
 
 ---
 
