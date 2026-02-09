@@ -49,17 +49,18 @@ class MenuService(BaseService[UserMenuRequest, UserMenuResponse]):
         계층 구조 메뉴 트리를 반환합니다.
 
         Args:
-            request: 사용자 메뉴 조회 요청 (user_id, position_code)
+            request: 사용자 메뉴 조회 요청 (user_id, position_code, role_code)
             **kwargs: 추가 컨텍스트 정보
 
         Returns:
             ServiceResult[UserMenuResponse]: 메뉴 목록 및 개수
         """
         try:
-            # 1. 사용자가 접근 가능한 메뉴 조회
+            # 1. 사용자가 접근 가능한 메뉴 조회 (역할 기반 분기 포함)
             menus = await self.repository.get_menus_by_user(
                 user_id=request.user_id,
-                position_code=request.position_code
+                position_code=request.position_code,
+                role_code=request.role_code
             )
 
             # 2. 계층 구조로 변환
@@ -79,6 +80,7 @@ class MenuService(BaseService[UserMenuRequest, UserMenuResponse]):
                 extra={
                     "user_id": request.user_id,
                     "position_code": request.position_code,
+                    "role_code": request.role_code,
                     "menu_count": len(menus)
                 }
             )
@@ -91,6 +93,7 @@ class MenuService(BaseService[UserMenuRequest, UserMenuResponse]):
                 extra={
                     "user_id": request.user_id,
                     "position_code": request.position_code,
+                    "role_code": request.role_code,
                     "error": str(e)
                 }
             )

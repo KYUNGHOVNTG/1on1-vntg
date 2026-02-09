@@ -23,6 +23,7 @@ class MenuBase(BaseModel):
     up_menu_code: Optional[str] = Field(None, description="상위 메뉴 코드 (NULL: 최상위)")
     menu_level: int = Field(default=1, description="메뉴 깊이 (1: 최상위, 2: 2차...)")
     menu_url: Optional[str] = Field(None, description="프론트엔드 라우팅 경로")
+    menu_type: str = Field(default='COMMON', description="메뉴 타입 (COMMON: 일반, ADMIN: 관리자 전용)")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +53,7 @@ class UserMenuRequest(BaseModel):
 
     user_id: str = Field(..., description="사용자 ID")
     position_code: str = Field(..., description="직책 코드 (예: P001)")
+    role_code: str = Field(..., description="역할 코드 (예: R001=시스템 관리자, R002=일반 사용자)")
 
     model_config = ConfigDict(from_attributes=True)
 

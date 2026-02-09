@@ -17,7 +17,7 @@ interface MenuState {
     error: string | null;
 
     /** 사용자 메뉴 조회 */
-    fetchUserMenus: (userId: string, positionCode: string) => Promise<void>;
+    fetchUserMenus: (userId: string, positionCode: string, roleCode: string) => Promise<void>;
     /** 상태 초기화 */
     reset: () => void;
 }
@@ -27,10 +27,10 @@ export const useMenuStore = create<MenuState>((set) => ({
     loading: false,
     error: null,
 
-    fetchUserMenus: async (userId: string, positionCode: string) => {
+    fetchUserMenus: async (userId: string, positionCode: string, roleCode: string) => {
         set({ loading: true, error: null });
         try {
-            const response = await getUserMenus(userId, positionCode);
+            const response = await getUserMenus(userId, positionCode, roleCode);
             set({ menus: response.menus, loading: false });
         } catch (error) {
             set({

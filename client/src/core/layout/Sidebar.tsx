@@ -53,18 +53,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user, isAuthenticated } = useAuthStore();
   const { menus, loading, fetchUserMenus } = useMenuStore();
 
-  // 사용자 로그인 시 메뉴 조회
+  // 사용자 로그인 시 메뉴 조회 (role_code 포함)
   useEffect(() => {
-    if (isAuthenticated && user?.id && user?.position_code) {
-      fetchUserMenus(user.id, user.position_code);
+    if (isAuthenticated && user?.id && user?.position_code && user?.role_code) {
+      fetchUserMenus(user.id, user.position_code, user.role_code);
     }
-  }, [isAuthenticated, user?.id, user?.position_code, fetchUserMenus]);
+  }, [isAuthenticated, user?.id, user?.position_code, user?.role_code, fetchUserMenus]);
 
-  // 메뉴를 최상위와 하위로 분리 (시스템 관리는 별도로)
+  // 메뉴를 menu_type 기반으로 동적 분리
   const mainMenus = menus.filter(
-    (menu) => menu.menu_level === 1 && menu.menu_code !== 'M004'
+    (menu) => menu.menu_level === 1 && menu.menu_type === 'COMMON'
   );
-  const systemMenus = menus.filter((menu) => menu.menu_code === 'M004');
+  const adminMenus = menus.filter(
+    (menu) => menu.menu_level === 1 && menu.menu_type === 'ADMIN'
+  );
 
   return (
     <>
@@ -154,21 +156,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )
           )}
 
-          {/* 시스템 메뉴 */}
-          {/* 시스템 메뉴 */}
-          {systemMenus.length > 0 && (
+          {/* 관리자 메뉴 (role_code=R001인 경우에만 표시됨) */}
+          {adminMenus.length > 0 && (
             <div className="mt-6">
               {!isCollapsed && (
                 <div className="mb-2 px-8 animate-fade-in-up">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    System Management
+                    Admin
                   </p>
                 </div>
               )}
               {isCollapsed && <div className="my-4 h-px bg-gray-100 mx-4" />}
 
               <div className="space-y-1">
-                {systemMenus.map((menu) => (
+                {adminMenus.map((menu) => (
                   <MenuItemComponent
                     key={menu.menu_code}
                     menu={menu}

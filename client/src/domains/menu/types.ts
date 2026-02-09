@@ -24,6 +24,8 @@ export interface Menu {
     menu_level: number;
     /** 프론트엔드 라우팅 경로 */
     menu_url: string | null;
+    /** 메뉴 타입 (COMMON: 일반, ADMIN: 관리자 전용) */
+    menu_type: 'COMMON' | 'ADMIN';
 }
 
 /**
@@ -52,4 +54,6 @@ export interface UserMenuRequest {
     user_id: string;
     /** 직책 코드 (예: P001) */
     position_code: string;
+    /** 역할 코드 (예: R001=시스템 관리자, R002=일반 사용자) */
+    role_code: string;
 }

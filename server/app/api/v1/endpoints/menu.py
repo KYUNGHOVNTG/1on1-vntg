@@ -27,23 +27,26 @@ router = APIRouter(prefix="/menus", tags=["menus"])
     "/user/{user_id}",
     response_model=UserMenuResponse,
     summary="사용자별 메뉴 조회",
-    description="사용자가 접근 가능한 메뉴를 계층 구조로 조회합니다. 직책별 권한과 개인별 예외 권한을 결합하여 반환합니다.",
+    description="사용자가 접근 가능한 메뉴를 계층 구조로 조회합니다. 역할(role)에 따라 관리자 메뉴와 일반 메뉴를 분리하여 반환합니다.",
 )
 async def get_user_menus(
     user_id: str,
     position_code: str = Query(..., description="직책 코드 (예: P001)"),
+    role_code: str = Query(..., description="역할 코드 (예: R001=시스템 관리자, R002=일반 사용자)"),
     db: AsyncSession = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),  # 세션 검증
 ) -> UserMenuResponse:
     """
     사용자별 메뉴 조회
 
-    사용자의 직책(position_code)에 따른 메뉴 권한과
-    개인별 예외 메뉴 권한을 결합하여 조회합니다.
+    사용자의 역할(role_code)과 직책(position_code)에 따른 메뉴를 조회합니다.
+    - 일반 사용자(R002): COMMON 메뉴만 (직책별 + 개인별 예외)
+    - 시스템 관리자(R001): COMMON 메뉴 + ADMIN 메뉴 전체
 
     Args:
         user_id: 사용자 ID
         position_code: 직책 코드 (예: P001)
+        role_code: 역할 코드 (예: R001, R002)
         db: 데이터베이스 세션 (자동 주입)
 
     Returns:
@@ -56,7 +59,8 @@ async def get_user_menus(
         service = MenuService(db)
         request = UserMenuRequest(
             user_id=user_id,
-            position_code=position_code
+            position_code=position_code,
+            role_code=role_code
         )
 
         result = await service.execute(request)
@@ -77,6 +81,7 @@ async def get_user_menus(
             extra={
                 "user_id": user_id,
                 "position_code": position_code,
+                "role_code": role_code,
                 "error": str(e)
             }
         )
