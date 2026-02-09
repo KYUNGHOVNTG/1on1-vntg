@@ -94,18 +94,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         // ✅ useAuthStore에 사용자 정보 저장
         if (response.user_id && response.email && response.name) {
-          // position_code 확인 (백엔드에서 반드시 제공해야 함)
           const positionCode = response.position_code;
+          const roleCode = response.role_code;
 
           if (!positionCode) {
             console.warn('⚠️ position_code가 백엔드 응답에 없습니다. fallback 사용:', response.position);
+          }
+          if (!roleCode) {
+            console.warn('⚠️ role_code가 백엔드 응답에 없습니다. fallback 사용: R002');
           }
 
           setUser({
             id: response.user_id,
             email: response.email,
             name: response.name,
-            position_code: positionCode || response.position || 'P005', // fallback
+            position_code: positionCode || response.position || 'P005',
+            role_code: roleCode || 'R002',
           });
 
           console.log('✅ useAuthStore에 사용자 정보 저장:', {
@@ -113,7 +117,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             email: response.email,
             name: response.name,
             role: response.role,
-            role_code: response.role_code,
+            role_code: roleCode || 'R002',
             position: response.position,
             position_code: positionCode || response.position || 'P005',
           });
@@ -186,11 +190,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         if (response.user_id && response.email && response.name) {
           const positionCode = response.position_code;
+          const roleCode = response.role_code;
           setUser({
             id: response.user_id,
             email: response.email,
             name: response.name,
             position_code: positionCode || response.position || 'P005',
+            role_code: roleCode || 'R002',
           });
 
           console.log('✅ useAuthStore에 사용자 정보 저장:', {
@@ -198,6 +204,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             email: response.email,
             name: response.name,
             position_code: positionCode || response.position || 'P005',
+            role_code: roleCode || 'R002',
           });
         }
 

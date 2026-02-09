@@ -16,7 +16,8 @@ interface User {
   name: string;
   /** 직책 코드 (예: P001) */
   position_code: string;
-  // TODO: 추가 사용자 정보
+  /** 역할 코드 (예: R001=시스템 관리자, R002=일반 사용자) */
+  role_code: string;
 }
 
 interface AuthState {

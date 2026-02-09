@@ -76,6 +76,13 @@ class Menu(Base):
         comment="프론트엔드 라우팅 경로"
     )
 
+    menu_type: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default='COMMON',
+        comment="메뉴 타입 (COMMON: 일반 메뉴, ADMIN: 관리자 전용 메뉴)"
+    )
+
     # 이력 관리
     in_user: Mapped[Optional[str]] = mapped_column(
         String(50),
