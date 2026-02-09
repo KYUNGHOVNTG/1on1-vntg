@@ -17,6 +17,8 @@ from server.app.core.database import Base
 # 모든 모델을 import하여 metadata에 등록
 from server.app.domain.auth.models import RefreshToken
 from server.app.domain.user.models import User
+from server.app.domain.menu.models import Menu, PositionMenu, UserMenu
+from server.app.domain.common.models import CodeMaster, CodeDetail  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
