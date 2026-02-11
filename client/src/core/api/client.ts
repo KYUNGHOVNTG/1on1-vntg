@@ -95,20 +95,12 @@ class ApiClient {
           localStorage.removeItem('access_token');
 
           // 세션 만료 플래그 설정 (App.tsx에서 Zustand store 초기화에 사용)
-          // error_code에 따라 다른 플래그 설정
-          if (errorCode === 'SESSION_REVOKED') {
-            sessionStorage.setItem('session_revoked', 'true');
-          } else {
-            sessionStorage.setItem('session_expired', 'true');
-          }
+          sessionStorage.setItem('session_expired', 'true');
 
           // 현재 위치가 로그인 페이지가 아니면 리다이렉트
           if (window.location.pathname !== '/') {
             // error_code에 따라 다른 메시지 표시
-            if (errorCode === 'SESSION_REVOKED') {
-              // 다른 곳에서 로그인됨
-              toast.warning('다른 기기에서 로그인하여 현재 세션이 종료되었습니다');
-            } else if (errorCode === 'SESSION_IDLE_TIMEOUT') {
+            if (errorCode === 'SESSION_IDLE_TIMEOUT') {
               // Idle timeout
               toast.warning('장시간 사용하지 않아 자동 로그아웃되었습니다');
             } else if (errorCode === 'SESSION_EXPIRED') {
