@@ -57,3 +57,31 @@ export interface UserMenuRequest {
     /** 역할 코드 (예: R001=시스템 관리자, R002=일반 사용자) */
     role_code: string;
 }
+
+/**
+ * 메뉴 생성 요청
+ */
+export interface MenuCreateRequest {
+    menu_code: string;
+    menu_name: string;
+    up_menu_code?: string;
+    menu_level: number;
+    menu_url?: string;
+    sort_seq?: number;
+    use_yn?: string;
+    rmk?: string;
+    menu_type?: 'COMMON' | 'ADMIN';
+}
+
+/**
+ * 메뉴 수정 요청
+ */
+export interface MenuUpdateRequest {
+    menu_name?: string;
+    up_menu_code?: string;
+    menu_level?: number;
+    menu_url?: string;
+    sort_seq?: number;
+    use_yn?: string;
+    rmk?: string;
+}

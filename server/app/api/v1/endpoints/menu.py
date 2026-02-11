@@ -15,6 +15,9 @@ from server.app.domain.menu.schemas import (
     MenuHierarchyResponse,
     UserMenuRequest,
     UserMenuResponse,
+    MenuCreateRequest,
+    MenuUpdateRequest,
+    MenuResponse,
 )
 from server.app.domain.menu.service import MenuService
 
@@ -151,4 +154,143 @@ async def get_menu_hierarchy(
         raise HTTPException(
             status_code=500,
             detail=f"메뉴 계층 구조 조회 중 오류가 발생했습니다: {str(e)}"
+        )
+
+
+@router.post(
+    "",
+    response_model=MenuResponse,
+    summary="메뉴 생성",
+    description="새로운 메뉴를 생성합니다.",
+)
+async def create_menu(
+    request: MenuCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    # current_user_id: str = Depends(get_current_user_id), # TODO: 관리자 권한 체크 필요
+) -> MenuResponse:
+    """
+    메뉴 생성
+
+    Args:
+        request: 메뉴 생성 요청 정보
+        db: 데이터베이스 세션
+
+    Returns:
+        MenuResponse: 생성된 메뉴 정보
+    """
+    try:
+        service = MenuService(db)
+        result = await service.create_menu(request)
+
+        if not result.success:
+            raise HTTPException(
+                status_code=400,
+                detail=result.error or "메뉴 생성에 실패했습니다."
+            )
+
+        return result.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in create_menu: {str(e)}", extra={"error": str(e)})
+        raise HTTPException(
+            status_code=500,
+            detail=f"메뉴 생성 중 오류가 발생했습니다: {str(e)}"
+        )
+
+
+@router.put(
+    "/{menu_code}",
+    response_model=MenuResponse,
+    summary="메뉴 수정",
+    description="기존 메뉴 정보를 수정합니다.",
+)
+async def update_menu(
+    menu_code: str,
+    request: MenuUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> MenuResponse:
+    """
+    메뉴 수정
+
+    Args:
+        menu_code: 수정할 메뉴 코드
+        request: 메뉴 수정 요청 정보
+        db: 데이터베이스 세션
+
+    Returns:
+        MenuResponse: 수정된 메뉴 정보
+    """
+    try:
+        service = MenuService(db)
+        result = await service.update_menu(menu_code, request)
+
+        if not result.success:
+            # ServiceResult가 fail인 경우 대부분 400 또는 404 상황
+            # 실제 실패 원인에 따라 status code를 분기하면 좋지만 여기서는 400으로 통일
+            # (Service에서 NotFoundException 등을 던지면 위에서 catch됨)
+            # Service에서 Exception을 catch해서 fail로 리턴하는 구조이므로, 
+            # error 메시지가 명확하다면 400, 아니면 500이 적절.
+            raise HTTPException(
+                status_code=400,
+                detail=result.error or "메뉴 수정에 실패했습니다."
+            )
+
+        return result.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in update_menu: {str(e)}", 
+            extra={"menu_code": menu_code, "error": str(e)}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"메뉴 수정 중 오류가 발생했습니다: {str(e)}"
+        )
+
+
+@router.delete(
+    "/{menu_code}",
+    summary="메뉴 삭제",
+    description="메뉴를 삭제합니다. 하위 메뉴가 있는 경우 삭제할 수 없습니다.",
+)
+async def delete_menu(
+    menu_code: str,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    메뉴 삭제
+
+    Args:
+        menu_code: 삭제할 메뉴 코드
+        db: 데이터베이스 세션
+
+    Returns:
+        None
+    """
+    try:
+        service = MenuService(db)
+        result = await service.delete_menu(menu_code)
+
+        if not result.success:
+            raise HTTPException(
+                status_code=400,
+                detail=result.error or "메뉴 삭제에 실패했습니다."
+            )
+
+        return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in delete_menu: {str(e)}", 
+            extra={"menu_code": menu_code, "error": str(e)}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"메뉴 삭제 중 오류가 발생했습니다: {str(e)}"
         )

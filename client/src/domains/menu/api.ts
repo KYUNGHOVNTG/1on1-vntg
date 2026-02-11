@@ -5,7 +5,12 @@
  */
 
 import { apiClient } from '@/core/api/client';
-import type { UserMenuResponse, MenuHierarchy } from './types';
+import type {
+    UserMenuResponse,
+    MenuHierarchy,
+    MenuCreateRequest,
+    MenuUpdateRequest
+} from './types';
 
 /**
  * 사용자별 메뉴 조회
@@ -48,4 +53,36 @@ export async function getMenuHierarchy(
         params: menuCodes ? { menu_codes: menuCodes.join(',') } : undefined,
     });
     return response.data;
+}
+
+/**
+ * 메뉴 생성
+ * 
+ * @param data - 메뉴 생성 요청 데이터
+ * @returns 생성된 메뉴 정보
+ */
+export async function createMenu(data: MenuCreateRequest): Promise<MenuHierarchy> {
+    const response = await apiClient.post<MenuHierarchy>('/v1/menus', data);
+    return response.data;
+}
+
+/**
+ * 메뉴 수정
+ * 
+ * @param menuCode - 수정할 메뉴 코드
+ * @param data - 메뉴 수정 요청 데이터
+ * @returns 수정된 메뉴 정보
+ */
+export async function updateMenu(menuCode: string, data: MenuUpdateRequest): Promise<MenuHierarchy> {
+    const response = await apiClient.put<MenuHierarchy>(`/v1/menus/${menuCode}`, data);
+    return response.data;
+}
+
+/**
+ * 메뉴 삭제
+ * 
+ * @param menuCode - 삭제할 메뉴 코드
+ */
+export async function deleteMenu(menuCode: string): Promise<void> {
+    await apiClient.delete(`/v1/menus/${menuCode}`);
 }

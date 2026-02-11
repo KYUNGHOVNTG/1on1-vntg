@@ -15,6 +15,14 @@ from server.app.domain.menu.schemas import (
     MenuHierarchyResponse,
     UserMenuRequest,
     UserMenuResponse,
+    MenuCreateRequest,
+    MenuUpdateRequest,
+    MenuResponse,
+)
+from server.app.shared.exceptions import (
+    ValidationException,
+    NotFoundException,
+    BusinessLogicException,
 )
 from server.app.shared.base.service import BaseService
 from server.app.shared.types import ServiceResult
@@ -195,3 +203,161 @@ class MenuService(BaseService[UserMenuRequest, UserMenuResponse]):
         top_level_menus.sort(key=lambda x: x.sort_seq or 0)
 
         return top_level_menus
+
+    async def create_menu(
+        self,
+        request: MenuCreateRequest
+    ) -> ServiceResult[MenuResponse]:
+        """
+        메뉴를 생성합니다.
+
+        Args:
+            request: 메뉴 생성 요청 데이터
+
+        Returns:
+            ServiceResult[MenuResponse]: 생성된 메뉴 정보
+        """
+        try:
+            # 1. 중복 확인
+            existing_menu = await self.repository.get_menu_by_code(request.menu_code)
+            if existing_menu:
+                raise ValidationException(f"이미 존재하는 메뉴 코드입니다: {request.menu_code}")
+
+            # 2. 상위 메뉴 확인
+            if request.up_menu_code:
+                parent_menu = await self.repository.get_menu_by_code(request.up_menu_code)
+                if not parent_menu:
+                    raise ValidationException(f"상위 메뉴를 찾을 수 없습니다: {request.up_menu_code}")
+                
+                # 레벨 검증 (상위 메뉴 레벨 + 1)
+                if request.menu_level != parent_menu.menu_level + 1:
+                    raise ValidationException(
+                        f"메뉴 레벨이 올바르지 않습니다. 상위 메뉴 레벨: {parent_menu.menu_level}, 요청 레벨: {request.menu_level}"
+                    )
+            elif request.menu_level != 1:
+                 raise ValidationException("상위 메뉴가 없는 경우 메뉴 레벨은 1이어야 합니다.")
+
+            # 3. 메뉴 생성
+            menu = Menu(
+                menu_code=request.menu_code,
+                menu_name=request.menu_name,
+                sort_seq=request.sort_seq,
+                use_yn=request.use_yn,
+                rmk=request.rmk,
+                up_menu_code=request.up_menu_code,
+                menu_level=request.menu_level,
+                menu_url=request.menu_url,
+                menu_type='COMMON'  # 기본값, 필요 시 request에 추가
+            )
+
+            created_menu = await self.repository.create(menu)
+            
+            logger.info(
+                f"Menu created successfully: {menu.menu_code}",
+                extra={"menu_code": menu.menu_code, "menu_name": menu.menu_name}
+            )
+
+            return ServiceResult.ok(MenuResponse.model_validate(created_menu))
+
+        except ApplicationException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to create menu: {str(e)}", extra={"error": str(e)})
+            return ServiceResult.fail(f"메뉴 생성 중 오류가 발생했습니다: {str(e)}")
+
+    async def update_menu(
+        self,
+        menu_code: str,
+        request: MenuUpdateRequest
+    ) -> ServiceResult[MenuResponse]:
+        """
+        메뉴를 수정합니다.
+
+        Args:
+            menu_code: 수정할 메뉴 코드
+            request: 메뉴 수정 요청 데이터
+
+        Returns:
+            ServiceResult[MenuResponse]: 수정된 메뉴 정보
+        """
+        try:
+            # 1. 메뉴 조회
+            menu = await self.repository.get_menu_by_code(menu_code)
+            if not menu:
+                raise NotFoundException(f"메뉴를 찾을 수 없습니다: {menu_code}")
+
+            # 2. 상위 메뉴 변경 시 유효성 검사
+            if request.up_menu_code and request.up_menu_code != menu.up_menu_code:
+                # 자기 자신이나 하위 메뉴를 상위 메뉴로 설정 불가
+                if request.up_menu_code == menu_code:
+                     raise ValidationException("자기 자신을 상위 메뉴로 설정할 수 없습니다.")
+                
+                # 순환 참조 방지 로직 필요하나 2단계 제한이므로 간단히 처리
+                parent_menu = await self.repository.get_menu_by_code(request.up_menu_code)
+                if not parent_menu:
+                    raise ValidationException(f"상위 메뉴를 찾을 수 없습니다: {request.up_menu_code}")
+                
+                # 레벨 자동 조정 또는 검증
+                # 여기서는 request.menu_level이 주어지면 검증, 아니면 자동 조정도 가능하지만
+                # 명확성을 위해 request 값 우선 검증
+                if request.menu_level and request.menu_level != parent_menu.menu_level + 1:
+                     raise ValidationException(
+                        f"메뉴 레벨이 상위 메뉴와 일치하지 않습니다. 상위: {parent_menu.menu_level}, 요청: {request.menu_level}"
+                    )
+
+            # 3. 데이터 업데이트
+            update_data = request.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(menu, key, value)
+            
+            # 4. 저장
+            updated_menu = await self.repository.update(menu)
+
+            logger.info(
+                f"Menu updated successfully: {menu_code}",
+                extra={"menu_code": menu_code, "updates": update_data}
+            )
+
+            return ServiceResult.ok(MenuResponse.model_validate(updated_menu))
+
+        except ApplicationException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to update menu: {str(e)}", extra={"error": str(e)})
+            return ServiceResult.fail(f"메뉴 수정 중 오류가 발생했습니다: {str(e)}")
+
+    async def delete_menu(self, menu_code: str) -> ServiceResult[None]:
+        """
+        메뉴를 삭제합니다.
+
+        Args:
+            menu_code: 삭제할 메뉴 코드
+
+        Returns:
+            ServiceResult[None]: 성공 여부
+        """
+        try:
+            # 1. 메뉴 조회
+            menu = await self.repository.get_menu_by_code(menu_code)
+            if not menu:
+                raise NotFoundException(f"메뉴를 찾을 수 없습니다: {menu_code}")
+
+            # 2. 하위 메뉴 존재 여부 확인
+            children = await self.repository.get_children_menus(menu_code)
+            if children:
+                raise BusinessLogicException(
+                    f"하위 메뉴가 존재하여 삭제할 수 없습니다. 하위 메뉴: {[c.menu_name for c in children]}"
+                )
+
+            # 3. 삭제
+            await self.repository.delete(menu)
+
+            logger.info(f"Menu deleted successfully: {menu_code}")
+
+            return ServiceResult.ok(None)
+
+        except ApplicationException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to delete menu: {str(e)}", extra={"error": str(e)})
+            return ServiceResult.fail(f"메뉴 삭제 중 오류가 발생했습니다: {str(e)}")

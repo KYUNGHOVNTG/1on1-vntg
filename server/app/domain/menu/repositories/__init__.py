@@ -198,3 +198,45 @@ class MenuRepository(BaseRepository[Optional[str], List[Menu]]):
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def create(self, menu: Menu) -> Menu:
+        """
+        메뉴 생성
+
+        Args:
+            menu: 생성할 메뉴 객체
+
+        Returns:
+            Menu: 생성된 메뉴 객체
+        """
+        self.db.add(menu)
+        await self.db.commit()
+        await self.db.refresh(menu)
+        return menu
+
+    async def update(self, menu: Menu) -> Menu:
+        """
+        메뉴 수정
+
+        Args:
+            menu: 수정할 메뉴 객체
+
+        Returns:
+            Menu: 수정된 메뉴 객체 (변경된 값 반영됨)
+        """
+        # SQLAlchemy 객체가 세션에 attach되어 있다면 commit 시 자동 반영됨
+        if menu not in self.db:
+             await self.db.merge(menu)
+        await self.db.commit()
+        await self.db.refresh(menu)
+        return menu
+
+    async def delete(self, menu: Menu) -> None:
+        """
+        메뉴 삭제
+
+        Args:
+            menu: 삭제할 메뉴 객체
+        """
+        await self.db.delete(menu)
+        await self.db.commit()
