@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from server.app.api.v1.endpoints import sample, docs, system, menu, code
 from server.app.domain.auth.router import router as auth_router
+from server.app.domain.permission.router import router as permission_router
 
 # v1 메인 라우터 생성
 api_router = APIRouter()
@@ -45,6 +46,12 @@ api_router.include_router(
 # Common Code 도메인 라우터
 api_router.include_router(
     code.router,
+)
+
+# Permission 도메인 라우터 (권한 관리)
+api_router.include_router(
+    permission_router,
+    # prefix는 이미 permission_router에 정의되어 있음
 )
 
 # TODO: 새로운 도메인을 추가할 때 여기에 라우터를 포함하세요

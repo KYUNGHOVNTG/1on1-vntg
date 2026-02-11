@@ -7,6 +7,7 @@ FastAPI 공통 의존성 (Dependencies)
 from typing import Optional
 
 from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,8 +41,12 @@ async def get_database_session() -> AsyncSession:
 # ====================
 
 
+# Swagger UI 연동을 위한 Security Scheme 정의
+reusable_oauth2 = HTTPBearer()
+
+
 async def get_current_user_id(
-    authorization: Optional[str] = Header(None),
+    token: HTTPAuthorizationCredentials = Depends(reusable_oauth2),
     db: AsyncSession = Depends(get_database_session)
 ) -> str:
     """
@@ -53,7 +58,7 @@ async def get_current_user_id(
             return {"user_id": user_id}
 
     Args:
-        authorization: Authorization 헤더 (Bearer {token})
+        token: HTTPAuthorizationCredentials (FastAPI가 자동으로 Bearer 토큰 파싱)
         db: 데이터베이스 세션
 
     Returns:
@@ -62,34 +67,12 @@ async def get_current_user_id(
     Raises:
         HTTPException: 토큰이 유효하지 않은 경우
     """
-    # 1. Authorization 헤더 확인
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # 2. Bearer 스킴 확인
-    try:
-        scheme, token = authorization.split()
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication scheme",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # 1. Authorization 헤더 및 스킴 확인 (HTTPBearer가 처리)
+    # token.credentials에 실제 토큰 문자열이 들어있음
 
     # 3. JWT 디코딩 및 검증
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(token.credentials)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -215,7 +198,7 @@ async def get_current_user_id(
 
 
 async def get_current_session_id(
-    authorization: Optional[str] = Header(None),
+    token: HTTPAuthorizationCredentials = Depends(reusable_oauth2),
     db: AsyncSession = Depends(get_database_session)
 ) -> str:
     """
@@ -230,7 +213,7 @@ async def get_current_session_id(
             return {"session_id": session_id}
 
     Args:
-        authorization: Authorization 헤더 (Bearer {token})
+        token: HTTPAuthorizationCredentials
         db: 데이터베이스 세션
 
     Returns:
@@ -239,34 +222,11 @@ async def get_current_session_id(
     Raises:
         HTTPException: 토큰이 유효하지 않은 경우
     """
-    # 1. Authorization 헤더 확인
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # 2. Bearer 스킴 확인
-    try:
-        scheme, token = authorization.split()
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication scheme",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # 1. Authorization 헤더 및 스킴 확인 (HTTPBearer가 처리)
 
     # 3. JWT 디코딩 및 검증
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(token.credentials)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

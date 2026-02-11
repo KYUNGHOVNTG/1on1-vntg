@@ -81,49 +81,35 @@ class MenuRepository(BaseRepository[Optional[str], List[Menu]]):
         Returns:
             List[Menu]: 사용자가 접근 가능한 메뉴 목록
         """
-        # 1. COMMON 메뉴: 직책별 메뉴 조회
+        # 1. 직책별 메뉴 권한 조회
         position_menu_stmt = (
             select(Menu.menu_code)
             .join(PositionMenu, Menu.menu_code == PositionMenu.menu_code)
             .where(
                 and_(
                     PositionMenu.position_code == position_code,
-                    Menu.menu_type == 'COMMON'
+                    Menu.use_yn == 'Y'
                 )
             )
         )
 
-        # 2. COMMON 메뉴: 개인별 예외 메뉴 조회
+        # 2. 사용자별 추가 메뉴 권한 조회
         user_menu_stmt = (
             select(Menu.menu_code)
             .join(UserMenu, Menu.menu_code == UserMenu.menu_code)
             .where(
                 and_(
                     UserMenu.user_id == user_id,
-                    Menu.menu_type == 'COMMON'
+                    Menu.use_yn == 'Y'
                 )
             )
         )
 
-        # 3. COMMON 메뉴 코드 결합
-        common_menu_codes_stmt = position_menu_stmt.union(user_menu_stmt)
-        common_menu_codes_result = await self.db.execute(common_menu_codes_stmt)
-        menu_codes = [row[0] for row in common_menu_codes_result.all()]
-
-        # 4. ADMIN 메뉴: 시스템 관리자(R001)인 경우 전체 ADMIN 메뉴 추가
-        if role_code == 'R001':
-            admin_menu_stmt = (
-                select(Menu.menu_code)
-                .where(
-                    and_(
-                        Menu.menu_type == 'ADMIN',
-                        Menu.use_yn == 'Y'
-                    )
-                )
-            )
-            admin_menu_result = await self.db.execute(admin_menu_stmt)
-            admin_menu_codes = [row[0] for row in admin_menu_result.all()]
-            menu_codes = list(set(menu_codes + admin_menu_codes))
+        # 3. 전체 메뉴 코드 결합 (직책 권한 + 사용자 권한)
+        # union을 사용하여 중복 제거
+        menu_codes_stmt = position_menu_stmt.union(user_menu_stmt)
+        menu_codes_result = await self.db.execute(menu_codes_stmt)
+        menu_codes = [row[0] for row in menu_codes_result.all()]
 
         # 5. 메뉴 코드로 메뉴 정보 조회
         if not menu_codes:
