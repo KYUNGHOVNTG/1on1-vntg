@@ -11,17 +11,12 @@ from server.app.core.database import get_db
 from server.app.core.dependencies import get_current_user_id, get_current_session_id
 from server.app.core.logging import get_logger
 from server.app.domain.auth.schemas import (
-    CheckActiveSessionRequest,
-    CheckActiveSessionResponse,
     CleanupExpiredSessionsResponse,
-    CompleteForceLoginRequest,
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
     HeartbeatResponse,
     LogoutResponse,
-    RevokeSessionRequest,
-    RevokeSessionResponse,
     SessionStatsResponse,
     UserInfoResponse,
 )
@@ -169,116 +164,6 @@ async def get_current_user_info(
         user_id=user_id,
         message="인증 성공"
     )
-
-
-@router.post(
-    "/check-active-session",
-    response_model=CheckActiveSessionResponse,
-    summary="활성 세션 확인",
-    description="사용자의 활성 세션이 있는지 확인합니다.",
-)
-async def check_active_session(
-    request: CheckActiveSessionRequest,
-    db: AsyncSession = Depends(get_db),
-) -> CheckActiveSessionResponse:
-    """
-    사용자의 활성 세션을 확인합니다.
-
-    Args:
-        request: 활성 세션 확인 요청
-        db: 데이터베이스 세션
-
-    Returns:
-        CheckActiveSessionResponse: 활성 세션 정보
-    """
-    service = SessionService(db)
-    result = await service.check_active_session(request.user_id)
-
-    logger.info(
-        f"활성 세션 확인 완료: user_id={request.user_id}, has_active={result.has_active_session}"
-    )
-
-    return result
-
-
-@router.post(
-    "/revoke-session",
-    response_model=RevokeSessionResponse,
-    summary="세션 폐기",
-    description="사용자의 모든 활성 세션을 폐기합니다. (동시접속 제어용)",
-)
-async def revoke_session(
-    request: RevokeSessionRequest,
-    db: AsyncSession = Depends(get_db),
-) -> RevokeSessionResponse:
-    """
-    사용자의 모든 활성 세션을 폐기합니다.
-
-    Args:
-        request: 세션 폐기 요청
-        db: 데이터베이스 세션
-
-    Returns:
-        RevokeSessionResponse: 폐기 결과
-    """
-    if not request.revoke_previous:
-        return RevokeSessionResponse(
-            success=True,
-            message="세션 폐기가 요청되지 않았습니다"
-        )
-
-    service = SessionService(db)
-    result = await service.revoke_previous_sessions(request.user_id)
-
-    logger.info(
-        f"세션 폐기 완료: user_id={request.user_id}, success={result.success}"
-    )
-
-    return result
-
-
-@router.post(
-    "/complete-force-login",
-    response_model=GoogleAuthResponse,
-    summary="강제 로그인 완료",
-    description="기존 세션을 폐기하고 임시 저장된 토큰으로 로그인을 완료합니다.",
-)
-async def complete_force_login(
-    request: CompleteForceLoginRequest,
-    db: AsyncSession = Depends(get_db),
-) -> GoogleAuthResponse:
-    """
-    강제 로그인을 완료합니다.
-
-    동시접속 감지 후 사용자가 "기존 세션 종료하고 로그인"을 선택했을 때 호출됩니다.
-    1. 기존 세션 폐기
-    2. 임시 저장된 토큰으로 새 세션 생성
-    3. 토큰 반환
-
-    Args:
-        request: 강제 로그인 요청 (user_id 포함)
-        db: 데이터베이스 세션
-
-    Returns:
-        GoogleAuthResponse: 로그인 결과
-
-    Raises:
-        HTTPException 401: 임시 저장된 토큰이 없거나 만료된 경우
-    """
-    logger.info(f"강제 로그인 요청: user_id={request.user_id}")
-
-    service = SessionService(db)
-    result = await service.complete_force_login(request.user_id)
-
-    if not result.success:
-        logger.error(f"강제 로그인 실패: {result.error}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=result.error,
-        )
-
-    logger.info(f"강제 로그인 성공: user_id={request.user_id}")
-    return result.data
 
 
 @router.post(
