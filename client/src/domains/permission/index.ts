@@ -25,3 +25,13 @@ export {
   updateUserMenus,
   getMenusForPermission,
 } from './api';
+
+// Components
+export {
+  MenuTreeCheckbox,
+  PositionPermissionPanel,
+  UserPermissionPanel,
+} from './components';
+
+// Pages
+export { PermissionManagementPage } from './pages/PermissionManagementPage';

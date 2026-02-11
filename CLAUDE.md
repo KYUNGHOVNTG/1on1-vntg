@@ -94,13 +94,65 @@ alembic downgrade -1
 
 이 프로젝트는 Alembic을 사용하여 마이그레이션을 관리합니다.
 
-1. **모든 스키마 변경은 Alembic 마이그레이션으로 관리**: DB 콘솔에서 직접 실행 금지
-2. **마이그레이션 생성 절차**: 모델(models.py) 먼저 수정 → `alembic revision --autogenerate -m "설명"` → 검토 후 `alembic upgrade head`
+### 기본 원칙
+
+1. **모든 DB 변경은 Alembic 마이그레이션으로 관리**:
+   - 스키마 변경 (테이블, 컬럼 추가/수정/삭제)
+   - 데이터 변경 (초기 데이터, 마스터 데이터 INSERT/UPDATE/DELETE)
+   - DB 콘솔에서 직접 실행 절대 금지
+   - 직접 SQL 쿼리 제공 금지 (반드시 Alembic 마이그레이션 파일로)
+
+2. **마이그레이션 생성 절차**:
+   - 스키마 변경: 모델(models.py) 먼저 수정 → `alembic revision --autogenerate -m "설명"`
+   - 데이터 변경: `alembic revision -m "설명"` → 수동으로 upgrade/downgrade 작성
+   - 검토 후 `alembic upgrade head` 실행
+
 3. **변경 원칙**:
    - 모델 우선 변경 (Single Source of Truth)
    - 기존 마이그레이션 파일 수정 금지 (새 마이그레이션 생성)
    - 테이블 정의 변경 시 반드시 해당 도메인의 모델(`server/app/domain/{domain}/models/`)을 함께 수정
-4. **AI 에이전트 규칙**: DB 변경이 필요할 시 → 도메인 모델 먼저 수정 → Alembic 마이그레이션 생성 명령어 안내 → 사용자 확인 후 진행
+   - 모든 마이그레이션은 rollback 가능하도록 downgrade() 함수 필수 구현
+
+### AI 에이전트 필수 체크리스트 (DB 작업 전)
+
+**CRITICAL**: DB 관련 작업을 시작하기 전 다음을 **반드시** 확인하세요:
+
+1. **기존 데이터 확인 (필수)**:
+   - `migration/` 폴더의 초기 데이터 파일 확인 (예: `20260120_seed_*.sql`)
+   - `alembic/versions/` 폴더의 기존 마이그레이션 파일 확인
+   - 추가하려는 데이터가 이미 존재하는지 검색 (`grep`, `Glob` 도구 활용)
+
+2. **메뉴 데이터 작업 시 (특히 중요)**:
+   - 기존 메뉴 코드 확인: `migration/` 폴더에서 `menu_code` 검색
+   - 메뉴 URL 중복 확인: 동일한 `menu_url`이 있는지 확인
+   - 메뉴 계층 구조 파악: 상위 메뉴(`up_menu_code`) 관계 확인
+   - **절대로 임의의 메뉴 코드를 생성하지 마세요**
+
+3. **Alembic 마이그레이션 규칙**:
+   ```python
+   # 올바른 예시: 데이터 마이그레이션
+   def upgrade() -> None:
+       op.execute("""
+           INSERT INTO cm_menu (...) VALUES (...)
+       """)
+
+   def downgrade() -> None:
+       op.execute("DELETE FROM cm_menu WHERE menu_code = 'M999'")
+   ```
+
+4. **금지 사항**:
+   - ❌ 직접 SQL 쿼리 제공 (`INSERT INTO ...` 직접 실행)
+   - ❌ 기존 데이터 확인 없이 작업
+   - ❌ 사용자에게 "DB에서 직접 실행하세요" 안내
+   - ❌ `migration/` 폴더 확인 생략
+
+### AI 에이전트 작업 절차
+
+DB 변경이 필요할 시:
+1. **기존 데이터 확인** (migration/, alembic/versions/ 검색)
+2. 도메인 모델 수정 (스키마 변경 시)
+3. Alembic 마이그레이션 생성 명령어 안내
+4. 사용자 확인 후 진행
 
 ---
 
