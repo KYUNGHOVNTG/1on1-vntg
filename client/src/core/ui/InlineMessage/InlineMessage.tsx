@@ -5,8 +5,13 @@
  * 주로 유효성 검증 오류, 경고, 성공 메시지에 사용
  *
  * @example
+ * // message prop 사용
  * <InlineMessage variant="error" message="이메일 형식이 올바르지 않습니다" />
- * <InlineMessage variant="success" message="저장되었습니다" />
+ *
+ * // children 사용 (권장)
+ * <InlineMessage variant="warning">
+ *   변경된 내용이 있습니다. 저장 버튼을 클릭하여 저장하세요.
+ * </InlineMessage>
  */
 
 import React from 'react';
@@ -17,6 +22,7 @@ import { cn } from '../../utils/cn';
 export const InlineMessage: React.FC<InlineMessageProps> = ({
   variant = 'error',
   message,
+  children,
   className,
   showIcon = true,
 }) => {
@@ -56,7 +62,7 @@ export const InlineMessage: React.FC<InlineMessageProps> = ({
       role="alert"
     >
       {showIcon && <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', config.iconClass)} />}
-      <span className="flex-1">{message}</span>
+      <span className="flex-1">{children || message}</span>
     </div>
   );
 };
