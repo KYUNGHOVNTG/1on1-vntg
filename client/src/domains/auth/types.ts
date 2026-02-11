@@ -42,8 +42,6 @@ export interface GoogleAuthResponse {
   position?: string;
   role_code?: string;
   position_code?: string;
-  has_active_session?: boolean; // 기존 활성 세션 존재 여부
-  existing_session_info?: SessionInfo; // 기존 세션 정보
 }
 
 /**
@@ -52,44 +50,6 @@ export interface GoogleAuthResponse {
 export interface LogoutResponse {
   success: boolean;
   message: string;
-}
-
-/**
- * 활성 세션 확인 요청
- */
-export interface CheckActiveSessionRequest {
-  user_id: string;
-}
-
-/**
- * 활성 세션 확인 응답
- */
-export interface CheckActiveSessionResponse {
-  has_active_session: boolean;
-  session_info?: SessionInfo;
-}
-
-/**
- * 세션 폐기 요청
- */
-export interface RevokeSessionRequest {
-  user_id: string;
-  revoke_previous?: boolean;
-}
-
-/**
- * 세션 폐기 응답
- */
-export interface RevokeSessionResponse {
-  success: boolean;
-  message: string;
-}
-
-/**
- * 강제 로그인 완료 요청
- */
-export interface CompleteForceLoginRequest {
-  user_id: string;
 }
 
 /**
