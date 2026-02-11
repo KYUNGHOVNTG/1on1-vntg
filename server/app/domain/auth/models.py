@@ -24,13 +24,7 @@ class RefreshToken(Base):
     __tablename__ = "auth_refresh_token"
     
     __table_args__ = (
-        # 1. 활성 세션 조회 및 동시접속 체크 최적화
-        Index(
-            'idx_refresh_token_user_active',
-            'user_id', 'revoked_yn', 'last_activity_at',
-            postgresql_where='revoked_yn = \'N\''
-        ),
-        # 2. 만료 세션 정리 크론잡 최적화
+        # Idle timeout 세션 정리 최적화 (cleanup_expired_sessions)
         Index(
             'idx_refresh_token_cleanup',
             'last_activity_at',
