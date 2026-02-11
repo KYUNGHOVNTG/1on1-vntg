@@ -42,8 +42,6 @@ class GoogleAuthResponse(BaseModel):
     position: str | None = Field(None, description="직급 (TEAM_LEADER, MEMBER 등)")
     role_code: str | None = Field(None, description="역할 코드 (R001, R002 등)")
     position_code: str | None = Field(None, description="직급 코드 (P001, P002 등)")
-    has_active_session: bool = Field(default=False, description="기존 활성 세션 존재 여부")
-    existing_session_info: SessionInfo | None = Field(None, description="기존 세션 정보")
 
 
 
@@ -61,39 +59,6 @@ class UserInfoResponse(BaseModel):
     email: str | None = Field(None, description="사용자 이메일")
     name: str | None = Field(None, description="사용자 이름")
     message: str = Field(default="인증 성공", description="응답 메시지")
-
-
-class CheckActiveSessionRequest(BaseModel):
-    """활성 세션 확인 요청"""
-
-    user_id: str = Field(..., description="사용자 ID")
-
-
-class CheckActiveSessionResponse(BaseModel):
-    """활성 세션 확인 응답"""
-
-    has_active_session: bool = Field(..., description="활성 세션 존재 여부")
-    session_info: SessionInfo | None = Field(None, description="세션 정보")
-
-
-class RevokeSessionRequest(BaseModel):
-    """세션 폐기 요청"""
-
-    user_id: str = Field(..., description="사용자 ID")
-    revoke_previous: bool = Field(default=True, description="기존 세션 폐기 여부")
-
-
-class RevokeSessionResponse(BaseModel):
-    """세션 폐기 응답"""
-
-    success: bool = Field(..., description="폐기 성공 여부")
-    message: str = Field(default="세션이 폐기되었습니다", description="응답 메시지")
-
-
-class CompleteForceLoginRequest(BaseModel):
-    """강제 로그인 완료 요청"""
-
-    user_id: str = Field(..., description="사용자 ID")
 
 
 class HeartbeatResponse(BaseModel):
@@ -127,11 +92,6 @@ __all__ = [
     "LogoutResponse",
     "UserInfoResponse",
     "SessionInfo",
-    "CheckActiveSessionRequest",
-    "CheckActiveSessionResponse",
-    "RevokeSessionRequest",
-    "RevokeSessionResponse",
-    "CompleteForceLoginRequest",
     "HeartbeatResponse",
     "SessionStatsResponse",
     "CleanupExpiredSessionsResponse",

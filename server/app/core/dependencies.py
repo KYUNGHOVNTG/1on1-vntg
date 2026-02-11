@@ -103,12 +103,12 @@ async def get_current_user_id(
         session = result.scalar_one_or_none()
 
         if session and session.revoked_yn == 'Y':
-            # 해당 세션이 폐기됨 (다른 곳에서 로그인)
+            # 세션이 폐기됨 (Idle timeout 또는 로그아웃)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
-                    "error_code": "SESSION_REVOKED",
-                    "message": "다른 기기에서 로그인하여 현재 세션이 종료되었습니다"
+                    "error_code": "SESSION_EXPIRED",
+                    "message": "세션이 만료되었습니다"
                 },
                 headers={"WWW-Authenticate": "Bearer"},
             )
@@ -144,12 +144,12 @@ async def get_current_user_id(
             revoked_session = revoked_result.scalar_one_or_none()
 
             if revoked_session:
-                # 세션이 폐기됨 (다른 곳에서 로그인)
+                # 세션이 폐기됨 (Idle timeout 또는 로그아웃)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail={
-                        "error_code": "SESSION_REVOKED",
-                        "message": "다른 기기에서 로그인하여 현재 세션이 종료되었습니다"
+                        "error_code": "SESSION_EXPIRED",
+                        "message": "세션이 만료되었습니다"
                     },
                     headers={"WWW-Authenticate": "Bearer"},
                 )
@@ -266,8 +266,8 @@ async def get_current_session_id(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "error_code": "SESSION_REVOKED",
-                "message": "다른 기기에서 로그인하여 현재 세션이 종료되었습니다"
+                "error_code": "SESSION_EXPIRED",
+                "message": "세션이 만료되었습니다"
             },
             headers={"WWW-Authenticate": "Bearer"},
         )
