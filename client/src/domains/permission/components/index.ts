@@ -5,3 +5,5 @@
  */
 
 export { MenuTreeCheckbox } from './MenuTreeCheckbox';
+export { PositionPermissionPanel } from './PositionPermissionPanel';
+export { UserPermissionPanel } from './UserPermissionPanel';

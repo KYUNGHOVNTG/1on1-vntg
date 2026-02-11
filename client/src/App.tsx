@@ -8,6 +8,7 @@ import { logout as logoutAPI, getCurrentUser } from './domains/auth/api';
 import { DashboardPage } from './domains/dashboard';
 import { CodeManagementPage } from './domains/common';
 import { MenuManagementPage } from './domains/menu';
+import { PermissionManagementPage } from './domains/permission';
 import { ComponentShowcasePage } from './domains/system/pages/ComponentShowcasePage';
 import { MainLayout } from './core/layout';
 import { useAuthStore } from './core/store/useAuthStore';
@@ -178,6 +179,7 @@ function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/system/codes" element={<CodeManagementPage />} />
             <Route path="/system/menus" element={<MenuManagementPage />} />
+            <Route path="/system/permissions" element={<PermissionManagementPage />} />
             <Route path="/system/components" element={<ComponentShowcasePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
