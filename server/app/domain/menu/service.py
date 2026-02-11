@@ -177,6 +177,10 @@ class MenuService(BaseService[UserMenuRequest, UserMenuResponse]):
         # 메뉴 코드로 빠른 조회를 위한 딕셔너리
         menu_dict = {menu.menu_code: menu for menu in menus}
 
+        # 모든 메뉴의 children을 빈 리스트로 명시적 초기화 (SQLAlchemy lazy loading 방지)
+        for menu in menus:
+            menu.children = []
+
         # 최상위 메뉴만 필터링 (menu_level == 1 또는 up_menu_code가 None)
         top_level_menus = [
             menu for menu in menus
@@ -187,16 +191,13 @@ class MenuService(BaseService[UserMenuRequest, UserMenuResponse]):
         for menu in menus:
             if menu.up_menu_code and menu.up_menu_code in menu_dict:
                 parent = menu_dict[menu.up_menu_code]
-                # children이 리스트가 아니면 초기화
-                if not isinstance(parent.children, list):
-                    parent.children = []
                 # 중복 방지
                 if menu not in parent.children:
                     parent.children.append(menu)
 
         # sort_seq 순서로 정렬
         for menu in menus:
-            if hasattr(menu, 'children') and menu.children:
+            if menu.children:
                 menu.children.sort(key=lambda x: x.sort_seq or 0)
 
         # 최상위 메뉴도 정렬
