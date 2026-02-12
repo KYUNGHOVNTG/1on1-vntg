@@ -8,4 +8,6 @@ export * from './types';
 export * from './api';
 export * from './store';
 export * from './pages/EmployeeListPage';
+export * from './pages/OrgChartPage';
+export * from './pages/DepartmentDetailPage';
 export * from './components/EmployeeDetailModal';
