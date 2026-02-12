@@ -1,0 +1,167 @@
+[
+  {
+    "dept_code": "DEPT001",
+    "dept_name": "경영본부",
+    "upper_dept_code": null,
+    "dept_head_emp_no": "EMP001",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT002",
+    "dept_name": "기술본부",
+    "upper_dept_code": null,
+    "dept_head_emp_no": "EMP002",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT003",
+    "dept_name": "영업본부",
+    "upper_dept_code": null,
+    "dept_head_emp_no": "EMP003",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT011",
+    "dept_name": "인사팀",
+    "upper_dept_code": "DEPT001",
+    "dept_head_emp_no": "EMP004",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT012",
+    "dept_name": "재무팀",
+    "upper_dept_code": "DEPT001",
+    "dept_head_emp_no": "EMP005",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT021",
+    "dept_name": "개발1팀",
+    "upper_dept_code": "DEPT002",
+    "dept_head_emp_no": "EMP006",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT022",
+    "dept_name": "개발2팀",
+    "upper_dept_code": "DEPT002",
+    "dept_head_emp_no": "EMP007",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT031",
+    "dept_name": "영업1팀",
+    "upper_dept_code": "DEPT003",
+    "dept_head_emp_no": "EMP008",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT032",
+    "dept_name": "영업2팀",
+    "upper_dept_code": "DEPT003",
+    "dept_head_emp_no": "EMP009",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT111",
+    "dept_name": "채용파트",
+    "upper_dept_code": "DEPT011",
+    "dept_head_emp_no": "EMP010",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT112",
+    "dept_name": "평가파트",
+    "upper_dept_code": "DEPT011",
+    "dept_head_emp_no": "EMP011",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT211",
+    "dept_name": "프론트엔드파트",
+    "upper_dept_code": "DEPT021",
+    "dept_head_emp_no": "EMP012",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT212",
+    "dept_name": "백엔드파트",
+    "upper_dept_code": "DEPT021",
+    "dept_head_emp_no": "EMP013",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT221",
+    "dept_name": "AI파트",
+    "upper_dept_code": "DEPT022",
+    "dept_head_emp_no": "EMP014",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "dept_code": "DEPT311",
+    "dept_name": "영업지원파트",
+    "upper_dept_code": "DEPT031",
+    "dept_head_emp_no": "EMP015",
+    "use_yn": "Y",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  }
+]
