@@ -40,6 +40,15 @@ class EmployeeBase(BaseModel):
     on_work_yn: str = Field(..., description="재직 여부 (Y/N)")
 
 
+class EmployeeDetailResponse(EmployeeBase):
+    """
+    직원 상세 응답 스키마
+
+    API 응답용 간소화된 직원 상세 정보입니다.
+    """
+    pass
+
+
 class EmployeeProfile(EmployeeBase):
     """
     직원 프로필 스키마 (주소속 + 겸직 통합)
@@ -98,15 +107,6 @@ class EmployeeSearchParams(BaseModel):
     dept_code: Optional[str] = Field(None, description="부서 코드")
     page: int = Field(default=1, ge=1, description="페이지 번호")
     limit: int = Field(default=20, ge=1, le=100, description="페이지당 건수")
-
-
-class EmployeeDetailResponse(EmployeeBase):
-    """
-    직원 상세 응답 스키마
-
-    API 응답용 간소화된 직원 상세 정보입니다.
-    """
-    pass
 
 
 class ConcurrentPositionResponse(BaseModel):
