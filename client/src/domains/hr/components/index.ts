@@ -7,3 +7,4 @@ export { OrgTreeNodeComponent } from './OrgTreeNode';
 export { DepartmentInfoCard } from './DepartmentInfoCard';
 export { DepartmentEmployeeList } from './DepartmentEmployeeList';
 export { EmployeeDetailModal } from './EmployeeDetailModal';
+export { SyncHistoryTable } from './SyncHistoryTable';

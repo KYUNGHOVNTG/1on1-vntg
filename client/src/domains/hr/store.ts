@@ -13,6 +13,10 @@ import type {
   OrgTreeNode,
   DepartmentDetail,
   DepartmentEmployeesResponse,
+  SyncHistory,
+  EmployeeSyncRequest,
+  DepartmentSyncRequest,
+  SyncExecutionResponse,
 } from './types';
 import * as hrApi from './api';
 
@@ -36,6 +40,10 @@ interface HRState {
   departmentEmployees: Employee[];
   departmentEmployeesTotal: number;
 
+  // 동기화 관련 상태
+  syncHistory: SyncHistory[];
+  syncHistoryTotal: number;
+
   // 로딩/에러 상태
   loading: {
     employees: boolean;
@@ -43,6 +51,9 @@ interface HRState {
     orgTree: boolean;
     department: boolean;
     departmentEmployees: boolean;
+    syncEmployees: boolean;
+    syncDepartments: boolean;
+    syncHistory: boolean;
   };
   error: {
     employees: string | null;
@@ -50,6 +61,9 @@ interface HRState {
     orgTree: string | null;
     department: string | null;
     departmentEmployees: string | null;
+    syncEmployees: string | null;
+    syncDepartments: string | null;
+    syncHistory: string | null;
   };
 
   // 직원 관련 액션
@@ -63,6 +77,11 @@ interface HRState {
   fetchDepartmentById: (deptCode: string) => Promise<void>;
   fetchDepartmentEmployees: (deptCode: string, includeSubDepts?: boolean) => Promise<void>;
   clearSelectedDepartment: () => void;
+
+  // 동기화 관련 액션
+  syncEmployees: (employees: EmployeeSyncRequest[]) => Promise<SyncExecutionResponse>;
+  syncDepartments: (departments: DepartmentSyncRequest[]) => Promise<SyncExecutionResponse>;
+  fetchSyncHistory: (syncType?: 'employees' | 'departments' | 'org_tree', limit?: number) => Promise<void>;
 
   // 에러 클리어
   clearError: (key: keyof HRState['error']) => void;
@@ -88,12 +107,18 @@ export const useHRStore = create<HRState>((set, get) => ({
   departmentEmployees: [],
   departmentEmployeesTotal: 0,
 
+  syncHistory: [],
+  syncHistoryTotal: 0,
+
   loading: {
     employees: false,
     employee: false,
     orgTree: false,
     department: false,
     departmentEmployees: false,
+    syncEmployees: false,
+    syncDepartments: false,
+    syncHistory: false,
   },
   error: {
     employees: null,
@@ -101,6 +126,9 @@ export const useHRStore = create<HRState>((set, get) => ({
     orgTree: null,
     department: null,
     departmentEmployees: null,
+    syncEmployees: null,
+    syncDepartments: null,
+    syncHistory: null,
   },
 
   // =============================================
@@ -318,7 +346,102 @@ export const useHRStore = create<HRState>((set, get) => ({
         orgTree: null,
         department: null,
         departmentEmployees: null,
+        syncEmployees: null,
+        syncDepartments: null,
+        syncHistory: null,
       },
     });
+  },
+
+  // =============================================
+  // 동기화 관련 액션
+  // =============================================
+
+  /**
+   * 직원 정보 동기화
+   *
+   * @param employees - 동기화할 직원 목록
+   * @returns 동기화 실행 결과
+   */
+  syncEmployees: async (employees: EmployeeSyncRequest[]): Promise<SyncExecutionResponse> => {
+    set((state) => ({
+      loading: { ...state.loading, syncEmployees: true },
+      error: { ...state.error, syncEmployees: null },
+    }));
+
+    try {
+      const result = await hrApi.syncEmployees(employees);
+      set((state) => ({
+        loading: { ...state.loading, syncEmployees: false },
+      }));
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '직원 정보 동기화 실패';
+      set((state) => ({
+        loading: { ...state.loading, syncEmployees: false },
+        error: { ...state.error, syncEmployees: errorMessage },
+      }));
+      throw error;
+    }
+  },
+
+  /**
+   * 부서 정보 동기화
+   *
+   * @param departments - 동기화할 부서 목록
+   * @returns 동기화 실행 결과
+   */
+  syncDepartments: async (departments: DepartmentSyncRequest[]): Promise<SyncExecutionResponse> => {
+    set((state) => ({
+      loading: { ...state.loading, syncDepartments: true },
+      error: { ...state.error, syncDepartments: null },
+    }));
+
+    try {
+      const result = await hrApi.syncDepartments(departments);
+      set((state) => ({
+        loading: { ...state.loading, syncDepartments: false },
+      }));
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '부서 정보 동기화 실패';
+      set((state) => ({
+        loading: { ...state.loading, syncDepartments: false },
+        error: { ...state.error, syncDepartments: errorMessage },
+      }));
+      throw error;
+    }
+  },
+
+  /**
+   * 동기화 이력 조회
+   *
+   * @param syncType - 동기화 타입 필터
+   * @param limit - 최대 조회 건수
+   */
+  fetchSyncHistory: async (
+    syncType?: 'employees' | 'departments' | 'org_tree',
+    limit = 50
+  ) => {
+    set((state) => ({
+      loading: { ...state.loading, syncHistory: true },
+      error: { ...state.error, syncHistory: null },
+    }));
+
+    try {
+      const response = await hrApi.getSyncHistory(syncType, limit);
+      set({
+        syncHistory: response.items,
+        syncHistoryTotal: response.total,
+        loading: { ...get().loading, syncHistory: false },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '동기화 이력 조회 실패';
+      set((state) => ({
+        loading: { ...state.loading, syncHistory: false },
+        error: { ...state.error, syncHistory: errorMessage },
+      }));
+      throw error;
+    }
   },
 }));
