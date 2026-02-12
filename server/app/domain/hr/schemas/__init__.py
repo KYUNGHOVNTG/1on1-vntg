@@ -11,6 +11,8 @@ from server.app.domain.hr.schemas.employee import (
     EmployeeListItem,
     EmployeeListResponse,
     EmployeeSearchParams,
+    EmployeeDetailResponse,
+    ConcurrentPositionResponse,
 )
 
 from server.app.domain.hr.schemas.department import (
@@ -20,6 +22,7 @@ from server.app.domain.hr.schemas.department import (
     OrgTreeNode,
     OrgTreeResponse,
     DepartmentSearchParams,
+    DepartmentDetailResponse,
 )
 
 __all__ = [
@@ -30,6 +33,8 @@ __all__ = [
     "EmployeeListItem",
     "EmployeeListResponse",
     "EmployeeSearchParams",
+    "EmployeeDetailResponse",
+    "ConcurrentPositionResponse",
     # Department schemas
     "DepartmentBase",
     "DepartmentInfo",
@@ -37,4 +42,5 @@ __all__ = [
     "OrgTreeNode",
     "OrgTreeResponse",
     "DepartmentSearchParams",
+    "DepartmentDetailResponse",
 ]
