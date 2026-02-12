@@ -135,6 +135,60 @@ const response = await apiClient.get('/v1/hr/employees');
 
 ---
 
+#### **실수 6: API 응답 구조 불일치 (백엔드 ↔ 프론트엔드)**
+```python
+# ❌ 잘못된 접근 (백엔드가 배열만 반환)
+@router.get("/departments/{dept_code}/employees")
+async def get_department_employees(...) -> list[EmployeeDetailResponse]:
+    return await service.get_department_employees(dept_code)
+    # 실제 응답: [{ emp_no: "E001", ... }, ...]
+
+# 프론트엔드 (store.ts)
+const response: DepartmentEmployeesResponse = await api.getDepartmentEmployees(...);
+set({
+  employees: response.items,  // ❌ undefined! (배열에는 items 속성 없음)
+  total: response.total,       // ❌ undefined!
+});
+
+# ✅ 올바른 접근 (백엔드가 구조화된 객체 반환)
+# 1. schemas.py에 응답 스키마 정의
+class DepartmentEmployeesResponse(BaseModel):
+    items: list[EmployeeDetailResponse]
+    total: int
+
+# 2. router.py에서 구조화된 응답 반환
+@router.get("/departments/{dept_code}/employees")
+async def get_department_employees(...) -> DepartmentEmployeesResponse:
+    employees = await service.get_department_employees(dept_code)
+    return DepartmentEmployeesResponse(
+        items=employees,
+        total=len(employees)
+    )
+
+# 프론트엔드 (store.ts)
+const response: DepartmentEmployeesResponse = await api.getDepartmentEmployees(...);
+set({
+  employees: response.items,  // ✅ 정상 작동
+  total: response.total,      // ✅ 정상 작동
+});
+```
+
+**왜?**
+- 백엔드가 배열을 직접 반환하면 프론트엔드는 `response.items`를 접근할 때 `undefined` 에러 발생
+- 모든 리스트 API는 `{ items: [...], total: number }` 형태로 통일해야 일관성 유지
+- 향후 페이지네이션 추가 시 확장 용이
+
+**AI 에이전트 필수 체크리스트 (API 개발 시):**
+1. **백엔드 응답 스키마 먼저 확인**: 다른 리스트 API들의 응답 구조 확인 (`EmployeeListResponse`, `DepartmentListResponse` 등)
+2. **프론트엔드 타입 정의 확인**: `types.ts`에서 기대하는 응답 구조 확인
+3. **일관성 검증**:
+   - 모든 리스트 API는 `{ items: T[], total: number }` 구조 사용
+   - 단일 객체 API는 객체 직접 반환
+   - 트리 구조 API는 `{ std_year?: string, tree: T[] }` 또는 메타데이터 포함
+4. **테스트**: 개발자 도구 Network 탭에서 실제 응답 구조 확인
+
+---
+
 ### 🔄 작업 순서 (절대 변경 금지)
 
 ```

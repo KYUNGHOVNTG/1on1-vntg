@@ -23,6 +23,7 @@ from server.app.domain.hr.schemas.department import (
     OrgTreeResponse,
     DepartmentSearchParams,
     DepartmentDetailResponse,
+    DepartmentEmployeesResponse,
 )
 
 from server.app.domain.hr.schemas.sync import (
@@ -51,6 +52,7 @@ __all__ = [
     "OrgTreeResponse",
     "DepartmentSearchParams",
     "DepartmentDetailResponse",
+    "DepartmentEmployeesResponse",
     # Sync schemas
     "EmployeeSyncRequest",
     "DepartmentSyncRequest",
