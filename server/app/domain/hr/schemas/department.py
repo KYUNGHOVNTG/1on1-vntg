@@ -90,3 +90,13 @@ class DepartmentSearchParams(BaseModel):
     search: Optional[str] = Field(None, description="검색어 (부서명, 부서 코드)")
     use_yn: Optional[str] = Field(None, description="사용 여부 (Y/N)")
     upper_dept_code: Optional[str] = Field(None, description="상위 부서 코드")
+
+
+class DepartmentDetailResponse(DepartmentBase):
+    """
+    부서 상세 응답 스키마
+
+    API 응답용 간소화된 부서 상세 정보입니다.
+    """
+
+    dept_head_emp_no: Optional[str] = Field(None, description="부서장 사번")

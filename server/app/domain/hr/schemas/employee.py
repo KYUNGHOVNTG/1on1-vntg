@@ -95,3 +95,27 @@ class EmployeeSearchParams(BaseModel):
     dept_code: Optional[str] = Field(None, description="부서 코드")
     page: int = Field(default=1, ge=1, description="페이지 번호")
     limit: int = Field(default=20, ge=1, le=100, description="페이지당 건수")
+
+
+class EmployeeDetailResponse(EmployeeBase):
+    """
+    직원 상세 응답 스키마
+
+    API 응답용 간소화된 직원 상세 정보입니다.
+    """
+    pass
+
+
+class ConcurrentPositionResponse(BaseModel):
+    """
+    겸직 정보 응답 스키마
+
+    API 응답용 겸직 정보입니다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    emp_no: str = Field(..., description="사번")
+    dept_code: str = Field(..., description="부서 코드")
+    is_main: str = Field(..., description="본직 여부 (Y/N)")
+    position_code: str = Field(..., description="직책 코드")
