@@ -10,6 +10,7 @@ import { CodeManagementPage } from './domains/common';
 import { MenuManagementPage } from './domains/menu';
 import { PermissionManagementPage } from './domains/permission';
 import { ComponentShowcasePage } from './domains/system/pages/ComponentShowcasePage';
+import { EmployeeListPage } from './domains/hr';
 import { MainLayout } from './core/layout';
 import { useAuthStore } from './core/store/useAuthStore';
 import { useActivityTracker } from './core/hooks';
@@ -177,6 +178,7 @@ function App() {
           <Toaster richColors position="top-center" />
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/hr/employees" element={<EmployeeListPage />} />
             <Route path="/system/codes" element={<CodeManagementPage />} />
             <Route path="/system/menus" element={<MenuManagementPage />} />
             <Route path="/system/permissions" element={<PermissionManagementPage />} />
