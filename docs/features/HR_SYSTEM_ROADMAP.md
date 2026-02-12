@@ -291,6 +291,439 @@ Mock → Real API 전환 준비 완료 및 전체 시스템 안정화
 
 ---
 
+## 📝 상세 TASK 정의 (Sonnet 4.5 최적화)
+
+> 각 TASK는 Sonnet 4.5가 한 번에 처리하기 적절한 크기로 구성되었습니다.
+> Backend와 Frontend를 분리하되, 관련 파일들을 그룹화하여 효율적으로 작업할 수 있습니다.
+
+---
+
+### 1주차 TASK
+
+#### TASK 1-1: HR 도메인 기본 구조 + SQLAlchemy 모델
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `server/app/domain/hr/` 폴더 구조 생성
+- [ ] `server/app/domain/hr/models/user.py` - `CMUser` 모델 (CM_USER 테이블)
+- [ ] `server/app/domain/hr/models/employee.py` - `HRMgnt` 모델 (HR_MGNT 테이블)
+- [ ] `server/app/domain/hr/models/concurrent_position.py` - `HRMgntConcur` 모델 (HR_MGNT_CONCUR 테이블)
+- [ ] `server/app/domain/hr/models/department.py` - `CMDepartment`, `CMDepartmentTree` 모델
+- [ ] `server/app/domain/hr/models/__init__.py` - 모델 export
+
+**산출물**: 6개 파일 (5개 모델 + 1개 __init__)
+
+**검증**:
+- [ ] 모든 모델에 타입 힌트 완료
+- [ ] 테이블명, 컬럼명 정확히 매핑
+- [ ] Foreign Key 관계 정의 완료
+
+---
+
+#### TASK 1-2: Pydantic 스키마 + Repository 인터페이스
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `server/app/domain/hr/schemas/employee.py` - `EmployeeProfile`, `ConcurrentPosition`, `EmployeeListResponse`
+- [ ] `server/app/domain/hr/schemas/department.py` - `DepartmentInfo`, `OrgTreeNode`, `DepartmentListResponse`
+- [ ] `server/app/domain/hr/schemas/__init__.py` - 스키마 export
+- [ ] `server/app/domain/hr/repositories/employee_repository.py` - `IEmployeeRepository` (인터페이스)
+- [ ] `server/app/domain/hr/repositories/department_repository.py` - `IDepartmentRepository` (인터페이스)
+- [ ] `server/app/domain/hr/repositories/__init__.py` - Repository export
+
+**산출물**: 6개 파일
+
+**검증**:
+- [ ] Pydantic v2 문법 사용 (ConfigDict 등)
+- [ ] 모든 필드에 타입 힌트 및 description 추가
+- [ ] Repository는 ABC 상속하여 추상 메서드 정의
+
+---
+
+#### TASK 1-3: Mock JSON 데이터 + Mock Repository 구현
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `server/app/domain/hr/repositories/mock/` 폴더 생성
+- [ ] `employee_mock.json` - 직원 20명 (겸직자 5명, 퇴직자 3명 포함)
+- [ ] `department_mock.json` - 부서 15개 (3-depth 계층, 부서장 정보 포함)
+- [ ] `org_tree_mock.json` - 조직도 뷰 데이터
+- [ ] `server/app/domain/hr/repositories/mock/employee_mock_repository.py` - Mock 구현체
+- [ ] `server/app/domain/hr/repositories/mock/department_mock_repository.py` - Mock 구현체
+- [ ] `server/app/domain/hr/repositories/mock/__init__.py` - Mock Repository export
+
+**산출물**: 7개 파일 (3개 JSON + 3개 Python + 1개 __init__)
+
+**검증**:
+- [ ] Mock 데이터가 실제 테이블 스키마와 일치
+- [ ] 겸직자의 경우 HR_MGNT_CONCUR에 2개 이상 레코드
+- [ ] Mock Repository가 IRepository 인터페이스 구현
+
+---
+
+#### TASK 1-4: Alembic 마이그레이션 생성
+**예상 소요**: 30분 - 1시간
+
+**작업 내용**:
+- [ ] 기존 마이그레이션 파일 확인 (`alembic/versions/`)
+- [ ] `alembic revision --autogenerate -m "Add HR tables"` 실행
+- [ ] 생성된 마이그레이션 파일 검토
+  - CM_USER, HR_MGNT, HR_MGNT_CONCUR, CM_DEPARTMENT, CM_DEPARTMENT_TREE
+  - Foreign Key 제약조건 확인
+  - Index 추가 (EMP_NO, DEPT_CODE, USER_ID)
+- [ ] `downgrade()` 함수 구현
+- [ ] `alembic upgrade head` 실행하여 테스트
+
+**산출물**: 1개 마이그레이션 파일
+
+**검증**:
+- [ ] `alembic upgrade head` 성공
+- [ ] `alembic downgrade -1` 성공
+- [ ] DB에 5개 테이블 생성 확인
+
+---
+
+### 2주차 TASK
+
+#### TASK 2-1: 직원 Service + Formatter + Repository 구현
+**예상 소요**: 2-3시간
+
+**작업 내용**:
+- [ ] `server/app/domain/hr/formatters/employee_formatter.py` - 겸직 정보 병합 로직
+- [ ] `server/app/domain/hr/formatters/__init__.py`
+- [ ] `server/app/domain/hr/service.py` - `HRService` 클래스 생성
+  - `get_employees()` - 목록 조회 (필터링, 검색, 페이징)
+  - `get_employee_by_id()` - 상세 조회
+  - Mock Repository 주입 (DI)
+- [ ] `server/app/domain/hr/__init__.py` - Service export
+
+**산출물**: 4개 파일
+
+**검증**:
+- [ ] Service는 Repository 인터페이스에만 의존 (구현체 무관)
+- [ ] Formatter로 주소속 + 겸직 정보 병합
+- [ ] 검색 기능 (성명, 사번, 부서)
+- [ ] 필터링 (재직 여부, 직책)
+
+---
+
+#### TASK 2-2: 직원 Router + API 엔드포인트
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `server/app/api/v1/hr.py` - HR Router 생성
+  - `GET /api/v1/hr/employees` - 목록 조회
+  - `GET /api/v1/hr/employees/{emp_no}` - 상세 조회
+  - Query Parameters: `search`, `on_work_yn`, `position_code`, `page`, `limit`
+- [ ] `server/app/api/v1/__init__.py` - hr router 등록
+- [ ] `server/app/main.py` - hr router include
+
+**산출물**: 3개 파일 (1개 신규 + 2개 수정)
+
+**검증**:
+- [ ] Swagger UI에서 API 문서 확인
+- [ ] 각 엔드포인트 200 응답 확인
+- [ ] 에러 응답 정의 (404, 422 등)
+
+---
+
+#### TASK 2-3: Frontend - HR API 클라이언트 + Zustand Store
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `client/src/domains/hr/` 폴더 구조 생성
+- [ ] `client/src/domains/hr/types.ts` - TypeScript 타입 정의
+  - `Employee`, `ConcurrentPosition`, `EmployeeListResponse`
+- [ ] `client/src/domains/hr/api.ts` - API 클라이언트 함수
+  - `getEmployees()`, `getEmployeeById()`
+- [ ] `client/src/domains/hr/store.ts` - Zustand 스토어
+  - `employees`, `selectedEmployee`, `loading`, `error`
+  - `fetchEmployees()`, `fetchEmployeeById()`, `setFilters()`
+- [ ] `client/src/domains/hr/index.ts` - export
+
+**산출물**: 5개 파일
+
+**검증**:
+- [ ] apiClient 사용 (axios 직접 import 금지)
+- [ ] 타입 안전성 (any 타입 사용 금지)
+- [ ] 에러 처리 로직 포함
+
+---
+
+#### TASK 2-4: Frontend - 직원 목록 페이지
+**예상 소요**: 2-3시간
+
+**작업 내용**:
+- [ ] `client/src/domains/hr/pages/EmployeeListPage.tsx` - 메인 페이지
+- [ ] `client/src/domains/hr/components/EmployeeSearchBar.tsx` - 검색 바
+- [ ] `client/src/domains/hr/components/EmployeeTable.tsx` - 테이블
+- [ ] `client/src/domains/hr/components/ConcurrentBadge.tsx` - 겸직 배지
+- [ ] `client/src/domains/hr/components/index.ts` - 컴포넌트 export
+
+**산출물**: 5개 파일
+
+**검증**:
+- [ ] 검색 기능 동작 (성명, 사번, 부서)
+- [ ] 필터링 동작 (재직 여부, 직책)
+- [ ] 겸직자에게 "겸직" 배지 표시
+- [ ] 페이징 동작 확인
+- [ ] Tailwind CSS 사용 (인라인 스타일 금지)
+- [ ] 1on1-Mirror 디자인 시스템 준수
+
+---
+
+#### TASK 2-5: Frontend - 직원 상세 페이지
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `client/src/domains/hr/pages/EmployeeDetailPage.tsx` - 상세 페이지
+- [ ] `client/src/domains/hr/components/EmployeeInfoCard.tsx` - 기본 정보 카드
+- [ ] `client/src/domains/hr/components/ConcurrentPositionList.tsx` - 겸직 정보 리스트
+- [ ] React Router 라우팅 설정 (`/hr/employees/:empNo`)
+
+**산출물**: 3개 파일 (+ 라우팅 설정 1개)
+
+**검증**:
+- [ ] 직원 기본 정보 표시 (사번, 성명, 부서, 직책, 재직 여부)
+- [ ] 겸직 정보 표시 (겸직 부서 + 직책 리스트)
+- [ ] 목록으로 돌아가기 버튼 동작
+- [ ] 디자인 시스템 준수
+
+---
+
+### 3주차 TASK
+
+#### TASK 3-1: 조직도 Calculator + Service 구현
+**예상 소요**: 2-3시간
+
+**작업 내용**:
+- [ ] `server/app/domain/hr/calculators/org_tree_calculator.py` - 트리 변환 로직
+  - `build_tree()` - 리스트 → 계층형 JSON 변환
+  - `DISP_LVL` 기준 정렬
+- [ ] `server/app/domain/hr/calculators/__init__.py`
+- [ ] `server/app/domain/hr/service.py` 확장
+  - `get_org_tree()` - 조직도 조회
+  - `get_department_info()` - 부서 상세 조회
+  - `get_department_employees()` - 부서별 직원 목록
+
+**산출물**: 3개 파일 (2개 신규 + 1개 수정)
+
+**검증**:
+- [ ] Calculator는 순수 함수 (Side Effect 금지)
+- [ ] 3-depth 계층 구조 정확히 변환
+- [ ] 부서장 정보 포함
+- [ ] 소속 직원 수 집계
+
+---
+
+#### TASK 3-2: 부서 Router + API 엔드포인트
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `server/app/api/v1/hr.py` 확장
+  - `GET /api/v1/hr/org-tree` - 조직도 트리
+  - `GET /api/v1/hr/departments/{dept_code}` - 부서 상세
+  - `GET /api/v1/hr/departments/{dept_code}/employees` - 부서별 직원 목록
+
+**산출물**: 1개 파일 (수정)
+
+**검증**:
+- [ ] Swagger UI에서 API 문서 확인
+- [ ] 조직도 트리 구조 확인
+- [ ] 부서 상세 정보 응답 확인
+
+---
+
+#### TASK 3-3: Frontend - 조직도 API 확장 + Store 업데이트
+**예상 소요**: 1시간
+
+**작업 내용**:
+- [ ] `client/src/domains/hr/types.ts` 확장
+  - `Department`, `OrgTreeNode`, `DepartmentDetail`
+- [ ] `client/src/domains/hr/api.ts` 확장
+  - `getOrgTree()`, `getDepartmentById()`, `getDepartmentEmployees()`
+- [ ] `client/src/domains/hr/store.ts` 확장
+  - `orgTree`, `selectedDepartment`, `departmentEmployees`
+  - `fetchOrgTree()`, `fetchDepartmentById()`, `fetchDepartmentEmployees()`
+
+**산출물**: 3개 파일 (수정)
+
+**검증**:
+- [ ] 타입 안전성 유지
+- [ ] API 클라이언트 정상 동작
+
+---
+
+#### TASK 3-4: Frontend - 조직도 트리 뷰 컴포넌트
+**예상 소요**: 2-3시간
+
+**작업 내용**:
+- [ ] `client/src/domains/hr/pages/OrgChartPage.tsx` - 조직도 메인 페이지
+- [ ] `client/src/domains/hr/components/OrgTreeView.tsx` - 재귀형 트리 컴포넌트
+- [ ] `client/src/domains/hr/components/OrgTreeNode.tsx` - 트리 노드 컴포넌트
+- [ ] React Router 라우팅 설정 (`/hr/org-chart`)
+
+**산출물**: 3개 파일 (+ 라우팅 설정)
+
+**검증**:
+- [ ] 3-depth 계층 구조 시각화
+- [ ] 부서 클릭 시 상세 정보 표시
+- [ ] 부서장 정보, 소속 직원 수 표시
+- [ ] 확장/축소 애니메이션
+- [ ] 디자인 시스템 준수
+
+---
+
+#### TASK 3-5: Frontend - 부서 상세 페이지
+**예상 소요**: 1-2시간
+
+**작업 내용**:
+- [ ] `client/src/domains/hr/pages/DepartmentDetailPage.tsx` - 부서 상세 페이지
+- [ ] `client/src/domains/hr/components/DepartmentInfoCard.tsx` - 부서 정보 카드
+- [ ] `client/src/domains/hr/components/DepartmentEmployeeList.tsx` - 소속 직원 리스트
+- [ ] React Router 라우팅 설정 (`/hr/departments/:deptCode`)
+
+**산출물**: 3개 파일 (+ 라우팅 설정)
+
+**검증**:
+- [ ] 부서 기본 정보 표시
+- [ ] 부서장 정보 표시
+- [ ] 소속 직원 리스트 (겸직자 포함)
+- [ ] 조직도로 돌아가기 버튼
+- [ ] 디자인 시스템 준수
+
+---
+
+### 4주차 TASK
+
+#### TASK 4-1: 동기화 API + 이력 테이블 + 마이그레이션
+**예상 소요**: 2-3시간
+
+**작업 내용**:
+- [ ] `server/app/domain/hr/models/sync_history.py` - `HRSyncHistory` 모델
+- [ ] `server/app/domain/hr/schemas/sync.py` - `EmployeeSyncRequest`, `DepartmentSyncRequest`, `SyncHistoryResponse`
+- [ ] `server/app/domain/hr/service.py` 확장
+  - `sync_employees()` - 직원 정보 Bulk Insert/Update
+  - `sync_departments()` - 부서 정보 동기화
+  - `get_sync_history()` - 동기화 이력 조회
+- [ ] `server/app/api/v1/hr.py` 확장
+  - `POST /api/v1/hr/sync/employees`
+  - `POST /api/v1/hr/sync/departments`
+  - `GET /api/v1/hr/sync/history`
+- [ ] Alembic 마이그레이션 생성 (`HR_SYNC_HISTORY` 테이블)
+
+**산출물**: 5개 파일 (4개 신규/수정 + 1개 마이그레이션)
+
+**검증**:
+- [ ] Bulk Insert/Update 로직 동작
+- [ ] 동기화 이력 저장 확인
+- [ ] 에러 로그 기록 확인
+
+---
+
+#### TASK 4-2: Frontend - 동기화 관리 페이지
+**예상 소요**: 2시간
+
+**작업 내용**:
+- [ ] `client/src/domains/hr/types.ts` 확장 - `SyncHistory`, `SyncRequest`
+- [ ] `client/src/domains/hr/api.ts` 확장 - `syncEmployees()`, `syncDepartments()`, `getSyncHistory()`
+- [ ] `client/src/domains/hr/store.ts` 확장 - `syncHistory`, `fetchSyncHistory()`
+- [ ] `client/src/domains/hr/pages/SyncManagementPage.tsx` - 동기화 관리 페이지
+- [ ] `client/src/domains/hr/components/SyncButton.tsx` - 동기화 버튼 컴포넌트
+- [ ] `client/src/domains/hr/components/SyncHistoryTable.tsx` - 이력 테이블
+- [ ] React Router 라우팅 설정 (`/hr/sync`)
+
+**산출물**: 7개 파일
+
+**검증**:
+- [ ] "직원 정보 동기화" 버튼 동작
+- [ ] "부서 정보 동기화" 버튼 동작
+- [ ] 동기화 이력 조회 및 표시
+- [ ] 성공/실패 건수 표시
+- [ ] Toast 알림 표시
+
+---
+
+#### TASK 4-3: 메뉴 등록 + 권한 설정
+**예상 소요**: 1시간
+
+**작업 내용**:
+- [ ] Alembic 마이그레이션 생성 (메뉴 데이터)
+  - `M700` - 인사관리 (Root)
+  - `M710` - 직원 관리
+  - `M720` - 조직도 관리
+  - `M730` - 동기화 관리
+- [ ] 메뉴 URL 매핑
+  - `/hr/employees` → M710
+  - `/hr/org-chart` → M720
+  - `/hr/sync` → M730
+- [ ] 권한 설정 (시스템 관리자만 접근)
+
+**산출물**: 1개 마이그레이션 파일
+
+**검증**:
+- [ ] 메뉴 트리에 인사관리 메뉴 표시
+- [ ] 각 메뉴 클릭 시 페이지 이동 확인
+- [ ] 권한 없는 사용자 접근 차단 확인
+
+---
+
+#### TASK 4-4: 통합 테스트 + API 문서화
+**예상 소요**: 2-3시간
+
+**작업 내용**:
+- [ ] Backend 통합 테스트 작성
+  - `tests/domain/hr/test_service.py` - Service 테스트
+  - `tests/api/v1/test_hr.py` - API 엔드포인트 테스트
+- [ ] Frontend E2E Flow 테스트
+  - 직원 목록 → 상세 → 조직도 → 부서 상세 → 직원 목록
+- [ ] Mock Repository ↔ Real Repository 교체 테스트
+- [ ] API 명세서 작성
+  - `docs/api/HR_API_SPEC.md` - 외부 연동 가이드
+  - Swagger UI 스크린샷 포함
+- [ ] 성능 테스트
+  - 1000명 직원 데이터 조회 성능
+  - 조직도 트리 변환 속도
+
+**산출물**: 4개 파일 (2개 테스트 + 1개 문서 + 1개 성능 리포트)
+
+**검증**:
+- [ ] 모든 테스트 통과
+- [ ] API 문서 완성도 100%
+- [ ] 성능 목표 달성 (직원 목록 2초 이내, 트리 변환 1초 이내)
+
+---
+
+## 📊 TASK 진행 현황
+
+### 1주차 (4 TASK)
+- [ ] TASK 1-1: HR 도메인 기본 구조 + SQLAlchemy 모델
+- [ ] TASK 1-2: Pydantic 스키마 + Repository 인터페이스
+- [ ] TASK 1-3: Mock JSON 데이터 + Mock Repository 구현
+- [ ] TASK 1-4: Alembic 마이그레이션 생성
+
+### 2주차 (5 TASK)
+- [ ] TASK 2-1: 직원 Service + Formatter + Repository 구현
+- [ ] TASK 2-2: 직원 Router + API 엔드포인트
+- [ ] TASK 2-3: Frontend - HR API 클라이언트 + Zustand Store
+- [ ] TASK 2-4: Frontend - 직원 목록 페이지
+- [ ] TASK 2-5: Frontend - 직원 상세 페이지
+
+### 3주차 (5 TASK)
+- [ ] TASK 3-1: 조직도 Calculator + Service 구현
+- [ ] TASK 3-2: 부서 Router + API 엔드포인트
+- [ ] TASK 3-3: Frontend - 조직도 API 확장 + Store 업데이트
+- [ ] TASK 3-4: Frontend - 조직도 트리 뷰 컴포넌트
+- [ ] TASK 3-5: Frontend - 부서 상세 페이지
+
+### 4주차 (4 TASK)
+- [ ] TASK 4-1: 동기화 API + 이력 테이블 + 마이그레이션
+- [ ] TASK 4-2: Frontend - 동기화 관리 페이지
+- [ ] TASK 4-3: 메뉴 등록 + 권한 설정
+- [ ] TASK 4-4: 통합 테스트 + API 문서화
+
+---
+
 **작성일**: 2026-02-12
 **작성자**: Claude (AI Assistant)
-**문서 버전**: 1.0
+**문서 버전**: 1.1 (상세 TASK 추가)
