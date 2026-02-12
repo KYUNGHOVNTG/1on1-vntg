@@ -6,5 +6,6 @@
 
 export * from './types';
 export * from './api';
+export * from './store';
 export * from './pages/EmployeeListPage';
 export * from './components/EmployeeDetailModal';
