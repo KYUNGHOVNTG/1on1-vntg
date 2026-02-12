@@ -84,3 +84,45 @@ export interface DepartmentListParams {
   use_yn?: 'Y' | 'N';
   upper_dept_code?: string;
 }
+
+/**
+ * 조직도 트리 노드
+ *
+ * 계층형 조직도 구조를 표현하는 재귀 타입입니다.
+ */
+export interface OrgTreeNode {
+  dept_code: string;
+  dept_name: string;
+  disp_lvl: number;
+  dept_head_emp_no: string | null;
+  dept_head_name?: string | null;
+  employee_count: number;
+  children: OrgTreeNode[];
+}
+
+/**
+ * 부서 상세 정보
+ *
+ * 부서 기본 정보 + 부서장 정보 + 소속 직원 수를 포함합니다.
+ */
+export interface DepartmentDetail {
+  dept_code: string;
+  dept_name: string;
+  upper_dept_code: string | null;
+  upper_dept_name?: string | null;
+  dept_head_emp_no: string | null;
+  dept_head_name?: string | null;
+  dept_head_position?: string | null;
+  use_yn: 'Y' | 'N';
+  employee_count: number;
+  main_employee_count: number;
+  concurrent_employee_count: number;
+}
+
+/**
+ * 부서별 직원 목록 응답
+ */
+export interface DepartmentEmployeesResponse {
+  items: Employee[];
+  total: number;
+}
