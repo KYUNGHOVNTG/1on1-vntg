@@ -34,17 +34,38 @@ export function SyncManagementPage() {
   // =============================================
   const handleSyncEmployees = async () => {
     try {
-      // Mock 데이터를 사용하여 동기화 테스트
+      // Mock 데이터를 사용하여 동기화 테스트 (20명)
       // 실제 운영 시에는 외부 시스템에서 전달받은 데이터를 사용
       const mockEmployees = [
-        {
-          emp_no: 'E001',
-          user_id: 'user001',
-          name_kor: '홍길동',
-          dept_code: 'D001',
-          position_code: 'P001',
-          on_work_yn: 'Y' as const,
-        },
+        // 경영지원팀 (D001)
+        { emp_no: 'E001', user_id: 'user001', name_kor: '김대표', dept_code: 'D001', position_code: 'P001', on_work_yn: 'Y' as const },
+        { emp_no: 'E002', user_id: 'user002', name_kor: '이총괄', dept_code: 'D001', position_code: 'P002', on_work_yn: 'Y' as const },
+        { emp_no: 'E003', user_id: 'user003', name_kor: '박경영', dept_code: 'D001', position_code: 'P005', on_work_yn: 'Y' as const },
+
+        // 개발팀 (D002)
+        { emp_no: 'E004', user_id: 'user004', name_kor: '최개발', dept_code: 'D002', position_code: 'P004', on_work_yn: 'Y' as const },
+        { emp_no: 'E005', user_id: 'user005', name_kor: '정프론트', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E006', user_id: 'user006', name_kor: '강백엔드', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E007', user_id: 'user007', name_kor: '조풀스택', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E008', user_id: 'user008', name_kor: '윤데이터', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E009', user_id: 'user009', name_kor: '장인프라', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E010', user_id: 'user010', name_kor: '임모바일', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const },
+
+        // 디자인팀 (D003)
+        { emp_no: 'E011', user_id: 'user011', name_kor: '한디자인', dept_code: 'D003', position_code: 'P004', on_work_yn: 'Y' as const },
+        { emp_no: 'E012', user_id: 'user012', name_kor: '오UI', dept_code: 'D003', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E013', user_id: 'user013', name_kor: '서UX', dept_code: 'D003', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E014', user_id: 'user014', name_kor: '신그래픽', dept_code: 'D003', position_code: 'P005', on_work_yn: 'Y' as const },
+
+        // 마케팅팀 (D004)
+        { emp_no: 'E015', user_id: 'user015', name_kor: '권마케팅', dept_code: 'D004', position_code: 'P004', on_work_yn: 'Y' as const },
+        { emp_no: 'E016', user_id: 'user016', name_kor: '황컨텐츠', dept_code: 'D004', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E017', user_id: 'user017', name_kor: '배SNS', dept_code: 'D004', position_code: 'P005', on_work_yn: 'Y' as const },
+
+        // 영업팀 (D005)
+        { emp_no: 'E018', user_id: 'user018', name_kor: '성영업', dept_code: 'D005', position_code: 'P004', on_work_yn: 'Y' as const },
+        { emp_no: 'E019', user_id: 'user019', name_kor: '곽세일즈', dept_code: 'D005', position_code: 'P005', on_work_yn: 'Y' as const },
+        { emp_no: 'E020', user_id: 'user020', name_kor: '류영업', dept_code: 'D005', position_code: 'P005', on_work_yn: 'Y' as const },
       ];
 
       const result = await syncEmployees(mockEmployees);
@@ -60,16 +81,14 @@ export function SyncManagementPage() {
 
   const handleSyncDepartments = async () => {
     try {
-      // Mock 데이터를 사용하여 동기화 테스트
+      // Mock 데이터를 사용하여 동기화 테스트 (5개 부서)
       // 실제 운영 시에는 외부 시스템에서 전달받은 데이터를 사용
       const mockDepartments = [
-        {
-          dept_code: 'D001',
-          dept_name: '개발팀',
-          upper_dept_code: null,
-          dept_head_emp_no: 'E001',
-          use_yn: 'Y' as const,
-        },
+        { dept_code: 'D001', dept_name: '경영지원팀', upper_dept_code: null, dept_head_emp_no: 'E002', use_yn: 'Y' as const },
+        { dept_code: 'D002', dept_name: '개발팀', upper_dept_code: null, dept_head_emp_no: 'E004', use_yn: 'Y' as const },
+        { dept_code: 'D003', dept_name: '디자인팀', upper_dept_code: null, dept_head_emp_no: 'E011', use_yn: 'Y' as const },
+        { dept_code: 'D004', dept_name: '마케팅팀', upper_dept_code: null, dept_head_emp_no: 'E015', use_yn: 'Y' as const },
+        { dept_code: 'D005', dept_name: '영업팀', upper_dept_code: null, dept_head_emp_no: 'E018', use_yn: 'Y' as const },
       ];
 
       const result = await syncDepartments(mockDepartments);
