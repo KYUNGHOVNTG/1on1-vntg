@@ -19,6 +19,13 @@ from server.app.domain.auth.models import RefreshToken
 from server.app.domain.user.models import User
 from server.app.domain.menu.models import Menu, PositionMenu, UserMenu
 from server.app.domain.common.models import CodeMaster, CodeDetail  # noqa: F401
+from server.app.domain.hr.models import (  # noqa: F401
+    CMUser,
+    HRMgnt,
+    HRMgntConcur,
+    CMDepartment,
+    CMDepartmentTree,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

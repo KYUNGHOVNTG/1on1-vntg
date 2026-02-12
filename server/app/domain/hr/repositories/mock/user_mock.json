@@ -1,0 +1,22 @@
+[
+  {"user_id": "user001", "email": "kim.cs@company.com", "use_yn": "Y", "role_code": "ROLE001", "position_code": "POS001", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user002", "email": "lee.yh@company.com", "use_yn": "Y", "role_code": "ROLE001", "position_code": "POS001", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user003", "email": "park.ms@company.com", "use_yn": "Y", "role_code": "ROLE001", "position_code": "POS001", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user004", "email": "jeong.jh@company.com", "use_yn": "Y", "role_code": "ROLE002", "position_code": "POS002", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user005", "email": "choi.sj@company.com", "use_yn": "Y", "role_code": "ROLE002", "position_code": "POS002", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user006", "email": "kang.dw@company.com", "use_yn": "Y", "role_code": "ROLE002", "position_code": "POS002", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user007", "email": "yoon.ar@company.com", "use_yn": "Y", "role_code": "ROLE002", "position_code": "POS002", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user008", "email": "jo.mh@company.com", "use_yn": "Y", "role_code": "ROLE002", "position_code": "POS002", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user009", "email": "han.jm@company.com", "use_yn": "Y", "role_code": "ROLE002", "position_code": "POS002", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user010", "email": "oh.sh@company.com", "use_yn": "Y", "role_code": "ROLE003", "position_code": "POS003", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user011", "email": "song.hk@company.com", "use_yn": "Y", "role_code": "ROLE003", "position_code": "POS003", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user012", "email": "im.sw@company.com", "use_yn": "Y", "role_code": "ROLE003", "position_code": "POS003", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user013", "email": "bae.sj@company.com", "use_yn": "Y", "role_code": "ROLE003", "position_code": "POS003", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user014", "email": "nam.jh@company.com", "use_yn": "Y", "role_code": "ROLE003", "position_code": "POS003", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user015", "email": "jeon.jh@company.com", "use_yn": "Y", "role_code": "ROLE003", "position_code": "POS003", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user016", "email": "yoo.js@company.com", "use_yn": "Y", "role_code": "ROLE004", "position_code": "POS004", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user017", "email": "kang.hd@company.com", "use_yn": "Y", "role_code": "ROLE004", "position_code": "POS004", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": null, "up_date": null},
+  {"user_id": "user018", "email": "shin.dy@company.com", "use_yn": "N", "role_code": "ROLE004", "position_code": "POS004", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": "SYSTEM", "up_date": "2024-12-31T00:00:00"},
+  {"user_id": "user019", "email": "kim.gr@company.com", "use_yn": "N", "role_code": "ROLE004", "position_code": "POS004", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": "SYSTEM", "up_date": "2024-11-30T00:00:00"},
+  {"user_id": "user020", "email": "seo.jh@company.com", "use_yn": "N", "role_code": "ROLE004", "position_code": "POS004", "in_user": "SYSTEM", "in_date": "2024-01-01T00:00:00", "up_user": "SYSTEM", "up_date": "2024-10-31T00:00:00"}
+]

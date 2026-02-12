@@ -1,0 +1,102 @@
+[
+  {
+    "emp_no": "EMP004",
+    "dept_code": "DEPT011",
+    "is_main": "Y",
+    "position_code": "POS002",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP004",
+    "dept_code": "DEPT111",
+    "is_main": "N",
+    "position_code": "POS003",
+    "in_user": "SYSTEM",
+    "in_date": "2024-06-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP006",
+    "dept_code": "DEPT021",
+    "is_main": "Y",
+    "position_code": "POS002",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP006",
+    "dept_code": "DEPT211",
+    "is_main": "N",
+    "position_code": "POS003",
+    "in_user": "SYSTEM",
+    "in_date": "2024-07-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP008",
+    "dept_code": "DEPT031",
+    "is_main": "Y",
+    "position_code": "POS002",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP008",
+    "dept_code": "DEPT311",
+    "is_main": "N",
+    "position_code": "POS003",
+    "in_user": "SYSTEM",
+    "in_date": "2024-08-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP016",
+    "dept_code": "DEPT212",
+    "is_main": "Y",
+    "position_code": "POS004",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP016",
+    "dept_code": "DEPT022",
+    "is_main": "N",
+    "position_code": "POS004",
+    "in_user": "SYSTEM",
+    "in_date": "2024-09-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP017",
+    "dept_code": "DEPT221",
+    "is_main": "Y",
+    "position_code": "POS004",
+    "in_user": "SYSTEM",
+    "in_date": "2024-01-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  },
+  {
+    "emp_no": "EMP017",
+    "dept_code": "DEPT021",
+    "is_main": "N",
+    "position_code": "POS004",
+    "in_user": "SYSTEM",
+    "in_date": "2024-10-01T00:00:00",
+    "up_user": null,
+    "up_date": null
+  }
+]

@@ -1,0 +1,171 @@
+"""
+HR 도메인 - 직원 정보 Mock Repository
+
+JSON 파일을 데이터 소스로 사용하는 Mock 구현체입니다.
+"""
+
+import json
+import os
+from typing import List, Optional, Tuple
+from datetime import datetime
+
+from server.app.domain.hr.repositories.employee_repository import IEmployeeRepository
+from server.app.domain.hr.models import HRMgnt, HRMgntConcur, CMUser
+
+
+class EmployeeMockRepository(IEmployeeRepository):
+    """
+    직원 정보 Mock Repository
+
+    JSON 파일에서 데이터를 로드하여 메모리에서 조회합니다.
+    """
+
+    def __init__(self):
+        """Mock 데이터 초기화"""
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        self.employees: List[dict] = []
+        self.concurrent_positions: List[dict] = []
+        self.users: List[dict] = []
+        self._load_data()
+
+    def _load_data(self) -> None:
+        """JSON 파일에서 Mock 데이터 로드"""
+        # 직원 데이터 로드
+        employee_path = os.path.join(self.base_path, "employee_mock.json")
+        with open(employee_path, "r", encoding="utf-8") as f:
+            self.employees = json.load(f)
+
+        # 겸직 데이터 로드
+        concurrent_path = os.path.join(self.base_path, "concurrent_position_mock.json")
+        with open(concurrent_path, "r", encoding="utf-8") as f:
+            self.concurrent_positions = json.load(f)
+
+        # 사용자 데이터 로드
+        user_path = os.path.join(self.base_path, "user_mock.json")
+        with open(user_path, "r", encoding="utf-8") as f:
+            self.users = json.load(f)
+
+    def _dict_to_employee(self, data: dict) -> HRMgnt:
+        """딕셔너리를 HRMgnt 객체로 변환"""
+        employee = HRMgnt()
+        employee.emp_no = data["emp_no"]
+        employee.user_id = data["user_id"]
+        employee.name_kor = data["name_kor"]
+        employee.dept_code = data["dept_code"]
+        employee.position_code = data["position_code"]
+        employee.on_work_yn = data["on_work_yn"]
+        employee.in_user = data.get("in_user")
+        employee.in_date = datetime.fromisoformat(data["in_date"])
+        employee.up_user = data.get("up_user")
+        employee.up_date = (
+            datetime.fromisoformat(data["up_date"]) if data.get("up_date") else None
+        )
+        return employee
+
+    def _dict_to_concurrent(self, data: dict) -> HRMgntConcur:
+        """딕셔너리를 HRMgntConcur 객체로 변환"""
+        concurrent = HRMgntConcur()
+        concurrent.emp_no = data["emp_no"]
+        concurrent.dept_code = data["dept_code"]
+        concurrent.is_main = data["is_main"]
+        concurrent.position_code = data["position_code"]
+        concurrent.in_user = data.get("in_user")
+        concurrent.in_date = datetime.fromisoformat(data["in_date"])
+        concurrent.up_user = data.get("up_user")
+        concurrent.up_date = (
+            datetime.fromisoformat(data["up_date"]) if data.get("up_date") else None
+        )
+        return concurrent
+
+    async def find_all(
+        self,
+        search: Optional[str] = None,
+        on_work_yn: Optional[str] = None,
+        position_code: Optional[str] = None,
+        dept_code: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> Tuple[List[HRMgnt], int]:
+        """직원 목록을 조회합니다 (페이징 포함)"""
+        # 필터링
+        filtered = self.employees.copy()
+
+        if search:
+            filtered = [
+                emp
+                for emp in filtered
+                if search.lower() in emp["name_kor"].lower()
+                or search.upper() in emp["emp_no"].upper()
+            ]
+
+        if on_work_yn:
+            filtered = [emp for emp in filtered if emp["on_work_yn"] == on_work_yn]
+
+        if position_code:
+            filtered = [emp for emp in filtered if emp["position_code"] == position_code]
+
+        if dept_code:
+            filtered = [emp for emp in filtered if emp["dept_code"] == dept_code]
+
+        # 전체 건수
+        total = len(filtered)
+
+        # 페이징
+        paginated = filtered[offset : offset + limit]
+
+        # 객체 변환
+        result = [self._dict_to_employee(emp) for emp in paginated]
+
+        return result, total
+
+    async def find_by_emp_no(self, emp_no: str) -> Optional[HRMgnt]:
+        """사번으로 직원 정보를 조회합니다"""
+        for emp_data in self.employees:
+            if emp_data["emp_no"] == emp_no:
+                return self._dict_to_employee(emp_data)
+        return None
+
+    async def find_concurrent_positions_by_emp_no(
+        self, emp_no: str
+    ) -> List[HRMgntConcur]:
+        """사번으로 겸직 정보를 조회합니다"""
+        result = []
+        for concurrent_data in self.concurrent_positions:
+            if concurrent_data["emp_no"] == emp_no:
+                result.append(self._dict_to_concurrent(concurrent_data))
+        return result
+
+    async def find_by_dept_code(
+        self, dept_code: str, include_concurrent: bool = True
+    ) -> List[HRMgnt]:
+        """부서 코드로 소속 직원을 조회합니다"""
+        result = []
+
+        # 주소속 직원 조회
+        for emp_data in self.employees:
+            if emp_data["dept_code"] == dept_code:
+                result.append(self._dict_to_employee(emp_data))
+
+        # 겸직자 포함
+        if include_concurrent:
+            concurrent_emp_nos = set()
+            for concurrent_data in self.concurrent_positions:
+                if (
+                    concurrent_data["dept_code"] == dept_code
+                    and concurrent_data["is_main"] == "N"
+                ):
+                    concurrent_emp_nos.add(concurrent_data["emp_no"])
+
+            for emp_no in concurrent_emp_nos:
+                for emp_data in self.employees:
+                    if emp_data["emp_no"] == emp_no and emp_data["dept_code"] != dept_code:
+                        result.append(self._dict_to_employee(emp_data))
+
+        return result
+
+    async def count_by_dept_code(
+        self, dept_code: str, include_concurrent: bool = True
+    ) -> int:
+        """부서별 소속 직원 수를 집계합니다"""
+        employees = await self.find_by_dept_code(dept_code, include_concurrent)
+        return len(employees)
