@@ -15,7 +15,8 @@ from server.app.core.config import settings
 from server.app.core.database import Base
 
 # 모든 모델을 import하여 metadata에 등록
-from server.app.domain.auth.models import CMUser, RefreshToken  # noqa: F401
+from server.app.domain.user.models import User  # noqa: F401
+from server.app.domain.auth.models import RefreshToken  # noqa: F401
 from server.app.domain.menu.models import Menu, PositionMenu, UserMenu  # noqa: F401
 from server.app.domain.common.models import CodeMaster, CodeDetail  # noqa: F401
 from server.app.domain.hr.models import (  # noqa: F401

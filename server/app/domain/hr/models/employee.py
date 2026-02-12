@@ -94,7 +94,7 @@ class HRMgnt(Base):
 
     # Relationships
     user = relationship(
-        "CMUser",
+        "User",
         back_populates="employee",
         foreign_keys=[user_id]
     )
