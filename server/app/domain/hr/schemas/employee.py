@@ -82,8 +82,9 @@ class EmployeeListResponse(BaseModel):
 
     total: int = Field(..., description="전체 건수")
     page: int = Field(..., description="현재 페이지")
-    limit: int = Field(..., description="페이지당 건수")
-    items: List[EmployeeListItem] = Field(..., description="직원 목록")
+    size: int = Field(..., description="페이지당 건수")
+    pages: int = Field(..., description="전체 페이지 수")
+    items: List[EmployeeDetailResponse] = Field(..., description="직원 목록")
 
 
 class EmployeeSearchParams(BaseModel):
