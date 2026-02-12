@@ -14,6 +14,7 @@ import type {
   DepartmentListResponse,
   DepartmentListParams,
   OrgTreeNode,
+  OrgTreeResponse,
   DepartmentDetail,
   DepartmentEmployeesResponse,
   EmployeeSyncRequest,
@@ -121,10 +122,10 @@ export async function getDepartment(deptCode: string): Promise<Department> {
  * @returns 조직도 트리 루트 노드 배열
  */
 export async function getOrgTree(year?: number): Promise<OrgTreeNode[]> {
-  const response = await apiClient.get<OrgTreeNode[]>('/v1/hr/org-tree', {
+  const response = await apiClient.get<OrgTreeResponse>('/v1/hr/org-tree', {
     params: year ? { year } : undefined,
   });
-  return response.data;
+  return response.data.tree;
 }
 
 /**
