@@ -9,6 +9,7 @@ from server.app.domain.user.models import User as CMUser
 from server.app.domain.hr.models.employee import HRMgnt
 from server.app.domain.hr.models.concurrent_position import HRMgntConcur
 from server.app.domain.hr.models.department import CMDepartment, CMDepartmentTree
+from server.app.domain.hr.models.sync_history import HRSyncHistory
 
 __all__ = [
     "CMUser",
@@ -16,4 +17,5 @@ __all__ = [
     "HRMgntConcur",
     "CMDepartment",
     "CMDepartmentTree",
+    "HRSyncHistory",
 ]
