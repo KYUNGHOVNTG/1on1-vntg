@@ -16,6 +16,10 @@ import type {
   OrgTreeNode,
   DepartmentDetail,
   DepartmentEmployeesResponse,
+  EmployeeSyncRequest,
+  DepartmentSyncRequest,
+  SyncExecutionResponse,
+  SyncHistoryListResponse,
 } from './types';
 
 // =============================================
@@ -155,6 +159,71 @@ export async function getDepartmentEmployees(
     `/v1/hr/departments/${deptCode}/employees`,
     {
       params: includeSubDepts ? { include_sub_depts: true } : undefined,
+    }
+  );
+  return response.data;
+}
+
+// =============================================
+// 동기화 API
+// =============================================
+
+/**
+ * 직원 정보 동기화
+ *
+ * 외부 시스템에서 전달받은 직원 데이터를 Bulk로 Insert/Update합니다.
+ *
+ * @param employees - 동기화할 직원 목록
+ * @returns 동기화 실행 결과
+ */
+export async function syncEmployees(
+  employees: EmployeeSyncRequest[]
+): Promise<SyncExecutionResponse> {
+  const response = await apiClient.post<SyncExecutionResponse>(
+    '/v1/hr/sync/employees',
+    employees
+  );
+  return response.data;
+}
+
+/**
+ * 부서 정보 동기화
+ *
+ * 외부 시스템에서 전달받은 부서 데이터를 Bulk로 Insert/Update합니다.
+ *
+ * @param departments - 동기화할 부서 목록
+ * @returns 동기화 실행 결과
+ */
+export async function syncDepartments(
+  departments: DepartmentSyncRequest[]
+): Promise<SyncExecutionResponse> {
+  const response = await apiClient.post<SyncExecutionResponse>(
+    '/v1/hr/sync/departments',
+    departments
+  );
+  return response.data;
+}
+
+/**
+ * 동기화 이력 조회
+ *
+ * 동기화 이력을 조회합니다. 타입 필터링 및 최대 조회 건수를 지정할 수 있습니다.
+ *
+ * @param syncType - 동기화 타입 필터 (선택)
+ * @param limit - 최대 조회 건수 (선택, 기본값: 50)
+ * @returns 동기화 이력 목록
+ */
+export async function getSyncHistory(
+  syncType?: 'employees' | 'departments' | 'org_tree',
+  limit = 50
+): Promise<SyncHistoryListResponse> {
+  const response = await apiClient.get<SyncHistoryListResponse>(
+    '/v1/hr/sync/history',
+    {
+      params: {
+        sync_type: syncType,
+        limit,
+      },
     }
   );
   return response.data;

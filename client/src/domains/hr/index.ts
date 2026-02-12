@@ -10,4 +10,5 @@ export * from './store';
 export * from './pages/EmployeeListPage';
 export * from './pages/OrgChartPage';
 export * from './pages/DepartmentDetailPage';
+export * from './pages/SyncManagementPage';
 export * from './components/EmployeeDetailModal';

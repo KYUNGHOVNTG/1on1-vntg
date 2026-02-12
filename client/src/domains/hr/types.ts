@@ -126,3 +126,68 @@ export interface DepartmentEmployeesResponse {
   items: Employee[];
   total: number;
 }
+
+// =============================================
+// 동기화 관련 타입
+// =============================================
+
+/**
+ * 직원 정보 동기화 요청
+ */
+export interface EmployeeSyncRequest {
+  emp_no: string;
+  user_id: string;
+  name_kor: string;
+  dept_code: string;
+  position_code: string;
+  on_work_yn: 'Y' | 'N';
+}
+
+/**
+ * 부서 정보 동기화 요청
+ */
+export interface DepartmentSyncRequest {
+  dept_code: string;
+  dept_name: string;
+  upper_dept_code: string | null;
+  dept_head_emp_no: string | null;
+  use_yn: 'Y' | 'N';
+}
+
+/**
+ * 동기화 이력 응답
+ */
+export interface SyncHistory {
+  sync_id: number;
+  sync_type: 'employees' | 'departments' | 'org_tree';
+  sync_status: 'success' | 'failure' | 'partial' | 'in_progress';
+  total_count: number;
+  success_count: number;
+  failure_count: number;
+  error_message: string | null;
+  sync_start_time: string;
+  sync_end_time: string | null;
+  in_user: string | null;
+  in_date: string;
+}
+
+/**
+ * 동기화 이력 목록 응답
+ */
+export interface SyncHistoryListResponse {
+  items: SyncHistory[];
+  total: number;
+}
+
+/**
+ * 동기화 실행 응답
+ */
+export interface SyncExecutionResponse {
+  sync_id: number;
+  sync_type: string;
+  sync_status: string;
+  total_count: number;
+  success_count: number;
+  failure_count: number;
+  message: string;
+}
