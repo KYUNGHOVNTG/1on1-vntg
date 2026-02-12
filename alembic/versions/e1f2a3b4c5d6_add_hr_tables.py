@@ -20,26 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # =============================================
-    # 1. CM_USER 테이블 생성 (사용자 계정)
-    # =============================================
-    op.create_table(
-        'cm_user',
-        sa.Column('user_id', sa.String(length=50), nullable=False, comment='사용자 ID'),
-        sa.Column('email', sa.String(length=100), nullable=False, comment='이메일'),
-        sa.Column('use_yn', sa.CHAR(length=1), nullable=False, server_default='Y', comment='사용여부'),
-        sa.Column('role_code', sa.String(length=10), nullable=True, comment='시스템 권한 코드 (ROLE)'),
-        sa.Column('position_code', sa.String(length=10), nullable=True, comment='직책 코드 (POSITION)'),
-        sa.Column('in_user', sa.String(length=50), nullable=True, comment='등록자'),
-        sa.Column('in_date', sa.DateTime(), nullable=False, server_default=sa.text('NOW()'), comment='등록일시'),
-        sa.Column('up_user', sa.String(length=50), nullable=True, comment='수정자'),
-        sa.Column('up_date', sa.DateTime(), nullable=True, comment='수정일시'),
-        sa.PrimaryKeyConstraint('user_id'),
-        sa.UniqueConstraint('email')
-    )
-    op.create_index('idx_cm_user_email', 'cm_user', ['email'], unique=False)
-
-    # =============================================
-    # 2. CM_DEPARTMENT 테이블 생성 (부서 정보)
+    # 1. CM_DEPARTMENT 테이블 생성 (부서 정보)
     # =============================================
     op.create_table(
         'cm_department',
@@ -58,7 +39,7 @@ def upgrade() -> None:
     op.create_index('idx_cm_department_upper', 'cm_department', ['upper_dept_code'], unique=False)
 
     # =============================================
-    # 3. HR_MGNT 테이블 생성 (인사 정보)
+    # 2. HR_MGNT 테이블 생성 (인사 정보)
     # =============================================
     op.create_table(
         'hr_mgnt',
@@ -82,7 +63,7 @@ def upgrade() -> None:
     op.create_index('idx_hr_mgnt_name', 'hr_mgnt', ['name_kor'], unique=False)
 
     # =============================================
-    # 4. HR_MGNT_CONCUR 테이블 생성 (겸직 정보)
+    # 3. HR_MGNT_CONCUR 테이블 생성 (겸직 정보)
     # =============================================
     op.create_table(
         'hr_mgnt_concur',
@@ -102,7 +83,7 @@ def upgrade() -> None:
     op.create_index('idx_hr_mgnt_concur_dept', 'hr_mgnt_concur', ['dept_code'], unique=False)
 
     # =============================================
-    # 5. CM_DEPARTMENT_TREE 테이블 생성 (조직도 뷰)
+    # 4. CM_DEPARTMENT_TREE 테이블 생성 (조직도 뷰)
     # =============================================
     op.create_table(
         'cm_department_tree',
@@ -142,6 +123,3 @@ def downgrade() -> None:
 
     op.drop_index('idx_cm_department_upper', table_name='cm_department')
     op.drop_table('cm_department')
-
-    op.drop_index('idx_cm_user_email', table_name='cm_user')
-    op.drop_table('cm_user')
