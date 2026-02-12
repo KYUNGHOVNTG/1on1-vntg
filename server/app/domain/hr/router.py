@@ -20,7 +20,13 @@ from server.app.domain.hr.schemas.employee import (
     EmployeeDetailResponse,
     EmployeeListResponse,
 )
-from server.app.domain.hr.service import DepartmentService, EmployeeService
+from server.app.domain.hr.schemas.sync import (
+    DepartmentSyncRequest,
+    EmployeeSyncRequest,
+    SyncExecutionResponse,
+    SyncHistoryListResponse,
+)
+from server.app.domain.hr.service import DepartmentService, EmployeeService, SyncService
 
 logger = get_logger(__name__)
 
@@ -325,3 +331,120 @@ async def get_department_employees(
 
     service = DepartmentService(db)
     return await service.get_department_employees(dept_code, include_concurrent=include_concurrent)
+
+
+# =============================================
+# 동기화 API
+# =============================================
+
+
+@router.post(
+    "/sync/employees",
+    response_model=SyncExecutionResponse,
+    summary="직원 정보 동기화",
+    description=(
+        "외부 시스템(오라클)에서 전달받은 직원 데이터를 Bulk로 Insert/Update합니다. "
+        "동기화 결과는 HR_SYNC_HISTORY 테이블에 기록됩니다."
+    ),
+)
+async def sync_employees(
+    employees: list[EmployeeSyncRequest],
+    db: AsyncSession = Depends(get_db),
+) -> SyncExecutionResponse:
+    """
+    직원 정보를 동기화합니다 (Bulk Insert/Update)
+
+    Args:
+        employees: 동기화할 직원 목록
+        db: 데이터베이스 세션
+
+    Returns:
+        SyncExecutionResponse: 동기화 실행 결과
+    """
+    logger.info("직원 정보 동기화 시작", extra={"total_count": len(employees)})
+
+    service = SyncService(db)
+    result = await service.sync_employees(employees=employees, in_user="system")
+
+    logger.info(
+        "직원 정보 동기화 완료",
+        extra={
+            "sync_id": result.sync_id,
+            "sync_status": result.sync_status,
+            "success_count": result.success_count,
+            "failure_count": result.failure_count,
+        },
+    )
+
+    return result
+
+
+@router.post(
+    "/sync/departments",
+    response_model=SyncExecutionResponse,
+    summary="부서 정보 동기화",
+    description=(
+        "외부 시스템(오라클)에서 전달받은 부서 데이터를 Bulk로 Insert/Update합니다. "
+        "동기화 결과는 HR_SYNC_HISTORY 테이블에 기록됩니다."
+    ),
+)
+async def sync_departments(
+    departments: list[DepartmentSyncRequest],
+    db: AsyncSession = Depends(get_db),
+) -> SyncExecutionResponse:
+    """
+    부서 정보를 동기화합니다 (Bulk Insert/Update)
+
+    Args:
+        departments: 동기화할 부서 목록
+        db: 데이터베이스 세션
+
+    Returns:
+        SyncExecutionResponse: 동기화 실행 결과
+    """
+    logger.info("부서 정보 동기화 시작", extra={"total_count": len(departments)})
+
+    service = SyncService(db)
+    result = await service.sync_departments(departments=departments, in_user="system")
+
+    logger.info(
+        "부서 정보 동기화 완료",
+        extra={
+            "sync_id": result.sync_id,
+            "sync_status": result.sync_status,
+            "success_count": result.success_count,
+            "failure_count": result.failure_count,
+        },
+    )
+
+    return result
+
+
+@router.get(
+    "/sync/history",
+    response_model=SyncHistoryListResponse,
+    summary="동기화 이력 조회",
+    description="동기화 이력을 조회합니다. 타입 필터링 및 최대 조회 건수를 지정할 수 있습니다.",
+)
+async def get_sync_history(
+    sync_type: str | None = Query(
+        None, description="동기화 타입 필터 (employees/departments/org_tree)"
+    ),
+    limit: int = Query(50, ge=1, le=200, description="최대 조회 건수 (1-200)"),
+    db: AsyncSession = Depends(get_db),
+) -> SyncHistoryListResponse:
+    """
+    동기화 이력을 조회합니다.
+
+    Args:
+        sync_type: 동기화 타입 필터
+        limit: 최대 조회 건수
+        db: 데이터베이스 세션
+
+    Returns:
+        SyncHistoryListResponse: 동기화 이력 목록
+    """
+    logger.info("동기화 이력 조회", extra={"sync_type": sync_type, "limit": limit})
+
+    service = SyncService(db)
+    return await service.get_sync_history(sync_type=sync_type, limit=limit)

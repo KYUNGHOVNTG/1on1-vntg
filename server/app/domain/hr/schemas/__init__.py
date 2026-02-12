@@ -25,6 +25,14 @@ from server.app.domain.hr.schemas.department import (
     DepartmentDetailResponse,
 )
 
+from server.app.domain.hr.schemas.sync import (
+    EmployeeSyncRequest,
+    DepartmentSyncRequest,
+    SyncHistoryResponse,
+    SyncHistoryListResponse,
+    SyncExecutionResponse,
+)
+
 __all__ = [
     # Employee schemas
     "ConcurrentPosition",
@@ -43,4 +51,10 @@ __all__ = [
     "OrgTreeResponse",
     "DepartmentSearchParams",
     "DepartmentDetailResponse",
+    # Sync schemas
+    "EmployeeSyncRequest",
+    "DepartmentSyncRequest",
+    "SyncHistoryResponse",
+    "SyncHistoryListResponse",
+    "SyncExecutionResponse",
 ]

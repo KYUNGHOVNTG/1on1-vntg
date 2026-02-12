@@ -9,9 +9,13 @@ HR 도메인 서비스
     - Calculator: 순수 비즈니스 로직 (조직도 트리 변환 등)
 """
 
+from datetime import datetime
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.domain.hr.calculators import OrgTreeCalculator
+from server.app.domain.hr.models import CMDepartment, HRMgnt, HRSyncHistory
 from server.app.domain.hr.repositories import (
     DepartmentDBRepository,
     EmployeeDBRepository,
@@ -26,6 +30,13 @@ from server.app.domain.hr.schemas.employee import (
     ConcurrentPositionResponse,
     EmployeeDetailResponse,
     EmployeeListResponse,
+)
+from server.app.domain.hr.schemas.sync import (
+    DepartmentSyncRequest,
+    EmployeeSyncRequest,
+    SyncExecutionResponse,
+    SyncHistoryListResponse,
+    SyncHistoryResponse,
 )
 from server.app.shared.exceptions import NotFoundException
 
@@ -363,3 +374,248 @@ class DepartmentService:
             )
             for emp in employees
         ]
+
+
+class SyncService:
+    """
+    동기화 서비스
+
+    외부 시스템(오라클)과의 데이터 동기화 기능을 제공합니다.
+
+    책임:
+        - 직원 정보 Bulk Insert/Update
+        - 부서 정보 Bulk Insert/Update
+        - 동기화 이력 기록 및 조회
+        - 트랜잭션 관리
+    """
+
+    def __init__(self, db: AsyncSession):
+        """
+        Args:
+            db: 비동기 데이터베이스 세션
+        """
+        self.db = db
+
+    async def sync_employees(
+        self,
+        employees: list[EmployeeSyncRequest],
+        in_user: str | None = None,
+    ) -> SyncExecutionResponse:
+        """
+        직원 정보 동기화 (Bulk Insert/Update)
+
+        외부 시스템에서 전달받은 직원 데이터를 Bulk로 업데이트합니다.
+
+        Args:
+            employees: 동기화할 직원 목록
+            in_user: 실행자
+
+        Returns:
+            SyncExecutionResponse: 동기화 실행 결과
+        """
+        sync_start_time = datetime.utcnow()
+        total_count = len(employees)
+        success_count = 0
+        failure_count = 0
+        error_messages: list[str] = []
+
+        # 동기화 이력 레코드 생성
+        sync_history = HRSyncHistory(
+            sync_type="employees",
+            sync_status="in_progress",
+            total_count=total_count,
+            success_count=0,
+            failure_count=0,
+            sync_start_time=sync_start_time,
+            in_user=in_user,
+        )
+        self.db.add(sync_history)
+        await self.db.flush()  # sync_id 생성
+
+        # Bulk Insert/Update
+        for emp_req in employees:
+            try:
+                # 기존 직원 조회
+                result = await self.db.execute(
+                    select(HRMgnt).where(HRMgnt.emp_no == emp_req.emp_no)
+                )
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    # Update
+                    existing.user_id = emp_req.user_id
+                    existing.name_kor = emp_req.name_kor
+                    existing.dept_code = emp_req.dept_code
+                    existing.position_code = emp_req.position_code
+                    existing.on_work_yn = emp_req.on_work_yn
+                    existing.up_user = in_user
+                    existing.up_date = datetime.utcnow()
+                else:
+                    # Insert
+                    new_employee = HRMgnt(
+                        emp_no=emp_req.emp_no,
+                        user_id=emp_req.user_id,
+                        name_kor=emp_req.name_kor,
+                        dept_code=emp_req.dept_code,
+                        position_code=emp_req.position_code,
+                        on_work_yn=emp_req.on_work_yn,
+                        in_user=in_user,
+                    )
+                    self.db.add(new_employee)
+
+                success_count += 1
+
+            except Exception as e:
+                failure_count += 1
+                error_messages.append(f"emp_no={emp_req.emp_no}: {str(e)}")
+
+        # 동기화 결과 업데이트
+        sync_history.success_count = success_count
+        sync_history.failure_count = failure_count
+        sync_history.sync_status = "success" if failure_count == 0 else "partial" if success_count > 0 else "failure"
+        sync_history.error_message = "\n".join(error_messages) if error_messages else None
+        sync_history.sync_end_time = datetime.utcnow()
+
+        await self.db.commit()
+
+        return SyncExecutionResponse(
+            sync_id=sync_history.sync_id,
+            sync_type="employees",
+            sync_status=sync_history.sync_status,
+            total_count=total_count,
+            success_count=success_count,
+            failure_count=failure_count,
+            message=f"직원 정보 동기화 완료: 성공 {success_count}건, 실패 {failure_count}건",
+        )
+
+    async def sync_departments(
+        self,
+        departments: list[DepartmentSyncRequest],
+        in_user: str | None = None,
+    ) -> SyncExecutionResponse:
+        """
+        부서 정보 동기화 (Bulk Insert/Update)
+
+        외부 시스템에서 전달받은 부서 데이터를 Bulk로 업데이트합니다.
+
+        Args:
+            departments: 동기화할 부서 목록
+            in_user: 실행자
+
+        Returns:
+            SyncExecutionResponse: 동기화 실행 결과
+        """
+        sync_start_time = datetime.utcnow()
+        total_count = len(departments)
+        success_count = 0
+        failure_count = 0
+        error_messages: list[str] = []
+
+        # 동기화 이력 레코드 생성
+        sync_history = HRSyncHistory(
+            sync_type="departments",
+            sync_status="in_progress",
+            total_count=total_count,
+            success_count=0,
+            failure_count=0,
+            sync_start_time=sync_start_time,
+            in_user=in_user,
+        )
+        self.db.add(sync_history)
+        await self.db.flush()  # sync_id 생성
+
+        # Bulk Insert/Update
+        for dept_req in departments:
+            try:
+                # 기존 부서 조회
+                result = await self.db.execute(
+                    select(CMDepartment).where(CMDepartment.dept_code == dept_req.dept_code)
+                )
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    # Update
+                    existing.dept_name = dept_req.dept_name
+                    existing.upper_dept_code = dept_req.upper_dept_code
+                    existing.dept_head_emp_no = dept_req.dept_head_emp_no
+                    existing.use_yn = dept_req.use_yn
+                    existing.up_user = in_user
+                    existing.up_date = datetime.utcnow()
+                else:
+                    # Insert
+                    new_department = CMDepartment(
+                        dept_code=dept_req.dept_code,
+                        dept_name=dept_req.dept_name,
+                        upper_dept_code=dept_req.upper_dept_code,
+                        dept_head_emp_no=dept_req.dept_head_emp_no,
+                        use_yn=dept_req.use_yn,
+                        in_user=in_user,
+                    )
+                    self.db.add(new_department)
+
+                success_count += 1
+
+            except Exception as e:
+                failure_count += 1
+                error_messages.append(f"dept_code={dept_req.dept_code}: {str(e)}")
+
+        # 동기화 결과 업데이트
+        sync_history.success_count = success_count
+        sync_history.failure_count = failure_count
+        sync_history.sync_status = "success" if failure_count == 0 else "partial" if success_count > 0 else "failure"
+        sync_history.error_message = "\n".join(error_messages) if error_messages else None
+        sync_history.sync_end_time = datetime.utcnow()
+
+        await self.db.commit()
+
+        return SyncExecutionResponse(
+            sync_id=sync_history.sync_id,
+            sync_type="departments",
+            sync_status=sync_history.sync_status,
+            total_count=total_count,
+            success_count=success_count,
+            failure_count=failure_count,
+            message=f"부서 정보 동기화 완료: 성공 {success_count}건, 실패 {failure_count}건",
+        )
+
+    async def get_sync_history(
+        self,
+        sync_type: str | None = None,
+        limit: int = 50,
+    ) -> SyncHistoryListResponse:
+        """
+        동기화 이력을 조회합니다
+
+        Args:
+            sync_type: 동기화 타입 필터 (employees/departments/org_tree)
+            limit: 최대 조회 건수
+
+        Returns:
+            SyncHistoryListResponse: 동기화 이력 목록
+        """
+        query = select(HRSyncHistory).order_by(HRSyncHistory.sync_id.desc()).limit(limit)
+
+        if sync_type:
+            query = query.where(HRSyncHistory.sync_type == sync_type)
+
+        result = await self.db.execute(query)
+        histories = result.scalars().all()
+
+        items = [
+            SyncHistoryResponse(
+                sync_id=history.sync_id,
+                sync_type=history.sync_type,
+                sync_status=history.sync_status,
+                total_count=history.total_count,
+                success_count=history.success_count,
+                failure_count=history.failure_count,
+                error_message=history.error_message,
+                sync_start_time=history.sync_start_time,
+                sync_end_time=history.sync_end_time,
+                in_user=history.in_user,
+                in_date=history.in_date,
+            )
+            for history in histories
+        ]
+
+        return SyncHistoryListResponse(items=items, total=len(items))
