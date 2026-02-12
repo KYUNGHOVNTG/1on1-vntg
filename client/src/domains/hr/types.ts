@@ -101,6 +101,14 @@ export interface OrgTreeNode {
 }
 
 /**
+ * 조직도 트리 조회 응답
+ */
+export interface OrgTreeResponse {
+  std_year: string;
+  tree: OrgTreeNode[];
+}
+
+/**
  * 부서 상세 정보
  *
  * 부서 기본 정보 + 부서장 정보 + 소속 직원 수를 포함합니다.
