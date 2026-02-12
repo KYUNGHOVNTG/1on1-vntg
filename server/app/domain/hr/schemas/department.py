@@ -100,3 +100,23 @@ class DepartmentDetailResponse(DepartmentBase):
     """
 
     dept_head_emp_no: Optional[str] = Field(None, description="부서장 사번")
+
+
+class DepartmentEmployeesResponse(BaseModel):
+    """
+    부서 직원 목록 조회 응답 스키마
+
+    부서별 소속 직원 목록과 총 인원 수를 포함합니다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    items: List["EmployeeDetailResponse"] = Field(..., description="직원 목록")
+    total: int = Field(..., description="전체 직원 수")
+
+
+# Forward reference를 위한 import (순환 참조 방지)
+from server.app.domain.hr.schemas.employee import EmployeeDetailResponse
+
+# Forward reference 업데이트
+DepartmentEmployeesResponse.model_rebuild()

@@ -11,6 +11,7 @@ from server.app.core.database import get_db
 from server.app.core.logging import get_logger
 from server.app.domain.hr.schemas.department import (
     DepartmentDetailResponse,
+    DepartmentEmployeesResponse,
     DepartmentInfo,
     DepartmentListResponse,
     OrgTreeResponse,
@@ -299,7 +300,7 @@ async def get_department_info(
 
 @router.get(
     "/departments/{dept_code}/employees",
-    response_model=list[EmployeeDetailResponse],
+    response_model=DepartmentEmployeesResponse,
     summary="부서별 직원 목록 조회",
     description=("특정 부서에 소속된 직원 목록을 조회합니다. " "기본적으로 겸직자도 포함됩니다."),
 )
@@ -309,7 +310,7 @@ async def get_department_employees(
         True, description="겸직자 포함 여부 (True: 포함, False: 주소속만)"
     ),
     db: AsyncSession = Depends(get_db),
-) -> list[EmployeeDetailResponse]:
+) -> DepartmentEmployeesResponse:
     """
     부서별 직원 목록을 조회합니다.
 
@@ -319,7 +320,7 @@ async def get_department_employees(
         db: 데이터베이스 세션
 
     Returns:
-        list[EmployeeDetailResponse]: 소속 직원 목록
+        DepartmentEmployeesResponse: 소속 직원 목록 (items, total)
 
     Raises:
         HTTPException(404): 부서를 찾을 수 없는 경우
@@ -330,7 +331,12 @@ async def get_department_employees(
     )
 
     service = DepartmentService(db)
-    return await service.get_department_employees(dept_code, include_concurrent=include_concurrent)
+    employees = await service.get_department_employees(dept_code, include_concurrent=include_concurrent)
+
+    return DepartmentEmployeesResponse(
+        items=employees,
+        total=len(employees)
+    )
 
 
 # =============================================
