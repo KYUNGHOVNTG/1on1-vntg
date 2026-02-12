@@ -15,7 +15,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.domain.hr.calculators import OrgTreeCalculator
-from server.app.domain.hr.models import CMDepartment, HRMgnt, HRSyncHistory
+from server.app.domain.hr.models import (
+    CMDepartment,
+    CMDepartmentTree,
+    HRMgnt,
+    HRSyncHistory,
+)
 from server.app.domain.hr.repositories import (
     DepartmentDBRepository,
     EmployeeDBRepository,
@@ -524,23 +529,28 @@ class SyncService:
         self.db.add(sync_history)
         await self.db.flush()  # sync_id 생성
 
+        # 현재 연도 (조직도 기준 연도)
+        current_year = str(datetime.utcnow().year)
+
         # Bulk Insert/Update
         for dept_req in departments:
             try:
-                # 기존 부서 조회
+                # =============================================
+                # 1. cm_department INSERT/UPDATE
+                # =============================================
                 result = await self.db.execute(
                     select(CMDepartment).where(CMDepartment.dept_code == dept_req.dept_code)
                 )
-                existing = result.scalar_one_or_none()
+                existing_dept = result.scalar_one_or_none()
 
-                if existing:
+                if existing_dept:
                     # Update
-                    existing.dept_name = dept_req.dept_name
-                    existing.upper_dept_code = dept_req.upper_dept_code
-                    existing.dept_head_emp_no = dept_req.dept_head_emp_no
-                    existing.use_yn = dept_req.use_yn
-                    existing.up_user = in_user
-                    existing.up_date = datetime.utcnow()
+                    existing_dept.dept_name = dept_req.dept_name
+                    existing_dept.upper_dept_code = dept_req.upper_dept_code
+                    existing_dept.dept_head_emp_no = dept_req.dept_head_emp_no
+                    existing_dept.use_yn = dept_req.use_yn
+                    existing_dept.up_user = in_user
+                    existing_dept.up_date = datetime.utcnow()
                 else:
                     # Insert
                     new_department = CMDepartment(
@@ -552,6 +562,57 @@ class SyncService:
                         in_user=in_user,
                     )
                     self.db.add(new_department)
+
+                await self.db.flush()  # cm_department 먼저 저장
+
+                # =============================================
+                # 2. 부서장 정보 조회 (hr_mgnt 테이블)
+                # =============================================
+                dept_head_name = None
+                if dept_req.dept_head_emp_no:
+                    head_result = await self.db.execute(
+                        select(HRMgnt.name_kor).where(
+                            HRMgnt.emp_no == dept_req.dept_head_emp_no
+                        )
+                    )
+                    dept_head_name = head_result.scalar_one_or_none()
+
+                # =============================================
+                # 3. cm_department_tree INSERT/UPDATE (조직도 표시용)
+                # =============================================
+                tree_result = await self.db.execute(
+                    select(CMDepartmentTree).where(
+                        CMDepartmentTree.std_year == current_year,
+                        CMDepartmentTree.dept_code == dept_req.dept_code,
+                    )
+                )
+                existing_tree = tree_result.scalar_one_or_none()
+
+                # disp_lvl 계산: upper_dept_code가 NULL이면 1 (최상위), 아니면 2
+                disp_lvl = 1 if dept_req.upper_dept_code is None else 2
+
+                if existing_tree:
+                    # Update
+                    existing_tree.dept_name = dept_req.dept_name
+                    existing_tree.upper_dept_code = dept_req.upper_dept_code
+                    existing_tree.disp_lvl = disp_lvl
+                    existing_tree.dept_head_emp_no = dept_req.dept_head_emp_no
+                    existing_tree.name_kor = dept_head_name
+                    existing_tree.up_user = in_user
+                    existing_tree.up_date = datetime.utcnow()
+                else:
+                    # Insert
+                    new_tree = CMDepartmentTree(
+                        std_year=current_year,
+                        dept_code=dept_req.dept_code,
+                        upper_dept_code=dept_req.upper_dept_code,
+                        dept_name=dept_req.dept_name,
+                        disp_lvl=disp_lvl,
+                        dept_head_emp_no=dept_req.dept_head_emp_no,
+                        name_kor=dept_head_name,
+                        in_user=in_user,
+                    )
+                    self.db.add(new_tree)
 
                 success_count += 1
 

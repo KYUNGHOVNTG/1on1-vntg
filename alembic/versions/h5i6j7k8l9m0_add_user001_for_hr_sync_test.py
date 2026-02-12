@@ -29,15 +29,15 @@ def upgrade() -> None:
     """
     HR 동기화 테스트 데이터 추가 (5개 부서, 20명 사용자)
     """
-    # 1. cm_department: 5개 부서 추가
+    # 1. cm_department: 5개 부서 추가 (부서장 정보 포함)
     op.execute("""
         INSERT INTO cm_department (dept_code, dept_name, upper_dept_code, dept_head_emp_no, use_yn, in_user)
         VALUES
-            ('D001', '경영지원팀', NULL, NULL, 'Y', 'system'),
-            ('D002', '개발팀', NULL, NULL, 'Y', 'system'),
-            ('D003', '디자인팀', NULL, NULL, 'Y', 'system'),
-            ('D004', '마케팅팀', NULL, NULL, 'Y', 'system'),
-            ('D005', '영업팀', NULL, NULL, 'Y', 'system')
+            ('D001', '경영지원팀', NULL, 'E002', 'Y', 'system'),
+            ('D002', '개발팀', NULL, 'E004', 'Y', 'system'),
+            ('D003', '디자인팀', NULL, 'E011', 'Y', 'system'),
+            ('D004', '마케팅팀', NULL, 'E015', 'Y', 'system'),
+            ('D005', '영업팀', NULL, 'E018', 'Y', 'system')
         ON CONFLICT (dept_code) DO NOTHING
     """)
 

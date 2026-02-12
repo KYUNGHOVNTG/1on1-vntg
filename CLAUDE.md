@@ -5,6 +5,158 @@ AI 에이전트와 협업할 때 다음 규칙을 **엄격히** 준수해야 합
 
 ---
 
+## ⛔ BLOCKING REQUIREMENTS (강제 규칙)
+
+**CRITICAL**: 아래 규칙을 따르지 않으면 시스템이 망가지거나 설계 의도를 벗어난 코드가 작성됩니다.
+**모든 작업은 반드시 이 순서를 따라야 합니다.**
+
+### 🚨 모든 코드 작업 시작 전 필수 출력
+
+코드를 수정하거나 파일을 생성하기 전에 **반드시 다음 체크리스트를 먼저 출력**하세요:
+
+```markdown
+## 📋 작업 전 체크리스트
+
+1. [ ] 관련 문서 확인: [문서 이름 명시]
+2. [ ] 기존 코드 전체 흐름 파악: [파일 경로 명시]
+3. [ ] 영향 범위 분석 완료: [영향받는 레이어/도메인]
+4. [ ] 수정 계획 작성 완료
+
+**사용자 승인 후 작업을 시작하겠습니다.**
+```
+
+**⚠️ 이 체크리스트를 출력하지 않고 바로 코드를 수정하지 마세요!**
+
+---
+
+### 📚 작업 유형별 필수 확인 문서
+
+작업 전 **반드시 먼저 읽어야 할 문서**:
+
+| 작업 유형 | 필수 문서 | 확인 사항 |
+|----------|----------|-----------|
+| **HR 관련 작업** | `docs/HR_INTEGRATION_TEST_GUIDE.md` | 동기화 흐름, 테이블 관계, 테스트 시나리오 |
+| **새 도메인 추가** | `server/app/examples/sample_domain/` | Repository-Calculator-Formatter 패턴 |
+| **공통코드 작업** | `server/app/domain/common/` | 하드코딩 금지, code_type 구조 |
+| **메뉴 권한 작업** | `migration/20260120_seed_*.sql` | 기존 메뉴 코드, 중복 방지 |
+| **DB 마이그레이션** | `alembic/versions/*.py` | 기존 마이그레이션, 데이터 중복 확인 |
+
+**CRITICAL**: 해당 문서를 읽지 않고 작업하면 설계 의도를 놓치고 실수가 반복됩니다!
+
+---
+
+### ⚠️ 자주 발생하는 실수 패턴 (반드시 숙지)
+
+#### **실수 1: 동기화 로직 수정 시**
+```python
+# ❌ 잘못된 접근 (cm_department만 업데이트)
+async def sync_departments(...):
+    # cm_department INSERT/UPDATE
+    self.db.add(department)
+    # ❌ cm_department_tree 업데이트 누락!
+
+# ✅ 올바른 접근 (cm_department + cm_department_tree 동시 업데이트)
+async def sync_departments(...):
+    # 1. cm_department INSERT/UPDATE
+    self.db.add(department)
+    # 2. cm_department_tree도 함께 업데이트 (조직도 표시용)
+    self.db.add(department_tree)
+```
+
+**왜?** 조직도 페이지는 `cm_department_tree`를 조회하므로, 이 테이블을 업데이트하지 않으면 조직도가 표시되지 않습니다.
+
+---
+
+#### **실수 2: 마이그레이션 데이터 추가 시**
+```bash
+# ❌ 잘못된 접근 (기존 데이터 확인 없이 추가)
+INSERT INTO cm_menu (menu_code, menu_name, ...)
+VALUES ('M005', '인사관리', ...);  # 중복 가능성!
+
+# ✅ 올바른 접근 (기존 데이터 확인 후 추가)
+# 1. migration/ 폴더에서 기존 데이터 검색
+grep -r "M005" migration/
+grep -r "인사관리" alembic/versions/
+
+# 2. 중복이 없으면 추가
+INSERT INTO cm_menu (menu_code, menu_name, ...)
+VALUES ('M005', '인사관리', ...)
+ON CONFLICT (menu_code) DO NOTHING;  # 중복 방지
+```
+
+**왜?** 데이터 중복은 제약 조건 위반을 일으키고 마이그레이션이 실패합니다.
+
+---
+
+#### **실수 3: 테이블 스키마 변경 시**
+```bash
+# ❌ 잘못된 접근 (기존 마이그레이션 파일 수정)
+# alembic/versions/abc123_create_user_table.py 파일을 직접 수정
+
+# ✅ 올바른 접근 (새 마이그레이션 파일 생성)
+alembic revision --autogenerate -m "add email column to user table"
+```
+
+**왜?** 기존 마이그레이션을 수정하면 다른 환경과 충돌하고 이력 추적이 불가능합니다.
+
+---
+
+#### **실수 4: Repository 없이 Service에서 직접 DB 접근**
+```python
+# ❌ 잘못된 접근 (Service에서 직접 쿼리)
+class EmployeeService:
+    async def get_employees(self):
+        result = await self.db.execute(  # ❌
+            select(Employee).where(...)
+        )
+
+# ✅ 올바른 접근 (Repository 위임)
+class EmployeeService:
+    async def get_employees(self):
+        return await self.employee_repo.find_all(...)  # ✅
+```
+
+**왜?** Service는 흐름 제어만 담당하고, 데이터 접근은 Repository로 위임해야 테스트와 유지보수가 쉽습니다.
+
+---
+
+#### **실수 5: 프론트엔드에서 axios 직접 import**
+```typescript
+// ❌ 잘못된 접근
+import axios from 'axios';
+const response = await axios.get('/api/v1/hr/employees');
+
+// ✅ 올바른 접근
+import { apiClient } from '@/core/api/client';
+const response = await apiClient.get('/v1/hr/employees');
+```
+
+**왜?** `apiClient`는 인증 헤더, 에러 핸들링, 로깅 등을 자동으로 처리합니다.
+
+---
+
+### 🔄 작업 순서 (절대 변경 금지)
+
+```
+1. 📚 문서 확인
+   ↓
+2. 🔍 기존 코드 전체 파악 (Repository → Service → Router)
+   ↓
+3. 📊 영향 범위 분석 (다른 레이어/도메인에 영향?)
+   ↓
+4. 📝 수정 계획 작성 및 사용자 승인 요청
+   ↓
+5. ✅ 승인 후 코드 수정 시작
+   ↓
+6. ✅ 테스트 실행
+   ↓
+7. ✅ 커밋 (한글 커밋 메시지 + 세션 URL)
+```
+
+**⚠️ 이 순서를 건너뛰면 설계 의도를 벗어난 코드가 작성됩니다!**
+
+---
+
 ## Quick Reference - 빌드 & 실행 명령어
 
 ```bash
