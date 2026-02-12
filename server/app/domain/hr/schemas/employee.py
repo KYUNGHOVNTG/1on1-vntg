@@ -4,6 +4,8 @@ HR 도메인 - 직원 정보 스키마
 직원 조회 및 관리를 위한 Pydantic 스키마를 정의합니다.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import List, Optional
 
