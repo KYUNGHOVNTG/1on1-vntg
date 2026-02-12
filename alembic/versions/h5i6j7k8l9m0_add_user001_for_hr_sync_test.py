@@ -1,7 +1,7 @@
 """add hr sync test data (20 employees, 5 departments)
 
 Revision ID: h5i6j7k8l9m0
-Revises: 27941e0cba88
+Revises: g3h4i5j6k7l8
 Create Date: 2026-02-12 06:50:00.000000
 
 HR 동기화 테스트를 위한 목데이터를 추가합니다.
@@ -20,7 +20,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'h5i6j7k8l9m0'
-down_revision: Union[str, None] = '27941e0cba88'
+down_revision: Union[str, None] = 'g3h4i5j6k7l8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -338,6 +338,62 @@ client/src/
 2. 사용자 확인 요청: 아키텍처 변경이 필요한 경우 설명하고 승인 요청
 3. 테스트 영향 평가: 기존 테스트가 깨질 가능성 확인
 
+### Git 커밋 메시지 규칙 (필수)
+
+**절대 규칙: 모든 커밋 메시지는 한글로 작성**
+
+#### 커밋 메시지 구조
+```
+제목: 변경 사항을 한 줄로 요약 (50자 이내)
+
+본문 (선택사항):
+- 변경 이유 및 배경 설명
+- 해결한 문제 상세
+- 주요 변경 내용
+- 테스트 결과
+- 참고 사항
+
+https://claude.ai/code/session_xxxxx
+```
+
+#### 예시 (올바른 커밋 메시지)
+```
+Pydantic forward reference 에러 수정
+
+문제:
+- EmployeeListResponse가 EmployeeDetailResponse를 참조
+- 정의 순서 문제로 Pydantic이 undefined annotation 에러 발생
+- Pydantic v2는 FastAPI 라우터 등록 시 즉시 스키마 검증 수행
+
+해결:
+- EmployeeDetailResponse를 EmployeeListResponse보다 먼저 정의
+- 클래스 정의 순서: EmployeeBase → EmployeeDetailResponse → EmployeeListResponse
+
+테스트:
+- Python 구문 검사 통과
+- 서버 시작 시 PydanticUndefinedAnnotation 에러 해결 확인
+
+https://claude.ai/code/session_jtUga
+```
+
+#### 금지 사항
+- ❌ 영어 커밋 메시지 (예: "Fix Pydantic error")
+- ❌ 단순 설명 (예: "수정", "변경")
+- ❌ 세션 URL 누락
+
+#### 제목 작성 규칙
+- **한글 사용 필수**: "~을 추가", "~를 수정", "~를 삭제"
+- **50자 이내**: 간결하고 명확하게
+- **마침표 사용 안 함**: 제목 끝에 마침표 생략
+- **명령형/완료형**: "추가했습니다" 대신 "추가"
+
+#### 본문 작성 규칙 (선택사항, 복잡한 변경 시 필수)
+1. **문제 (선택사항)**: 해결한 문제 상세 설명
+2. **해결 (필수)**: 어떻게 해결했는지 구체적으로 설명
+3. **영향 (선택사항)**: 변경으로 인한 영향 범위
+4. **테스트 (선택사항)**: 테스트 결과 및 검증 내용
+5. **세션 URL (필수)**: Claude Code 세션 링크
+
 ---
 
 ## 추가 참고 자료
