@@ -11,7 +11,7 @@ HR 도메인 서비스
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.domain.hr.calculators import OrgTreeCalculator
@@ -19,6 +19,7 @@ from server.app.domain.hr.models import (
     CMDepartment,
     CMDepartmentTree,
     HRMgnt,
+    HRMgntConcur,
     HRSyncHistory,
 )
 from server.app.domain.hr.repositories import (
@@ -37,6 +38,7 @@ from server.app.domain.hr.schemas.employee import (
     EmployeeListResponse,
 )
 from server.app.domain.hr.schemas.sync import (
+    ConcurrentPositionSyncRequest,
     DepartmentSyncRequest,
     EmployeeSyncRequest,
     SyncExecutionResponse,
@@ -467,6 +469,32 @@ class SyncService:
                         in_user=in_user,
                     )
                     self.db.add(new_employee)
+
+                # =============================================
+                # 겸직 정보 동기화 (HR_MGNT_CONCUR)
+                # concurrent_positions가 전달된 경우 Full Replace 방식으로 처리
+                # (겸직 관계 변경/삭제를 안전하게 반영하기 위해 삭제 후 재삽입)
+                # =============================================
+                if emp_req.concurrent_positions:
+                    await self.db.flush()  # hr_mgnt PK가 먼저 저장되어야 FK 제약 통과
+
+                    # 기존 겸직 레코드 전체 삭제
+                    await self.db.execute(
+                        sa_delete(HRMgntConcur).where(
+                            HRMgntConcur.emp_no == emp_req.emp_no
+                        )
+                    )
+
+                    # 새 겸직 레코드 삽입
+                    for concur in emp_req.concurrent_positions:
+                        new_concur = HRMgntConcur(
+                            emp_no=emp_req.emp_no,
+                            dept_code=concur.dept_code,
+                            is_main=concur.is_main,
+                            position_code=concur.position_code,
+                            in_user=in_user,
+                        )
+                        self.db.add(new_concur)
 
                 success_count += 1
 

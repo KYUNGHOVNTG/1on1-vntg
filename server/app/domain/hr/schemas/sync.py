@@ -5,9 +5,28 @@ HR 도메인 - 동기화 스키마
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+# =============================================
+# 겸직 정보 동기화 스키마
+# =============================================
+
+
+class ConcurrentPositionSyncRequest(BaseModel):
+    """
+    겸직 정보 동기화 요청
+
+    직원의 주소속 및 겸직 부서 정보를 동기화합니다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    dept_code: str = Field(..., description="부서 코드")
+    is_main: str = Field(..., description="본직 여부 (Y: 주소속, N: 겸직)")
+    position_code: str = Field(..., description="직책 코드")
 
 
 # =============================================
@@ -20,6 +39,7 @@ class EmployeeSyncRequest(BaseModel):
     직원 정보 동기화 요청
 
     외부 시스템에서 전달받은 직원 데이터를 Bulk로 업데이트합니다.
+    concurrent_positions에 겸직 정보를 포함할 수 있으며, 미포함 시 주소속만 처리됩니다.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -30,6 +50,10 @@ class EmployeeSyncRequest(BaseModel):
     dept_code: str = Field(..., description="부서 코드 (주소속)")
     position_code: str = Field(..., description="직책 코드")
     on_work_yn: str = Field(..., description="재직 여부 (Y/N)")
+    concurrent_positions: List[ConcurrentPositionSyncRequest] = Field(
+        default_factory=list,
+        description="겸직 정보 목록 (주소속 포함, 미전달 시 빈 배열로 처리)"
+    )
 
 
 # =============================================
