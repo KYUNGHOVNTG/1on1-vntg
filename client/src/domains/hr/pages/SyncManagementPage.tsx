@@ -49,8 +49,8 @@ export function SyncManagementPage() {
         {
           emp_no: 'E004', user_id: 'user004', name_kor: '최개발', dept_code: 'D002', position_code: 'P004', on_work_yn: 'Y' as const,
           concurrent_positions: [
-            { dept_code: 'D002', is_main: 'Y', position_code: 'P004' },
-            { dept_code: 'D003', is_main: 'N', position_code: 'P005' },
+            { dept_code: 'D002', is_main: 'Y' as const, position_code: 'P004' },
+            { dept_code: 'D003', is_main: 'N' as const, position_code: 'P005' },
           ],
         },
         { emp_no: 'E005', user_id: 'user005', name_kor: '정프론트', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
@@ -58,8 +58,8 @@ export function SyncManagementPage() {
         {
           emp_no: 'E006', user_id: 'user006', name_kor: '강백엔드', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const,
           concurrent_positions: [
-            { dept_code: 'D002', is_main: 'Y', position_code: 'P005' },
-            { dept_code: 'D004', is_main: 'N', position_code: 'P005' },
+            { dept_code: 'D002', is_main: 'Y' as const, position_code: 'P005' },
+            { dept_code: 'D004', is_main: 'N' as const, position_code: 'P005' },
           ],
         },
         { emp_no: 'E007', user_id: 'user007', name_kor: '조풀스택', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
@@ -67,8 +67,8 @@ export function SyncManagementPage() {
         {
           emp_no: 'E008', user_id: 'user008', name_kor: '윤데이터', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const,
           concurrent_positions: [
-            { dept_code: 'D002', is_main: 'Y', position_code: 'P005' },
-            { dept_code: 'D005', is_main: 'N', position_code: 'P005' },
+            { dept_code: 'D002', is_main: 'Y' as const, position_code: 'P005' },
+            { dept_code: 'D005', is_main: 'N' as const, position_code: 'P005' },
           ],
         },
         { emp_no: 'E009', user_id: 'user009', name_kor: '장인프라', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },

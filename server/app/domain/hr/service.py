@@ -107,15 +107,17 @@ class EmployeeService:
             limit=size,
         )
 
-        # 응답 변환
+        # 응답 변환 (dept_name, position_name 포함)
         items = [
             EmployeeDetailResponse(
-                emp_no=emp.emp_no,
-                user_id=emp.user_id,
-                name_kor=emp.name_kor,
-                dept_code=emp.dept_code,
-                position_code=emp.position_code,
-                on_work_yn=emp.on_work_yn,
+                emp_no=emp["emp_no"],
+                user_id=emp["user_id"],
+                name_kor=emp["name_kor"],
+                dept_code=emp["dept_code"],
+                dept_name=emp.get("dept_name"),
+                position_code=emp["position_code"],
+                position_name=emp.get("position_name"),
+                on_work_yn=emp["on_work_yn"],
             )
             for emp in employees
         ]

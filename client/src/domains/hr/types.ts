@@ -16,7 +16,9 @@ export interface Employee {
   user_id: string;
   name_kor: string;
   dept_code: string;
+  dept_name?: string | null;        // [TASK 5] 부서명 (cm_department JOIN)
   position_code: string;
+  position_name?: string | null;    // [TASK 5] 직책명 (cm_codedetail JOIN)
   on_work_yn: 'Y' | 'N';
 }
 
@@ -142,6 +144,12 @@ export interface DepartmentEmployeesResponse {
 /**
  * 직원 정보 동기화 요청
  */
+export interface ConcurrentPositionSyncRequest {
+  dept_code: string;
+  is_main: 'Y' | 'N';
+  position_code: string;
+}
+
 export interface EmployeeSyncRequest {
   emp_no: string;
   user_id: string;
@@ -149,7 +157,9 @@ export interface EmployeeSyncRequest {
   dept_code: string;
   position_code: string;
   on_work_yn: 'Y' | 'N';
+  concurrent_positions?: ConcurrentPositionSyncRequest[];
 }
+
 
 /**
  * 부서 정보 동기화 요청

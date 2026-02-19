@@ -4,13 +4,13 @@ HR 도메인 - 직원 정보 DB Repository
 SQLAlchemy를 사용하여 실제 DB에 접근하는 Repository 구현체입니다.
 """
 
-from typing import List, Optional, Tuple
-from sqlalchemy import select, func, or_
+from typing import Any, Dict, List, Optional, Tuple
+from sqlalchemy import and_, select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from server.app.domain.hr.repositories.employee_repository import IEmployeeRepository
-from server.app.domain.hr.models import HRMgnt, HRMgntConcur
+from server.app.domain.hr.models import HRMgnt, HRMgntConcur, CMDepartment
+from server.app.domain.common.models import CodeDetail
 
 
 class EmployeeDBRepository(IEmployeeRepository):
@@ -35,16 +35,13 @@ class EmployeeDBRepository(IEmployeeRepository):
         dept_code: Optional[str] = None,
         offset: int = 0,
         limit: int = 20,
-    ) -> Tuple[List[HRMgnt], int]:
-        """직원 목록을 조회합니다 (페이징 포함)"""
-        # 기본 쿼리
-        stmt = select(HRMgnt)
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """직원 목록을 조회합니다 (페이징 포함, 부서명·직책명 JOIN)"""
 
-        # 필터링
-        conditions = []
+        # 필터링 조건
+        conditions: list = []
 
         if search:
-            # 이름 또는 사번으로 검색
             conditions.append(
                 or_(
                     HRMgnt.name_kor.ilike(f"%{search}%"),
@@ -61,20 +58,61 @@ class EmployeeDBRepository(IEmployeeRepository):
         if dept_code:
             conditions.append(HRMgnt.dept_code == dept_code)
 
+        # 전체 건수 조회 (JOIN 전 HRMgnt 기준)
+        count_base = select(func.count(HRMgnt.emp_no))
+        if conditions:
+            count_base = count_base.where(*conditions)
+        count_result = await self.db.execute(count_base)
+        total = count_result.scalar_one()
+
+        # 부서명·직책명 JOIN 쿼리
+        # cm_department LEFT JOIN → dept_name
+        # cm_codedetail(POSITION) LEFT JOIN → position_name
+        stmt = (
+            select(
+                HRMgnt,
+                CMDepartment.dept_name.label("dept_name"),
+                CodeDetail.code_name.label("position_name"),
+            )
+            .join(
+                CMDepartment,
+                HRMgnt.dept_code == CMDepartment.dept_code,
+                isouter=True,
+            )
+            .join(
+                CodeDetail,
+                and_(
+                    CodeDetail.code_type == "POSITION",
+                    CodeDetail.code == HRMgnt.position_code,
+                ),
+                isouter=True,
+            )
+        )
+
         if conditions:
             stmt = stmt.where(*conditions)
 
-        # 전체 건수 조회
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        count_result = await self.db.execute(count_stmt)
-        total = count_result.scalar_one()
-
-        # 페이징 적용
         stmt = stmt.offset(offset).limit(limit).order_by(HRMgnt.emp_no)
 
-        # 실행
         result = await self.db.execute(stmt)
-        employees = list(result.scalars().all())
+        rows = result.all()
+
+        # Row → dict 변환 (HRMgnt 속성 + dept_name + position_name)
+        employees: List[Dict[str, Any]] = []
+        for row in rows:
+            emp: HRMgnt = row[0]
+            employees.append(
+                {
+                    "emp_no": emp.emp_no,
+                    "user_id": emp.user_id,
+                    "name_kor": emp.name_kor,
+                    "dept_code": emp.dept_code,
+                    "dept_name": row.dept_name,
+                    "position_code": emp.position_code,
+                    "position_name": row.position_name,
+                    "on_work_yn": emp.on_work_yn,
+                }
+            )
 
         return employees, total
 

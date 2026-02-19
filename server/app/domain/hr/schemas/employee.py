@@ -98,6 +98,43 @@ class EmployeeListResponse(BaseModel):
     items: List[EmployeeDetailResponse] = Field(..., description="직원 목록")
 
 
+class EmployeeRowResponse(BaseModel):
+    """
+    직원 목록 1 ROW - 겸직 전개 포함
+
+    CONCUR 데이터가 있는 직원은 CONCUR 기준으로 여러 ROW로 전개됩니다.
+    CONCUR 데이터가 없는 직원은 HR_MGNT 기본 ROW 1건으로 표시됩니다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    emp_no: str = Field(..., description="사번")
+    user_id: str = Field(..., description="사용자 ID")
+    name_kor: str = Field(..., description="성명(한글)")
+    dept_code: str = Field(..., description="부서 코드")
+    dept_name: Optional[str] = Field(None, description="부서명")
+    position_code: str = Field(..., description="직책 코드")
+    position_name: Optional[str] = Field(None, description="직책명")
+    on_work_yn: str = Field(..., description="재직 여부 (Y/N)")
+    is_concurrent: bool = Field(
+        ...,
+        description="겸직 ROW 여부 (True: CONCUR 기반 ROW, False: 일반 ROW)"
+    )
+    is_main: str = Field(..., description="본직 여부 (Y: 본직, N: 겸직)")
+
+
+class EmployeeRowListResponse(BaseModel):
+    """겸직 전개 직원 목록 조회 응답 스키마"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total: int = Field(..., description="직원 수 (전개 전 기준)")
+    page: int = Field(..., description="현재 페이지")
+    size: int = Field(..., description="페이지당 건수")
+    pages: int = Field(..., description="전체 페이지 수")
+    items: List[EmployeeRowResponse] = Field(..., description="겸직 전개된 직원 목록")
+
+
 class EmployeeSearchParams(BaseModel):
     """직원 검색 파라미터 스키마"""
 
