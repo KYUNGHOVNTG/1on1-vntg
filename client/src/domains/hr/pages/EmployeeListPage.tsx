@@ -180,8 +180,8 @@ export function EmployeeListPage() {
         <form onSubmit={handleSearch}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             {/* 검색어 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-1.5 w-full">
+              <label className="text-xs font-semibold text-gray-700 ml-1 block">
                 검색
               </label>
               <div className="relative">
