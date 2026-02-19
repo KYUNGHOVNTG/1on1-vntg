@@ -36,6 +36,8 @@ from server.app.domain.hr.schemas.employee import (
     ConcurrentPositionResponse,
     EmployeeDetailResponse,
     EmployeeListResponse,
+    EmployeeRowListResponse,
+    EmployeeRowResponse,
 )
 from server.app.domain.hr.schemas.sync import (
     ConcurrentPositionSyncRequest,
@@ -153,6 +155,66 @@ class EmployeeService:
             dept_code=employee.dept_code,
             position_code=employee.position_code,
             on_work_yn=employee.on_work_yn,
+        )
+
+    async def get_employee_row_list(
+        self,
+        search: str | None = None,
+        on_work_yn: str | None = None,
+        position_code: str | None = None,
+        dept_code: str | None = None,
+        page: int = 1,
+        size: int = 20,
+    ) -> EmployeeRowListResponse:
+        """
+        겸직 전개 직원 목록을 조회합니다 (CONCUR 기준 다중 ROW)
+
+        CONCUR 데이터가 없는 직원은 1 ROW, 있는 직원은 CONCUR 건수만큼 ROW가 전개됩니다.
+
+        Args:
+            search: 검색어 (이름 또는 사번)
+            on_work_yn: 재직 여부 (Y/N)
+            position_code: 직책 코드 필터
+            dept_code: 부서 코드 필터
+            page: 페이지 번호 (1부터 시작)
+            size: 페이지 크기
+
+        Returns:
+            EmployeeRowListResponse: 겸직 전개된 직원 ROW 목록 및 페이징 정보
+        """
+        offset = (page - 1) * size
+
+        rows, total = await self.employee_repo.find_all_expanded(
+            search=search,
+            on_work_yn=on_work_yn,
+            position_code=position_code,
+            dept_code=dept_code,
+            offset=offset,
+            limit=size,
+        )
+
+        items = [
+            EmployeeRowResponse(
+                emp_no=row["emp_no"],
+                user_id=row["user_id"],
+                name_kor=row["name_kor"],
+                dept_code=row["dept_code"],
+                dept_name=row.get("dept_name"),
+                position_code=row["position_code"],
+                position_name=row.get("position_name"),
+                on_work_yn=row["on_work_yn"],
+                is_concurrent=row["is_concurrent"],
+                is_main=row["is_main"],
+            )
+            for row in rows
+        ]
+
+        return EmployeeRowListResponse(
+            items=items,
+            total=total,
+            page=page,
+            size=size,
+            pages=(total + size - 1) // size,
         )
 
     async def get_concurrent_positions(self, emp_no: str) -> list[ConcurrentPositionResponse]:
