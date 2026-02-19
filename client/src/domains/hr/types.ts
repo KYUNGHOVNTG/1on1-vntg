@@ -46,6 +46,36 @@ export interface EmployeeListParams {
 }
 
 /**
+ * 직원 목록 1 ROW - 겸직 전개 포함 (TASK 7)
+ *
+ * CONCUR 데이터가 있는 직원은 CONCUR 기준으로 여러 ROW로 전개됩니다.
+ * is_concurrent=true이고 is_main='N'인 ROW에는 겸직 라벨을 표시합니다.
+ */
+export interface EmployeeRow {
+  emp_no: string;
+  user_id: string;
+  name_kor: string;
+  dept_code: string;
+  dept_name?: string | null;
+  position_code: string;
+  position_name?: string | null;
+  on_work_yn: 'Y' | 'N';
+  is_concurrent: boolean;   // CONCUR 기반 ROW 여부 (true: 겸직 전개 ROW)
+  is_main: 'Y' | 'N';       // 본직 여부 (Y: 본직, N: 겸직)
+}
+
+/**
+ * 겸직 전개 직원 목록 응답 (TASK 7)
+ */
+export interface EmployeeRowListResponse {
+  items: EmployeeRow[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+/**
  * 겸직 정보
  */
 export interface ConcurrentPosition {

@@ -9,6 +9,7 @@ import type {
   Employee,
   EmployeeListResponse,
   EmployeeListParams,
+  EmployeeRowListResponse,
   ConcurrentPosition,
   Department,
   DepartmentListResponse,
@@ -40,6 +41,24 @@ export async function getEmployees(
 ): Promise<EmployeeListResponse> {
   const response = await apiClient.get<EmployeeListResponse>('/v1/hr/employees', {
     params,
+  });
+  return response.data;
+}
+
+/**
+ * 직원 목록 조회 (겸직 전개 모드) [TASK 7]
+ *
+ * expand_concurrent=true 파라미터를 사용하여 겸직자를 다중 ROW로 전개하여 조회합니다.
+ * CONCUR 데이터가 없는 직원은 1ROW, 겸직자는 CONCUR 기준으로 여러 ROW로 반환됩니다.
+ *
+ * @param params - 검색 및 필터 파라미터
+ * @returns 겸직 전개된 직원 목록 및 페이징 정보
+ */
+export async function getEmployeesExpanded(
+  params?: EmployeeListParams
+): Promise<EmployeeRowListResponse> {
+  const response = await apiClient.get<EmployeeRowListResponse>('/v1/hr/employees', {
+    params: { ...params, expand_concurrent: true },
   });
   return response.data;
 }
