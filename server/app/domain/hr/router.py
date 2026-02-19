@@ -4,6 +4,8 @@ HR API 라우터
 직원 및 부서 정보 조회 엔드포인트를 제공합니다.
 """
 
+from typing import Union
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +22,7 @@ from server.app.domain.hr.schemas.employee import (
     ConcurrentPositionResponse,
     EmployeeDetailResponse,
     EmployeeListResponse,
+    EmployeeRowListResponse,
 )
 from server.app.domain.hr.schemas.sync import (
     DepartmentSyncRequest,
@@ -41,9 +44,12 @@ router = APIRouter(prefix="/hr", tags=["hr"])
 
 @router.get(
     "/employees",
-    response_model=EmployeeListResponse,
+    response_model=None,
     summary="직원 목록 조회",
-    description="직원 목록을 조회합니다 (검색, 필터링, 페이징 지원)",
+    description=(
+        "직원 목록을 조회합니다 (검색, 필터링, 페이징 지원). "
+        "expand_concurrent=true 시 겸직 데이터를 CONCUR 기준으로 다중 ROW 전개하여 반환합니다."
+    ),
 )
 async def get_employees(
     search: str | None = Query(None, description="검색어 (이름 또는 사번)"),
@@ -52,8 +58,15 @@ async def get_employees(
     dept_code: str | None = Query(None, description="부서 코드 필터"),
     page: int = Query(1, ge=1, description="페이지 번호 (1부터 시작)"),
     size: int = Query(20, ge=1, le=100, description="페이지 크기 (1-100)"),
+    expand_concurrent: bool = Query(
+        False,
+        description=(
+            "겸직 전개 모드 (기본: False). "
+            "True이면 CONCUR 기준으로 겸직자를 다중 ROW로 전개하여 EmployeeRowListResponse 반환"
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
-) -> EmployeeListResponse:
+) -> Union[EmployeeListResponse, EmployeeRowListResponse]:
     """
     직원 목록을 조회합니다.
 
@@ -64,10 +77,12 @@ async def get_employees(
         dept_code: 부서 코드 필터
         page: 페이지 번호
         size: 페이지 크기
+        expand_concurrent: 겸직 전개 모드 (True: CONCUR 기준 다중 ROW, False: 기존 단일 ROW)
         db: 데이터베이스 세션
 
     Returns:
-        EmployeeListResponse: 직원 목록 및 페이징 정보
+        expand_concurrent=False: EmployeeListResponse (기존 동작)
+        expand_concurrent=True: EmployeeRowListResponse (겸직 전개)
     """
     logger.info(
         "직원 목록 조회",
@@ -78,10 +93,22 @@ async def get_employees(
             "dept_code": dept_code,
             "page": page,
             "size": size,
+            "expand_concurrent": expand_concurrent,
         },
     )
 
     service = EmployeeService(db)
+
+    if expand_concurrent:
+        return await service.get_employee_row_list(
+            search=search,
+            on_work_yn=on_work_yn,
+            position_code=position_code,
+            dept_code=dept_code,
+            page=page,
+            size=size,
+        )
+
     return await service.get_employee_list(
         search=search,
         on_work_yn=on_work_yn,

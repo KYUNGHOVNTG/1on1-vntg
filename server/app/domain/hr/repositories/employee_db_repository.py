@@ -5,8 +5,9 @@ SQLAlchemy를 사용하여 실제 DB에 접근하는 Repository 구현체입니�
 """
 
 from typing import Any, Dict, List, Optional, Tuple
-from sqlalchemy import and_, select, func, or_
+from sqlalchemy import and_, func, literal, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from server.app.domain.hr.repositories.employee_repository import IEmployeeRepository
 from server.app.domain.hr.models import HRMgnt, HRMgntConcur, CMDepartment
@@ -115,6 +116,162 @@ class EmployeeDBRepository(IEmployeeRepository):
             )
 
         return employees, total
+
+    async def find_all_expanded(
+        self,
+        search: Optional[str] = None,
+        on_work_yn: Optional[str] = None,
+        position_code: Optional[str] = None,
+        dept_code: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        겸직 전개 직원 목록을 조회합니다 (CONCUR 기준 다중 ROW)
+
+        - CONCUR 데이터가 없는 직원: HR_MGNT 기본 1 ROW (is_concurrent=False)
+        - CONCUR 데이터가 있는 직원: CONCUR 각 레코드를 1 ROW씩 전개 (is_concurrent=True)
+
+        Returns:
+            (expanded_rows, total_employee_count)
+            total은 전개 전 직원 수 (HR_MGNT 기준)
+        """
+        # ① 전체 직원 수 (전개 전, HR_MGNT 기준)
+        count_stmt = select(func.count(HRMgnt.emp_no))
+        if search:
+            count_stmt = count_stmt.where(
+                or_(
+                    HRMgnt.name_kor.ilike(f"%{search}%"),
+                    HRMgnt.emp_no.ilike(f"%{search}%"),
+                )
+            )
+        if on_work_yn:
+            count_stmt = count_stmt.where(HRMgnt.on_work_yn == on_work_yn)
+        count_result = await self.db.execute(count_stmt)
+        total = count_result.scalar_one()
+
+        # ② CONCUR가 없는 직원 서브쿼리 (일반 1 ROW, is_concurrent=False)
+        emp_no_with_concur_subq = select(HRMgntConcur.emp_no).distinct()
+
+        no_concur_q = (
+            select(
+                HRMgnt.emp_no.label("emp_no"),
+                HRMgnt.user_id.label("user_id"),
+                HRMgnt.name_kor.label("name_kor"),
+                HRMgnt.dept_code.label("dept_code"),
+                CMDepartment.dept_name.label("dept_name"),
+                HRMgnt.position_code.label("position_code"),
+                CodeDetail.code_name.label("position_name"),
+                HRMgnt.on_work_yn.label("on_work_yn"),
+                literal(False).label("is_concurrent"),
+                literal("Y").label("is_main"),
+            )
+            .join(
+                CMDepartment,
+                HRMgnt.dept_code == CMDepartment.dept_code,
+                isouter=True,
+            )
+            .join(
+                CodeDetail,
+                and_(
+                    CodeDetail.code_type == "POSITION",
+                    CodeDetail.code == HRMgnt.position_code,
+                ),
+                isouter=True,
+            )
+            .where(~HRMgnt.emp_no.in_(emp_no_with_concur_subq))
+        )
+        if search:
+            no_concur_q = no_concur_q.where(
+                or_(
+                    HRMgnt.name_kor.ilike(f"%{search}%"),
+                    HRMgnt.emp_no.ilike(f"%{search}%"),
+                )
+            )
+        if on_work_yn:
+            no_concur_q = no_concur_q.where(HRMgnt.on_work_yn == on_work_yn)
+        if position_code:
+            no_concur_q = no_concur_q.where(HRMgnt.position_code == position_code)
+        if dept_code:
+            no_concur_q = no_concur_q.where(HRMgnt.dept_code == dept_code)
+
+        # ③ CONCUR가 있는 직원 서브쿼리 (CONCUR 기준 전개, is_concurrent=True)
+        ConcurDept = aliased(CMDepartment)
+        ConcurCode = aliased(CodeDetail)
+
+        has_concur_q = (
+            select(
+                HRMgnt.emp_no.label("emp_no"),
+                HRMgnt.user_id.label("user_id"),
+                HRMgnt.name_kor.label("name_kor"),
+                HRMgntConcur.dept_code.label("dept_code"),
+                ConcurDept.dept_name.label("dept_name"),
+                HRMgntConcur.position_code.label("position_code"),
+                ConcurCode.code_name.label("position_name"),
+                HRMgnt.on_work_yn.label("on_work_yn"),
+                literal(True).label("is_concurrent"),
+                HRMgntConcur.is_main.label("is_main"),
+            )
+            .join(HRMgntConcur, HRMgnt.emp_no == HRMgntConcur.emp_no)
+            .join(
+                ConcurDept,
+                HRMgntConcur.dept_code == ConcurDept.dept_code,
+                isouter=True,
+            )
+            .join(
+                ConcurCode,
+                and_(
+                    ConcurCode.code_type == "POSITION",
+                    ConcurCode.code == HRMgntConcur.position_code,
+                ),
+                isouter=True,
+            )
+        )
+        if search:
+            has_concur_q = has_concur_q.where(
+                or_(
+                    HRMgnt.name_kor.ilike(f"%{search}%"),
+                    HRMgnt.emp_no.ilike(f"%{search}%"),
+                )
+            )
+        if on_work_yn:
+            has_concur_q = has_concur_q.where(HRMgnt.on_work_yn == on_work_yn)
+        if position_code:
+            has_concur_q = has_concur_q.where(HRMgntConcur.position_code == position_code)
+        if dept_code:
+            has_concur_q = has_concur_q.where(HRMgntConcur.dept_code == dept_code)
+
+        # ④ UNION ALL → 서브쿼리로 감싸서 페이징 적용
+        union_subq = union_all(no_concur_q, has_concur_q).subquery()
+
+        final_q = (
+            select(union_subq)
+            .order_by(union_subq.c.emp_no, union_subq.c.is_main.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+
+        result = await self.db.execute(final_q)
+        rows = result.all()
+
+        expanded: List[Dict[str, Any]] = []
+        for row in rows:
+            expanded.append(
+                {
+                    "emp_no": row.emp_no,
+                    "user_id": row.user_id,
+                    "name_kor": row.name_kor,
+                    "dept_code": row.dept_code,
+                    "dept_name": row.dept_name,
+                    "position_code": row.position_code,
+                    "position_name": row.position_name,
+                    "on_work_yn": row.on_work_yn,
+                    "is_concurrent": row.is_concurrent,
+                    "is_main": row.is_main,
+                }
+            )
+
+        return expanded, total
 
     async def find_by_emp_no(self, emp_no: str) -> Optional[HRMgnt]:
         """사번으로 직원 정보를 조회합니다"""
