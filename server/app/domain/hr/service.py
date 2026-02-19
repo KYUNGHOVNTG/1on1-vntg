@@ -535,30 +535,30 @@ class SyncService:
                     self.db.add(new_employee)
 
                 # =============================================
-                # 겸직 정보 동기화 (HR_MGNT_CONCUR)
-                # concurrent_positions가 전달된 경우 Full Replace 방식으로 처리
-                # (겸직 관계 변경/삭제를 안전하게 반영하기 위해 삭제 후 재삽입)
+                # 겸직 정보 동기화 (HR_MGNT_CONCUR) - Full Replace 방식
+                # concurrent_positions 값에 관계없이 항상 기존 레코드를 삭제 후 재삽입
+                # - 빈 배열([])이면 기존 겸직 레코드만 삭제 (겸직→비겸직 전환 처리)
+                # - 값이 있으면 삭제 후 새 레코드 삽입
                 # =============================================
-                if emp_req.concurrent_positions:
-                    await self.db.flush()  # hr_mgnt PK가 먼저 저장되어야 FK 제약 통과
+                await self.db.flush()  # hr_mgnt PK가 먼저 저장되어야 FK 제약 통과
 
-                    # 기존 겸직 레코드 전체 삭제
-                    await self.db.execute(
-                        sa_delete(HRMgntConcur).where(
-                            HRMgntConcur.emp_no == emp_req.emp_no
-                        )
+                # 기존 겸직 레코드 전체 삭제 (Full Replace)
+                await self.db.execute(
+                    sa_delete(HRMgntConcur).where(
+                        HRMgntConcur.emp_no == emp_req.emp_no
                     )
+                )
 
-                    # 새 겸직 레코드 삽입
-                    for concur in emp_req.concurrent_positions:
-                        new_concur = HRMgntConcur(
-                            emp_no=emp_req.emp_no,
-                            dept_code=concur.dept_code,
-                            is_main=concur.is_main,
-                            position_code=concur.position_code,
-                            in_user=in_user,
-                        )
-                        self.db.add(new_concur)
+                # 새 겸직 레코드 삽입 (concurrent_positions가 있을 때만)
+                for concur in emp_req.concurrent_positions:
+                    new_concur = HRMgntConcur(
+                        emp_no=emp_req.emp_no,
+                        dept_code=concur.dept_code,
+                        is_main=concur.is_main,
+                        position_code=concur.position_code,
+                        in_user=in_user,
+                    )
+                    self.db.add(new_concur)
 
                 success_count += 1
 
