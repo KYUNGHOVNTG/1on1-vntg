@@ -12,11 +12,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Search, Users, Filter, ChevronDown } from 'lucide-react';
+import { Search, Users, Filter } from 'lucide-react';
 import { getEmployeesExpanded, getDepartments } from '../api';
 import { apiClient } from '@/core/api/client';
 import type { EmployeeRow, EmployeeListParams, Department } from '../types';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
+import { Select } from '@/core/ui';
 
 // =============================================
 // 공통코드 타입 (직책 조회용, 로컬 정의)
@@ -31,12 +32,6 @@ interface CodeDetail {
 interface CodeDetailListResult {
   data: CodeDetail[];
 }
-
-// 공통 Select 컴포넌트 인라인 스타일 (재사용 가능)
-const selectClassName =
-  'h-10 w-full px-3 pr-9 border border-gray-200 rounded-xl text-sm ' +
-  'focus:border-[#4950DC] focus:ring-1 focus:ring-[#4950DC] outline-none ' +
-  'bg-white appearance-none cursor-pointer transition-all text-gray-700';
 
 export function EmployeeListPage() {
   // =============================================
@@ -201,68 +196,39 @@ export function EmployeeListPage() {
               </div>
             </div>
 
-            {/* [TASK 2] 재직 여부 - 공통 Select 스타일 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                재직 여부
-              </label>
-              <div className="relative">
-                <select
-                  value={onWorkYn}
-                  onChange={(e) => setOnWorkYn(e.target.value as 'Y' | 'N' | '')}
-                  className={selectClassName}
-                >
-                  <option value="">전체</option>
-                  <option value="Y">재직</option>
-                  <option value="N">퇴직</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              </div>
-            </div>
+            {/* [TASK 2] 재직 여부 - 공통 Select 컴포넌트 */}
+            <Select
+              label="재직 여부"
+              options={[
+                { value: '', label: '전체' },
+                { value: 'Y', label: '재직' },
+                { value: 'N', label: '퇴직' },
+              ]}
+              value={onWorkYn}
+              onChange={(v) => setOnWorkYn(v as 'Y' | 'N' | '')}
+            />
 
             {/* [TASK 3] 직책 - 공통코드 POSITION 연동 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                직책
-              </label>
-              <div className="relative">
-                <select
-                  value={positionCode}
-                  onChange={(e) => setPositionCode(e.target.value)}
-                  className={selectClassName}
-                >
-                  <option value="">전체</option>
-                  {positions.map((pos) => (
-                    <option key={pos.code} value={pos.code}>
-                      {pos.code_name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              </div>
-            </div>
+            <Select
+              label="직책"
+              options={[
+                { value: '', label: '전체' },
+                ...positions.map((pos) => ({ value: pos.code, label: pos.code_name })),
+              ]}
+              value={positionCode}
+              onChange={(v) => setPositionCode(v)}
+            />
 
             {/* [TASK 4] 부서 - cm_department 연동 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                부서
-              </label>
-              <div className="relative">
-                <select
-                  value={deptCode}
-                  onChange={(e) => setDeptCode(e.target.value)}
-                  className={selectClassName}
-                >
-                  <option value="">전체</option>
-                  {departments.map((dept) => (
-                    <option key={dept.dept_code} value={dept.dept_code}>
-                      {dept.dept_name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              </div>
-            </div>
+            <Select
+              label="부서"
+              options={[
+                { value: '', label: '전체' },
+                ...departments.map((dept) => ({ value: dept.dept_code, label: dept.dept_name })),
+              ]}
+              value={deptCode}
+              onChange={(v) => setDeptCode(v)}
+            />
           </div>
 
           {/* 버튼 영역 */}

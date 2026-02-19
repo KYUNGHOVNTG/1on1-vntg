@@ -21,6 +21,16 @@ class DepartmentBase(BaseModel):
     use_yn: str = Field(..., description="사용 여부 (Y/N)")
 
 
+class DepartmentDetailResponse(DepartmentBase):
+    """
+    부서 상세 응답 스키마
+
+    API 응답용 간소화된 부서 상세 정보입니다.
+    """
+
+    dept_head_emp_no: Optional[str] = Field(None, description="부서장 사번")
+
+
 class DepartmentInfo(DepartmentBase):
     """
     부서 상세 정보 스키마
@@ -43,7 +53,7 @@ class DepartmentListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     total: int = Field(..., description="전체 건수")
-    items: List[DepartmentInfo] = Field(..., description="부서 목록")
+    items: List[DepartmentDetailResponse] = Field(..., description="부서 목록")
 
 
 class OrgTreeNode(BaseModel):
@@ -90,16 +100,6 @@ class DepartmentSearchParams(BaseModel):
     search: Optional[str] = Field(None, description="검색어 (부서명, 부서 코드)")
     use_yn: Optional[str] = Field(None, description="사용 여부 (Y/N)")
     upper_dept_code: Optional[str] = Field(None, description="상위 부서 코드")
-
-
-class DepartmentDetailResponse(DepartmentBase):
-    """
-    부서 상세 응답 스키마
-
-    API 응답용 간소화된 부서 상세 정보입니다.
-    """
-
-    dept_head_emp_no: Optional[str] = Field(None, description="부서장 사번")
 
 
 class DepartmentEmployeesResponse(BaseModel):
