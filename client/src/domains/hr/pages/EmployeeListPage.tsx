@@ -8,13 +8,14 @@
  * [TASK 3] 직책 Select - 공통코드 테이블(POSITION) 연동
  * [TASK 4] 부서 Select - cm_department 연동
  * [TASK 5] Backend JOIN - 부서명·직책명 표시 (dept_name, position_name)
+ * [TASK 7] 겸직 전개 목록 표시 및 겸직 라벨 (expand_concurrent=true)
  */
 
 import { useState, useEffect } from 'react';
 import { Search, Users, Filter, ChevronDown } from 'lucide-react';
-import { getEmployees, getDepartments } from '../api';
+import { getEmployeesExpanded, getDepartments } from '../api';
 import { apiClient } from '@/core/api/client';
-import type { Employee, EmployeeListParams, Department } from '../types';
+import type { EmployeeRow, EmployeeListParams, Department } from '../types';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 
 // =============================================
@@ -41,7 +42,7 @@ export function EmployeeListPage() {
   // =============================================
   // State
   // =============================================
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [size] = useState(20);
@@ -119,7 +120,7 @@ export function EmployeeListPage() {
       if (positionCode) params.position_code = positionCode;
       if (deptCode) params.dept_code = deptCode;
 
-      const response = await getEmployees(params);
+      const response = await getEmployeesExpanded(params);
       setEmployees(response.items);
       setTotal(response.total);
       setPages(response.pages);
@@ -340,36 +341,51 @@ export function EmployeeListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {employees.map((employee) => (
-                    <tr
-                      key={employee.emp_no}
-                      onClick={() => handleRowClick(employee.emp_no)}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {employee.emp_no}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        {employee.name_kor}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {employee.dept_name ?? employee.dept_code}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {employee.position_name ?? employee.position_code}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium ${employee.on_work_yn === 'Y'
-                            ? 'bg-green-50 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
-                            }`}
-                        >
-                          {employee.on_work_yn === 'Y' ? '재직' : '퇴직'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {employees.map((employee) => {
+                    // [TASK 7] 겸직 전개 시 동일 emp_no가 여러 ROW로 나타나므로 유일한 key 생성
+                    const rowKey = employee.is_concurrent
+                      ? `${employee.emp_no}_${employee.dept_code}_${employee.is_main}`
+                      : employee.emp_no;
+                    // [TASK 7] 겸직 ROW 여부 (is_concurrent=true 이고 is_main='N'이면 겸직 ROW)
+                    const isConcurrentRow = employee.is_concurrent && employee.is_main === 'N';
+
+                    return (
+                      <tr
+                        key={rowKey}
+                        onClick={() => handleRowClick(employee.emp_no)}
+                        className={`hover:bg-gray-50 cursor-pointer transition-colors ${isConcurrentRow ? 'bg-orange-50/30' : ''}`}
+                      >
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {employee.emp_no}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <span>{employee.name_kor}</span>
+                          {/* [TASK 7] 겸직 ROW에 겸직 라벨 표시 */}
+                          {isConcurrentRow && (
+                            <span className="ml-2 px-1.5 py-0.5 bg-orange-50 text-orange-600 border border-orange-200 rounded text-xs font-medium">
+                              겸직
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {employee.dept_name ?? employee.dept_code}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {employee.position_name ?? employee.position_code}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <span
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium ${employee.on_work_yn === 'Y'
+                              ? 'bg-green-50 text-green-700'
+                              : 'bg-gray-100 text-gray-600'
+                              }`}
+                          >
+                            {employee.on_work_yn === 'Y' ? '재직' : '퇴직'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
