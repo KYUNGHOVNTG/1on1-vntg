@@ -137,6 +137,11 @@ class EmployeeDBRepository(IEmployeeRepository):
             total은 전개 전 직원 수 (HR_MGNT 기준)
         """
         # ① 전체 직원 수 (전개 전, HR_MGNT 기준)
+        # 설계 의도:
+        #   total은 "직원 수" 기준 (겸직 전개로 행이 늘어나도 직원 수는 동일)
+        #   search / on_work_yn 은 HR_MGNT 기준으로 명확하게 필터링 가능
+        #   position_code / dept_code 는 겸직 전개와 결합 시 의미가 모호하므로
+        #   total 산정에서는 제외 (각 서브쿼리에서 전개 행 필터링으로 처리)
         count_stmt = select(func.count(HRMgnt.emp_no))
         if search:
             count_stmt = count_stmt.where(
