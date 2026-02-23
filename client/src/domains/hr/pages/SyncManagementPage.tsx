@@ -38,57 +38,86 @@ export function SyncManagementPage() {
       // 실제 운영 시에는 외부 시스템에서 전달받은 데이터를 사용
       // 목 데이터 기준: concurrent_positions가 없는 직원은 빈 배열 (주소속만 관리)
       // 겸직이 있는 직원은 is_main='Y'(주소속) + is_main='N'(겸직) 레코드 포함
+      // position_code: P001=대표이사, P002=총괄, P003=센터장/실장, P004=팀장, P005=팀원
       const mockEmployees = [
-        // 경영지원팀 (D001)
-        { emp_no: 'E001', user_id: 'user001', name_kor: '김대표', dept_code: 'D001', position_code: 'P001', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E002', user_id: 'user002', name_kor: '이총괄', dept_code: 'D001', position_code: 'P002', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E003', user_id: 'user003', name_kor: '박경영', dept_code: 'D001', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 경영본부 (DEPT001) - 본부장
+        { emp_no: 'EMP001', user_id: 'user001', name_kor: '김철수', dept_code: 'DEPT001', position_code: 'P001', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 기술본부 (DEPT002) - 본부장
+        { emp_no: 'EMP002', user_id: 'user002', name_kor: '이영희', dept_code: 'DEPT002', position_code: 'P001', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 영업본부 (DEPT003) - 본부장
+        { emp_no: 'EMP003', user_id: 'user003', name_kor: '박민수', dept_code: 'DEPT003', position_code: 'P001', on_work_yn: 'Y' as const, concurrent_positions: [] },
 
-        // 개발팀 (D002)
-        // E004: 주소속 D002, 겸직 D003 (디자인팀 협업)
+        // 인사팀 (DEPT011) - 팀장, 겸직: 채용파트(DEPT111)
         {
-          emp_no: 'E004', user_id: 'user004', name_kor: '최개발', dept_code: 'D002', position_code: 'P004', on_work_yn: 'Y' as const,
+          emp_no: 'EMP004', user_id: 'user004', name_kor: '정지훈', dept_code: 'DEPT011', position_code: 'P002', on_work_yn: 'Y' as const,
           concurrent_positions: [
-            { dept_code: 'D002', is_main: 'Y' as const, position_code: 'P004' },
-            { dept_code: 'D003', is_main: 'N' as const, position_code: 'P005' },
+            { dept_code: 'DEPT011', is_main: 'Y' as const, position_code: 'P002' },
+            { dept_code: 'DEPT111', is_main: 'N' as const, position_code: 'P003' },
           ],
         },
-        { emp_no: 'E005', user_id: 'user005', name_kor: '정프론트', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        // E006: 주소속 D002, 겸직 D004 (마케팅팀 기술 지원)
+        // 재무팀 (DEPT012) - 팀장
+        { emp_no: 'EMP005', user_id: 'user005', name_kor: '최수진', dept_code: 'DEPT012', position_code: 'P002', on_work_yn: 'Y' as const, concurrent_positions: [] },
+
+        // 개발1팀 (DEPT021) - 팀장, 겸직: 프론트엔드파트(DEPT211)
         {
-          emp_no: 'E006', user_id: 'user006', name_kor: '강백엔드', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const,
+          emp_no: 'EMP006', user_id: 'user006', name_kor: '강동원', dept_code: 'DEPT021', position_code: 'P002', on_work_yn: 'Y' as const,
           concurrent_positions: [
-            { dept_code: 'D002', is_main: 'Y' as const, position_code: 'P005' },
-            { dept_code: 'D004', is_main: 'N' as const, position_code: 'P005' },
+            { dept_code: 'DEPT021', is_main: 'Y' as const, position_code: 'P002' },
+            { dept_code: 'DEPT211', is_main: 'N' as const, position_code: 'P003' },
           ],
         },
-        { emp_no: 'E007', user_id: 'user007', name_kor: '조풀스택', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        // E008: 주소속 D002, 겸직 D005 (영업팀 기술 지원)
+        // 개발2팀 (DEPT022) - 팀장
+        { emp_no: 'EMP007', user_id: 'user007', name_kor: '윤아름', dept_code: 'DEPT022', position_code: 'P002', on_work_yn: 'Y' as const, concurrent_positions: [] },
+
+        // 영업1팀 (DEPT031) - 팀장, 겸직: 영업지원파트(DEPT311)
         {
-          emp_no: 'E008', user_id: 'user008', name_kor: '윤데이터', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const,
+          emp_no: 'EMP008', user_id: 'user008', name_kor: '조민호', dept_code: 'DEPT031', position_code: 'P002', on_work_yn: 'Y' as const,
           concurrent_positions: [
-            { dept_code: 'D002', is_main: 'Y' as const, position_code: 'P005' },
-            { dept_code: 'D005', is_main: 'N' as const, position_code: 'P005' },
+            { dept_code: 'DEPT031', is_main: 'Y' as const, position_code: 'P002' },
+            { dept_code: 'DEPT311', is_main: 'N' as const, position_code: 'P003' },
           ],
         },
-        { emp_no: 'E009', user_id: 'user009', name_kor: '장인프라', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E010', user_id: 'user010', name_kor: '임모바일', dept_code: 'D002', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 영업2팀 (DEPT032) - 팀장
+        { emp_no: 'EMP009', user_id: 'user009', name_kor: '한지민', dept_code: 'DEPT032', position_code: 'P002', on_work_yn: 'Y' as const, concurrent_positions: [] },
 
-        // 디자인팀 (D003)
-        { emp_no: 'E011', user_id: 'user011', name_kor: '한디자인', dept_code: 'D003', position_code: 'P004', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E012', user_id: 'user012', name_kor: '오UI', dept_code: 'D003', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E013', user_id: 'user013', name_kor: '서UX', dept_code: 'D003', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E014', user_id: 'user014', name_kor: '신그래픽', dept_code: 'D003', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 채용파트 (DEPT111) - 파트장
+        { emp_no: 'EMP010', user_id: 'user010', name_kor: '오세훈', dept_code: 'DEPT111', position_code: 'P003', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 평가파트 (DEPT112) - 파트장
+        { emp_no: 'EMP011', user_id: 'user011', name_kor: '송혜교', dept_code: 'DEPT112', position_code: 'P003', on_work_yn: 'Y' as const, concurrent_positions: [] },
 
-        // 마케팅팀 (D004)
-        { emp_no: 'E015', user_id: 'user015', name_kor: '권마케팅', dept_code: 'D004', position_code: 'P004', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E016', user_id: 'user016', name_kor: '황컨텐츠', dept_code: 'D004', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E017', user_id: 'user017', name_kor: '배SNS', dept_code: 'D004', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 프론트엔드파트 (DEPT211) - 파트장
+        { emp_no: 'EMP012', user_id: 'user012', name_kor: '임시완', dept_code: 'DEPT211', position_code: 'P003', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 백엔드파트 (DEPT212) - 파트장
+        { emp_no: 'EMP013', user_id: 'user013', name_kor: '배수지', dept_code: 'DEPT212', position_code: 'P003', on_work_yn: 'Y' as const, concurrent_positions: [] },
 
-        // 영업팀 (D005)
-        { emp_no: 'E018', user_id: 'user018', name_kor: '성영업', dept_code: 'D005', position_code: 'P004', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E019', user_id: 'user019', name_kor: '곽세일즈', dept_code: 'D005', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
-        { emp_no: 'E020', user_id: 'user020', name_kor: '류영업', dept_code: 'D005', position_code: 'P005', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // AI파트 (DEPT221) - 파트장
+        { emp_no: 'EMP014', user_id: 'user014', name_kor: '남주혁', dept_code: 'DEPT221', position_code: 'P003', on_work_yn: 'Y' as const, concurrent_positions: [] },
+        // 영업지원파트 (DEPT311) - 파트장
+        { emp_no: 'EMP015', user_id: 'user015', name_kor: '전지현', dept_code: 'DEPT311', position_code: 'P003', on_work_yn: 'Y' as const, concurrent_positions: [] },
+
+        // 백엔드파트 (DEPT212) - 팀원, 겸직: 개발2팀(DEPT022)
+        {
+          emp_no: 'EMP016', user_id: 'user016', name_kor: '유재석', dept_code: 'DEPT212', position_code: 'P004', on_work_yn: 'Y' as const,
+          concurrent_positions: [
+            { dept_code: 'DEPT212', is_main: 'Y' as const, position_code: 'P004' },
+            { dept_code: 'DEPT022', is_main: 'N' as const, position_code: 'P004' },
+          ],
+        },
+        // AI파트 (DEPT221) - 팀원, 겸직: 개발1팀(DEPT021)
+        {
+          emp_no: 'EMP017', user_id: 'user017', name_kor: '강호동', dept_code: 'DEPT221', position_code: 'P004', on_work_yn: 'Y' as const,
+          concurrent_positions: [
+            { dept_code: 'DEPT221', is_main: 'Y' as const, position_code: 'P004' },
+            { dept_code: 'DEPT021', is_main: 'N' as const, position_code: 'P004' },
+          ],
+        },
+
+        // 인사팀 (DEPT011) - 퇴직자
+        { emp_no: 'EMP018', user_id: 'user018', name_kor: '신동엽', dept_code: 'DEPT011', position_code: 'P004', on_work_yn: 'N' as const, concurrent_positions: [] },
+        // 개발1팀 (DEPT021) - 퇴직자
+        { emp_no: 'EMP019', user_id: 'user019', name_kor: '김구라', dept_code: 'DEPT021', position_code: 'P004', on_work_yn: 'N' as const, concurrent_positions: [] },
+        // 영업1팀 (DEPT031) - 퇴직자
+        { emp_no: 'EMP020', user_id: 'user020', name_kor: '서장훈', dept_code: 'DEPT031', position_code: 'P004', on_work_yn: 'N' as const, concurrent_positions: [] },
       ];
 
       const result = await syncEmployees(mockEmployees);
@@ -104,14 +133,32 @@ export function SyncManagementPage() {
 
   const handleSyncDepartments = async () => {
     try {
-      // Mock 데이터를 사용하여 동기화 테스트 (5개 부서)
+      // Mock 데이터를 사용하여 동기화 테스트 (15개 부서, 3depth 계층 구조)
       // 실제 운영 시에는 외부 시스템에서 전달받은 데이터를 사용
       const mockDepartments = [
-        { dept_code: 'D001', dept_name: '경영지원팀', upper_dept_code: null, dept_head_emp_no: 'E002', use_yn: 'Y' as const },
-        { dept_code: 'D002', dept_name: '개발팀', upper_dept_code: null, dept_head_emp_no: 'E004', use_yn: 'Y' as const },
-        { dept_code: 'D003', dept_name: '디자인팀', upper_dept_code: null, dept_head_emp_no: 'E011', use_yn: 'Y' as const },
-        { dept_code: 'D004', dept_name: '마케팅팀', upper_dept_code: null, dept_head_emp_no: 'E015', use_yn: 'Y' as const },
-        { dept_code: 'D005', dept_name: '영업팀', upper_dept_code: null, dept_head_emp_no: 'E018', use_yn: 'Y' as const },
+        // Level 1: 본부
+        { dept_code: 'DEPT001', dept_name: '경영본부',       upper_dept_code: null,      dept_head_emp_no: 'EMP001', use_yn: 'Y' as const },
+        { dept_code: 'DEPT002', dept_name: '기술본부',       upper_dept_code: null,      dept_head_emp_no: 'EMP002', use_yn: 'Y' as const },
+        { dept_code: 'DEPT003', dept_name: '영업본부',       upper_dept_code: null,      dept_head_emp_no: 'EMP003', use_yn: 'Y' as const },
+        // Level 2: 팀 (경영본부 산하)
+        { dept_code: 'DEPT011', dept_name: '인사팀',         upper_dept_code: 'DEPT001', dept_head_emp_no: 'EMP004', use_yn: 'Y' as const },
+        { dept_code: 'DEPT012', dept_name: '재무팀',         upper_dept_code: 'DEPT001', dept_head_emp_no: 'EMP005', use_yn: 'Y' as const },
+        // Level 2: 팀 (기술본부 산하)
+        { dept_code: 'DEPT021', dept_name: '개발1팀',        upper_dept_code: 'DEPT002', dept_head_emp_no: 'EMP006', use_yn: 'Y' as const },
+        { dept_code: 'DEPT022', dept_name: '개발2팀',        upper_dept_code: 'DEPT002', dept_head_emp_no: 'EMP007', use_yn: 'Y' as const },
+        // Level 2: 팀 (영업본부 산하)
+        { dept_code: 'DEPT031', dept_name: '영업1팀',        upper_dept_code: 'DEPT003', dept_head_emp_no: 'EMP008', use_yn: 'Y' as const },
+        { dept_code: 'DEPT032', dept_name: '영업2팀',        upper_dept_code: 'DEPT003', dept_head_emp_no: 'EMP009', use_yn: 'Y' as const },
+        // Level 3: 파트 (인사팀 산하)
+        { dept_code: 'DEPT111', dept_name: '채용파트',       upper_dept_code: 'DEPT011', dept_head_emp_no: 'EMP010', use_yn: 'Y' as const },
+        { dept_code: 'DEPT112', dept_name: '평가파트',       upper_dept_code: 'DEPT011', dept_head_emp_no: 'EMP011', use_yn: 'Y' as const },
+        // Level 3: 파트 (개발1팀 산하)
+        { dept_code: 'DEPT211', dept_name: '프론트엔드파트', upper_dept_code: 'DEPT021', dept_head_emp_no: 'EMP012', use_yn: 'Y' as const },
+        { dept_code: 'DEPT212', dept_name: '백엔드파트',     upper_dept_code: 'DEPT021', dept_head_emp_no: 'EMP013', use_yn: 'Y' as const },
+        // Level 3: 파트 (개발2팀 산하)
+        { dept_code: 'DEPT221', dept_name: 'AI파트',         upper_dept_code: 'DEPT022', dept_head_emp_no: 'EMP014', use_yn: 'Y' as const },
+        // Level 3: 파트 (영업1팀 산하)
+        { dept_code: 'DEPT311', dept_name: '영업지원파트',   upper_dept_code: 'DEPT031', dept_head_emp_no: 'EMP015', use_yn: 'Y' as const },
       ];
 
       const result = await syncDepartments(mockDepartments);
