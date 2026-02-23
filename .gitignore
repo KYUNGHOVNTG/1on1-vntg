@@ -65,6 +65,7 @@ logs/
 .env
 .env.local
 .env.*.local
+gcp-key.json
 
 # Alembic
 # alembic/versions/*.py  # 마이그레이션 파일은 커밋해야 함

@@ -55,3 +55,5 @@ watchfiles==0.21.0
 psycopg2==2.9.11
 
 apscheduler==3.10.4
+
+google-cloud-storage>=2.0.0
