@@ -106,3 +106,32 @@ class IEmployeeRepository(ABC):
             int: 소속 직원 수
         """
         pass
+
+    @abstractmethod
+    async def count_main_by_dept_code(self, dept_code: str) -> int:
+        """
+        부서별 주소속 직원 수를 집계합니다 (hr_mgnt.dept_code 기준).
+
+        Args:
+            dept_code: 부서 코드
+
+        Returns:
+            int: 주소속 직원 수
+        """
+        pass
+
+    @abstractmethod
+    async def count_concurrent_by_dept_code(self, dept_code: str) -> int:
+        """
+        부서별 겸직 직원 수를 집계합니다.
+
+        hr_mgnt_concur에 등록되어 있고 is_main='N'이며
+        주소속 부서가 해당 부서가 아닌 직원 수를 반환합니다.
+
+        Args:
+            dept_code: 부서 코드
+
+        Returns:
+            int: 겸직 직원 수
+        """
+        pass

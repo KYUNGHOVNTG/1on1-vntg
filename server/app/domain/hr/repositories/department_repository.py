@@ -6,7 +6,7 @@ Mock Repository와 Real Repository가 이 인터페이스를 구현합니다.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from server.app.domain.hr.models import CMDepartment, CMDepartmentTree
 
@@ -103,5 +103,28 @@ class IDepartmentRepository(ABC):
 
         Returns:
             Optional[str]: 최신 연도 (YYYY) 또는 None
+        """
+        pass
+
+    @abstractmethod
+    async def find_department_info_with_upper(
+        self, dept_code: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        부서 상세 정보를 상위부서명, 부서장 직책명과 함께 조회합니다.
+
+        cm_department self-JOIN으로 상위부서명을, hr_mgnt + cm_codedetail JOIN으로
+        부서장 성명 및 직책명을 함께 반환합니다.
+
+        Args:
+            dept_code: 부서 코드
+
+        Returns:
+            Optional[Dict[str, Any]]: {
+                "department": CMDepartment,
+                "upper_dept_name": Optional[str],
+                "dept_head_name": Optional[str],
+                "dept_head_position": Optional[str],
+            } 또는 None
         """
         pass

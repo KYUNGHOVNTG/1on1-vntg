@@ -4,12 +4,14 @@ HR 도메인 - 부서 정보 DB Repository
 SQLAlchemy를 사용하여 실제 DB에 접근하는 Repository 구현체입니다.
 """
 
-from typing import List, Optional
-from sqlalchemy import select, or_, func
+from typing import Any, Dict, List, Optional
+from sqlalchemy import and_, select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from server.app.domain.hr.repositories.department_repository import IDepartmentRepository
-from server.app.domain.hr.models import CMDepartment, CMDepartmentTree
+from server.app.domain.hr.models import CMDepartment, CMDepartmentTree, HRMgnt
+from server.app.domain.common.models import CodeDetail
 
 
 class DepartmentDBRepository(IDepartmentRepository):
@@ -109,3 +111,51 @@ class DepartmentDBRepository(IDepartmentRepository):
         stmt = select(func.max(CMDepartmentTree.std_year))
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def find_department_info_with_upper(
+        self, dept_code: str
+    ) -> Optional[Dict[str, Any]]:
+        """부서 상세 정보를 상위부서명, 부서장 직책명과 함께 조회합니다"""
+        UpperDept = aliased(CMDepartment)
+
+        stmt = (
+            select(
+                CMDepartment,
+                UpperDept.dept_name.label("upper_dept_name"),
+                HRMgnt.name_kor.label("dept_head_name"),
+                CodeDetail.code_name.label("dept_head_position"),
+            )
+            .join(
+                UpperDept,
+                CMDepartment.upper_dept_code == UpperDept.dept_code,
+                isouter=True,
+            )
+            .join(
+                HRMgnt,
+                CMDepartment.dept_head_emp_no == HRMgnt.emp_no,
+                isouter=True,
+            )
+            .join(
+                CodeDetail,
+                and_(
+                    CodeDetail.code_type == "POSITION",
+                    CodeDetail.code == HRMgnt.position_code,
+                ),
+                isouter=True,
+            )
+            .where(CMDepartment.dept_code == dept_code)
+        )
+
+        result = await self.db.execute(stmt)
+        row = result.one_or_none()
+
+        if not row:
+            return None
+
+        department: CMDepartment = row[0]
+        return {
+            "department": department,
+            "upper_dept_name": row.upper_dept_name,
+            "dept_head_name": row.dept_head_name,
+            "dept_head_position": row.dept_head_position,
+        }
