@@ -298,32 +298,62 @@ class EmployeeDBRepository(IEmployeeRepository):
 
     async def find_by_dept_code(
         self, dept_code: str, include_concurrent: bool = True
-    ) -> List[HRMgnt]:
-        """부서 코드로 소속 직원을 조회합니다"""
+    ) -> List[Dict[str, Any]]:
+        """부서 코드로 소속 직원을 조회합니다 (직책명 포함)"""
+
+        def _build_emp_query(dept_code_filter: str | None = None, emp_nos: list | None = None):
+            """직책명(CodeDetail) JOIN 포함 직원 조회 쿼리 생성 헬퍼"""
+            q = (
+                select(
+                    HRMgnt,
+                    CodeDetail.code_name.label("position_name"),
+                )
+                .join(
+                    CodeDetail,
+                    and_(
+                        CodeDetail.code_type == "POSITION",
+                        CodeDetail.code == HRMgnt.position_code,
+                    ),
+                    isouter=True,
+                )
+            )
+            if dept_code_filter is not None:
+                q = q.where(HRMgnt.dept_code == dept_code_filter)
+            if emp_nos is not None:
+                q = q.where(HRMgnt.emp_no.in_(emp_nos))
+            return q
+
+        def _row_to_dict(row: Any) -> Dict[str, Any]:
+            emp: HRMgnt = row[0]
+            return {
+                "emp_no": emp.emp_no,
+                "user_id": emp.user_id,
+                "name_kor": emp.name_kor,
+                "dept_code": emp.dept_code,
+                "position_code": emp.position_code,
+                "position_name": row.position_name,
+                "on_work_yn": emp.on_work_yn,
+            }
+
         # 주소속 직원 조회
-        stmt = select(HRMgnt).where(HRMgnt.dept_code == dept_code)
-        result = await self.db.execute(stmt)
-        employees = list(result.scalars().all())
+        result = await self.db.execute(_build_emp_query(dept_code_filter=dept_code))
+        employees = [_row_to_dict(row) for row in result.all()]
 
         # 겸직자 포함
         if include_concurrent:
-            # 겸직 부서로 등록된 직원의 사번 조회
             concurrent_stmt = select(HRMgntConcur.emp_no).where(
                 HRMgntConcur.dept_code == dept_code, HRMgntConcur.is_main == "N"
             )
             concurrent_result = await self.db.execute(concurrent_stmt)
             concurrent_emp_nos = [row[0] for row in concurrent_result.all()]
 
-            # 겸직 직원 정보 조회 (주소속이 해당 부서가 아닌 경우만)
             if concurrent_emp_nos:
-                concurrent_employees_stmt = select(HRMgnt).where(
-                    HRMgnt.emp_no.in_(concurrent_emp_nos),
-                    HRMgnt.dept_code != dept_code,
-                )
                 concurrent_employees_result = await self.db.execute(
-                    concurrent_employees_stmt
+                    _build_emp_query(emp_nos=concurrent_emp_nos).where(
+                        HRMgnt.dept_code != dept_code
+                    )
                 )
-                employees.extend(list(concurrent_employees_result.scalars().all()))
+                employees.extend([_row_to_dict(row) for row in concurrent_employees_result.all()])
 
         return employees
 
@@ -331,8 +361,26 @@ class EmployeeDBRepository(IEmployeeRepository):
         self, dept_code: str, include_concurrent: bool = True
     ) -> int:
         """부서별 소속 직원 수를 집계합니다"""
-        employees = await self.find_by_dept_code(dept_code, include_concurrent)
-        return len(employees)
+        # 주소속
+        main_stmt = select(func.count(HRMgnt.emp_no)).where(HRMgnt.dept_code == dept_code)
+        main_result = await self.db.execute(main_stmt)
+        total = main_result.scalar_one()
+
+        if include_concurrent:
+            # 겸직 (is_main='N', 주소속 부서 != 조회 부서)
+            concur_stmt = (
+                select(func.count(HRMgntConcur.emp_no))
+                .join(HRMgnt, HRMgntConcur.emp_no == HRMgnt.emp_no)
+                .where(
+                    HRMgntConcur.dept_code == dept_code,
+                    HRMgntConcur.is_main == "N",
+                    HRMgnt.dept_code != dept_code,
+                )
+            )
+            concur_result = await self.db.execute(concur_stmt)
+            total += concur_result.scalar_one()
+
+        return total
 
     async def count_main_by_dept_code(self, dept_code: str) -> int:
         """부서별 주소속 직원 수를 집계합니다 (hr_mgnt.dept_code 기준)"""
