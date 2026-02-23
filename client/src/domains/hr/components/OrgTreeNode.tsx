@@ -4,8 +4,8 @@
  * 개별 부서 노드를 렌더링하고 하위 부서를 재귀적으로 표시합니다.
  */
 
-import { useState } from 'react';
-import { ChevronRight, ChevronDown, Building2, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Minus, Building2, Users } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import type { OrgTreeNode } from '../types';
 
@@ -14,6 +14,19 @@ interface OrgTreeNodeProps {
   level: number;
   selectedNode: OrgTreeNode | null;
   onNodeClick: (node: OrgTreeNode) => void;
+  expandAll?: boolean; // undefined: 개별 제어, true: 전체 펼침, false: 전체 접기
+  onExpandAllReset?: () => void; // 개별 토글 시 부모의 expandAll을 undefined로 리셋
+}
+
+const LEVEL_PADDING: Record<number, string> = {
+  0: 'pl-0',
+  1: 'pl-6',
+  2: 'pl-12',
+  3: 'pl-[72px]',
+};
+
+function getLevelPadding(level: number): string {
+  return LEVEL_PADDING[Math.min(level, 3)] ?? 'pl-[72px]';
 }
 
 export function OrgTreeNodeComponent({
@@ -21,6 +34,8 @@ export function OrgTreeNodeComponent({
   level,
   selectedNode,
   onNodeClick,
+  expandAll,
+  onExpandAllReset,
 }: OrgTreeNodeProps) {
   // =============================================
   // State
@@ -30,12 +45,22 @@ export function OrgTreeNodeComponent({
   const isSelected = selectedNode?.dept_code === node.dept_code;
 
   // =============================================
+  // Effects
+  // =============================================
+  useEffect(() => {
+    if (expandAll !== undefined && hasChildren) {
+      setIsExpanded(expandAll);
+    }
+  }, [expandAll, hasChildren]);
+
+  // =============================================
   // Handlers
   // =============================================
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (hasChildren) {
-      setIsExpanded(!isExpanded);
+      setIsExpanded((prev) => !prev);
+      onExpandAllReset?.();
     }
   };
 
@@ -47,7 +72,7 @@ export function OrgTreeNodeComponent({
   // Render
   // =============================================
   return (
-    <div className="select-none">
+    <div className={cn('select-none', getLevelPadding(level))}>
       {/* 노드 본체 */}
       <div
         className={cn(
@@ -56,24 +81,23 @@ export function OrgTreeNodeComponent({
             ? 'bg-[#4950DC] bg-opacity-10 border-2 border-[#4950DC]'
             : 'hover:bg-gray-50 border-2 border-transparent'
         )}
-        style={{ marginLeft: `${level * 24}px` }}
         onClick={handleClick}
       >
-        {/* 확장/축소 아이콘 */}
+        {/* 확장/축소 버튼 (+/-) */}
         <button
           onClick={handleToggle}
           className={cn(
-            'flex-shrink-0 w-5 h-5 flex items-center justify-center rounded transition-colors',
+            'flex-shrink-0 w-5 h-5 border border-gray-300 rounded flex items-center justify-center transition-colors',
             hasChildren
-              ? 'hover:bg-gray-200 text-gray-600'
+              ? 'hover:bg-gray-100 text-gray-600'
               : 'invisible'
           )}
         >
           {hasChildren &&
             (isExpanded ? (
-              <ChevronDown className="w-4 h-4" />
+              <Minus className="w-3 h-3" />
             ) : (
-              <ChevronRight className="w-4 h-4" />
+              <Plus className="w-3 h-3" />
             ))}
         </button>
 
@@ -116,25 +140,11 @@ export function OrgTreeNodeComponent({
             </div>
           </div>
         </div>
-
-        {/* 레벨 배지 */}
-        <div
-          className={cn(
-            'flex-shrink-0 px-2 py-1 rounded-lg text-xs font-medium',
-            level === 0
-              ? 'bg-blue-50 text-blue-700'
-              : level === 1
-              ? 'bg-green-50 text-green-700'
-              : 'bg-gray-100 text-gray-600'
-          )}
-        >
-          L{node.disp_lvl}
-        </div>
       </div>
 
       {/* 하위 부서 (재귀) */}
       {hasChildren && isExpanded && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-1 space-y-1">
           {node.children.map((child) => (
             <OrgTreeNodeComponent
               key={child.dept_code}
@@ -142,6 +152,8 @@ export function OrgTreeNodeComponent({
               level={level + 1}
               selectedNode={selectedNode}
               onNodeClick={onNodeClick}
+              expandAll={expandAll}
+              onExpandAllReset={onExpandAllReset}
             />
           ))}
         </div>

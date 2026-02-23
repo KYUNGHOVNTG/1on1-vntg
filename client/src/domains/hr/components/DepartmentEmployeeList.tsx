@@ -87,7 +87,7 @@ export function DepartmentEmployeeList({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {employee.position_code}
+                    {employee.position_name ?? employee.position_code}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <span

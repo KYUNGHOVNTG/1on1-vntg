@@ -157,7 +157,7 @@ export async function getOrgTree(year?: number): Promise<OrgTreeNode[]> {
  * @returns 부서 상세 정보 (부서장 정보 + 직원 수 포함)
  */
 export async function getDepartmentById(deptCode: string): Promise<DepartmentDetail> {
-  const response = await apiClient.get<DepartmentDetail>(`/v1/hr/departments/${deptCode}`);
+  const response = await apiClient.get<DepartmentDetail>(`/v1/hr/departments/${deptCode}/info`);
   return response.data;
 }
 
