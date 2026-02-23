@@ -6,11 +6,29 @@ JSON 파일을 데이터 소스로 사용하는 Mock 구현체입니다.
 
 import json
 import os
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 
 from server.app.domain.hr.repositories.employee_repository import IEmployeeRepository
 from server.app.domain.hr.models import HRMgnt, HRMgntConcur, CMUser
+
+# 직책 코드 → 직책명 매핑 (Mock 환경용)
+_POSITION_NAME_MAP: Dict[str, str] = {
+    "POS001": "대표이사",
+    "POS002": "이사",
+    "POS003": "부장",
+    "POS004": "차장",
+    "POS005": "과장",
+    "POS006": "대리",
+    "POS007": "주임",
+    "POS008": "사원",
+    # 기존 마이그레이션 시드 코드 (P001 형식)
+    "P001": "대표이사",
+    "P002": "이사",
+    "P003": "부장",
+    "P004": "과장",
+    "P005": "대리",
+}
 
 
 class EmployeeMockRepository(IEmployeeRepository):
@@ -135,16 +153,28 @@ class EmployeeMockRepository(IEmployeeRepository):
                 result.append(self._dict_to_concurrent(concurrent_data))
         return result
 
+    def _emp_data_to_dict(self, emp_data: dict) -> Dict[str, Any]:
+        """직원 JSON 데이터를 서비스 호환 dict로 변환 (position_name 포함)"""
+        return {
+            "emp_no": emp_data["emp_no"],
+            "user_id": emp_data["user_id"],
+            "name_kor": emp_data["name_kor"],
+            "dept_code": emp_data["dept_code"],
+            "position_code": emp_data["position_code"],
+            "position_name": _POSITION_NAME_MAP.get(emp_data["position_code"]),
+            "on_work_yn": emp_data["on_work_yn"],
+        }
+
     async def find_by_dept_code(
         self, dept_code: str, include_concurrent: bool = True
-    ) -> List[HRMgnt]:
-        """부서 코드로 소속 직원을 조회합니다"""
-        result = []
+    ) -> List[Dict[str, Any]]:
+        """부서 코드로 소속 직원을 조회합니다 (직책명 포함)"""
+        result: List[Dict[str, Any]] = []
 
         # 주소속 직원 조회
         for emp_data in self.employees:
             if emp_data["dept_code"] == dept_code:
-                result.append(self._dict_to_employee(emp_data))
+                result.append(self._emp_data_to_dict(emp_data))
 
         # 겸직자 포함
         if include_concurrent:
@@ -159,7 +189,7 @@ class EmployeeMockRepository(IEmployeeRepository):
             for emp_no in concurrent_emp_nos:
                 for emp_data in self.employees:
                     if emp_data["emp_no"] == emp_no and emp_data["dept_code"] != dept_code:
-                        result.append(self._dict_to_employee(emp_data))
+                        result.append(self._emp_data_to_dict(emp_data))
 
         return result
 
@@ -169,3 +199,21 @@ class EmployeeMockRepository(IEmployeeRepository):
         """부서별 소속 직원 수를 집계합니다"""
         employees = await self.find_by_dept_code(dept_code, include_concurrent)
         return len(employees)
+
+    async def count_main_by_dept_code(self, dept_code: str) -> int:
+        """부서별 주소속 직원 수를 집계합니다 (hr_mgnt.dept_code 기준)"""
+        return sum(1 for emp in self.employees if emp["dept_code"] == dept_code)
+
+    async def count_concurrent_by_dept_code(self, dept_code: str) -> int:
+        """부서별 겸직 직원 수를 집계합니다 (is_main='N', 주소속 부서 != 조회 부서)"""
+        concurrent_emp_nos = {
+            c["emp_no"]
+            for c in self.concurrent_positions
+            if c["dept_code"] == dept_code and c["is_main"] == "N"
+        }
+        # 주소속이 다른 직원만 카운트
+        return sum(
+            1
+            for emp in self.employees
+            if emp["emp_no"] in concurrent_emp_nos and emp["dept_code"] != dept_code
+        )

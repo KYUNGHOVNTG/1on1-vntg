@@ -150,3 +150,47 @@ class DepartmentMockRepository(IDepartmentRepository):
 
         years = {node["std_year"] for node in self.org_tree}
         return max(years) if years else None
+
+    async def find_department_info_with_upper(
+        self, dept_code: str
+    ) -> Optional[dict]:
+        """부서 상세 정보를 상위부서명, 부서장 정보와 함께 조회합니다 (Mock 구현)"""
+        target = next(
+            (d for d in self.departments if d["dept_code"] == dept_code), None
+        )
+        if not target:
+            return None
+
+        department = self._dict_to_department(target)
+
+        # 상위 부서명 조회
+        upper_dept_name: Optional[str] = None
+        if target.get("upper_dept_code"):
+            upper = next(
+                (d for d in self.departments if d["dept_code"] == target["upper_dept_code"]),
+                None,
+            )
+            if upper:
+                upper_dept_name = upper["dept_name"]
+
+        # 부서장 정보 조회 (org_tree에서 name_kor 활용)
+        dept_head_name: Optional[str] = None
+        dept_head_position: Optional[str] = None
+        if target.get("dept_head_emp_no"):
+            tree_node = next(
+                (
+                    n
+                    for n in self.org_tree
+                    if n["dept_code"] == dept_code and n.get("name_kor")
+                ),
+                None,
+            )
+            if tree_node:
+                dept_head_name = tree_node.get("name_kor")
+
+        return {
+            "department": department,
+            "upper_dept_name": upper_dept_name,
+            "dept_head_name": dept_head_name,
+            "dept_head_position": dept_head_position,
+        }

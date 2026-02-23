@@ -426,6 +426,30 @@ server/app/domain/{domain_name}/
 - 인라인 스타일 절대 금지 → Tailwind 유틸리티 클래스 사용
 - 조건부 클래스: `cn()` 유틸리티 사용 (`import { cn } from '@/utils/cn'`)
 
+#### ⚠️ Tailwind v4 Opacity 필수 규칙 (재발 금지)
+
+**`bg-opacity-*` 유틸리티는 Tailwind v4에서 동작하지 않습니다!**
+- `bg-opacity-*`를 단독 클래스로 사용하면 투명도가 무시되어 **배경이 100% 불투명**하게 렌더링됩니다.
+- 이로 인해 선택 상태 등에서 배경이 짙은 포인트 컬러로 덮여 **텍스트가 완전히 보이지 않는 버그**가 발생합니다.
+
+```tsx
+// ❌ 잘못된 사용 (Tailwind v4에서 bg-opacity-* 무시됨)
+'bg-[#4950DC] bg-opacity-10'   // → 실제 배경: 100% 불투명 #4950DC
+
+// ✅ 올바른 사용 (슬래시 수식어)
+'bg-[#4950DC]/10'              // → 실제 배경: 10% 투명도 연보라색
+```
+
+같은 원칙이 `text-opacity-*`, `border-opacity-*` 등 모든 opacity 유틸리티에 적용됩니다:
+```tsx
+// ❌ 잘못된 사용
+'text-[#4950DC] text-opacity-50'
+// ✅ 올바른 사용
+'text-[#4950DC]/50'
+```
+
+**선택(active/selected) 상태 클래스 작성 시 반드시 확인**하세요.
+
 ### API 통신 규칙
 - 직접 axios import 금지 → `import { apiClient } from '@/core/api/client'` 사용
 

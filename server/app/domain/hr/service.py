@@ -431,19 +431,20 @@ class DepartmentService:
         if not department:
             raise NotFoundException(f"부서를 찾을 수 없습니다: {dept_code}")
 
-        # 소속 직원 조회
+        # 소속 직원 조회 (position_name JOIN 포함)
         employees = await self.employee_repo.find_by_dept_code(
             dept_code, include_concurrent=include_concurrent
         )
 
         return [
             EmployeeDetailResponse(
-                emp_no=emp.emp_no,
-                user_id=emp.user_id,
-                name_kor=emp.name_kor,
-                dept_code=emp.dept_code,
-                position_code=emp.position_code,
-                on_work_yn=emp.on_work_yn,
+                emp_no=emp["emp_no"],
+                user_id=emp["user_id"],
+                name_kor=emp["name_kor"],
+                dept_code=emp["dept_code"],
+                position_code=emp["position_code"],
+                position_name=emp.get("position_name"),
+                on_work_yn=emp["on_work_yn"],
             )
             for emp in employees
         ]

@@ -6,7 +6,7 @@ Mock Repository와 Real Repository가 이 인터페이스를 구현합니다.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from server.app.domain.hr.models import HRMgnt, HRMgntConcur
 
@@ -78,16 +78,16 @@ class IEmployeeRepository(ABC):
     @abstractmethod
     async def find_by_dept_code(
         self, dept_code: str, include_concurrent: bool = True
-    ) -> List[HRMgnt]:
+    ) -> List[Dict[str, Any]]:
         """
-        부서 코드로 소속 직원을 조회합니다.
+        부서 코드로 소속 직원을 조회합니다 (직책명 포함).
 
         Args:
             dept_code: 부서 코드
             include_concurrent: 겸직자 포함 여부
 
         Returns:
-            List[HRMgnt]: 소속 직원 리스트
+            List[Dict[str, Any]]: 소속 직원 리스트 (position_name 포함)
         """
         pass
 

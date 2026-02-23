@@ -78,7 +78,7 @@ export function OrgTreeNodeComponent({
         className={cn(
           'flex items-center gap-2 px-4 py-3 rounded-xl cursor-pointer transition-all',
           isSelected
-            ? 'bg-[#4950DC] bg-opacity-10 border-2 border-[#4950DC]'
+            ? 'bg-[#4950DC]/10 border-2 border-[#4950DC]'
             : 'hover:bg-gray-50 border-2 border-transparent'
         )}
         onClick={handleClick}

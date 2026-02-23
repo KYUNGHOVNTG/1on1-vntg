@@ -29,7 +29,7 @@ export function DepartmentEmployeeList({
           <h2 className="text-base font-semibold text-gray-900">
             소속 직원
           </h2>
-          <span className="px-2.5 py-0.5 bg-[#4950DC] bg-opacity-10 text-[#4950DC] rounded-lg text-xs font-medium">
+          <span className="px-2.5 py-0.5 bg-[#4950DC]/10 text-[#4950DC] rounded-lg text-xs font-medium">
             {total}명
           </span>
         </div>
