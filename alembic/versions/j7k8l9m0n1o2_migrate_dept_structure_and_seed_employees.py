@@ -54,6 +54,36 @@ def upgrade() -> None:
     """
 
     # =============================================
+    # 0. 사전 정리: 기존 hr_mgnt 데이터 삭제
+    #    이유: 이전에 동기화 버튼을 통해 E001~E020 사번으로 데이터가 들어간 경우
+    #    hr_mgnt.user_id 컬럼에 UNIQUE 제약(uq_hr_mgnt_user_id)이 있어서
+    #    ON CONFLICT (emp_no) DO NOTHING으로는 user_id 중복을 처리할 수 없음
+    #    → INSERT 전에 user001~user020에 해당하는 기존 레코드를 완전히 제거
+    # =============================================
+    # hr_mgnt_concur는 FK로 hr_mgnt를 참조하므로 먼저 삭제
+    op.execute("""
+        DELETE FROM hr_mgnt_concur
+        WHERE emp_no IN (
+            SELECT emp_no FROM hr_mgnt
+            WHERE user_id IN (
+                'user001','user002','user003','user004','user005',
+                'user006','user007','user008','user009','user010',
+                'user011','user012','user013','user014','user015',
+                'user016','user017','user018','user019','user020'
+            )
+        )
+    """)
+    op.execute("""
+        DELETE FROM hr_mgnt
+        WHERE user_id IN (
+            'user001','user002','user003','user004','user005',
+            'user006','user007','user008','user009','user010',
+            'user011','user012','user013','user014','user015',
+            'user016','user017','user018','user019','user020'
+        )
+    """)
+
+    # =============================================
     # 1. hr_mgnt: 직원 20명 데이터 INSERT
     #    - 사번: EMP001~EMP020 (6자리)
     #    - user_id: user001~user020 (cm_user FK)
@@ -105,7 +135,14 @@ def upgrade() -> None:
             ('EMP019', 'user019', '김구라', 'DEPT021', 'P004', 'N', 'system'),
             -- 영업1팀 (DEPT031) - 퇴직자
             ('EMP020', 'user020', '서장훈', 'DEPT031', 'P004', 'N', 'system')
-        ON CONFLICT (emp_no) DO NOTHING
+        ON CONFLICT (emp_no) DO UPDATE SET
+            user_id       = EXCLUDED.user_id,
+            name_kor      = EXCLUDED.name_kor,
+            dept_code     = EXCLUDED.dept_code,
+            position_code = EXCLUDED.position_code,
+            on_work_yn    = EXCLUDED.on_work_yn,
+            up_user       = 'system',
+            up_date       = NOW()
     """)
 
     # =============================================
@@ -132,7 +169,11 @@ def upgrade() -> None:
             -- EMP017 (강호동): 주소속 AI파트(DEPT221) + 겸직 개발1팀(DEPT021)
             ('EMP017', 'DEPT221', 'Y', 'P004', 'system'),
             ('EMP017', 'DEPT021', 'N', 'P004', 'system')
-        ON CONFLICT (emp_no, dept_code) DO NOTHING
+        ON CONFLICT (emp_no, dept_code) DO UPDATE SET
+            is_main       = EXCLUDED.is_main,
+            position_code = EXCLUDED.position_code,
+            up_user       = 'system',
+            up_date       = NOW()
     """)
 
     # =============================================
