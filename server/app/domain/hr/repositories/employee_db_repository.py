@@ -333,3 +333,23 @@ class EmployeeDBRepository(IEmployeeRepository):
         """부서별 소속 직원 수를 집계합니다"""
         employees = await self.find_by_dept_code(dept_code, include_concurrent)
         return len(employees)
+
+    async def count_main_by_dept_code(self, dept_code: str) -> int:
+        """부서별 주소속 직원 수를 집계합니다 (hr_mgnt.dept_code 기준)"""
+        stmt = select(func.count(HRMgnt.emp_no)).where(HRMgnt.dept_code == dept_code)
+        result = await self.db.execute(stmt)
+        return result.scalar_one()
+
+    async def count_concurrent_by_dept_code(self, dept_code: str) -> int:
+        """부서별 겸직 직원 수를 집계합니다 (is_main='N'이며 주소속 부서가 다른 경우)"""
+        stmt = (
+            select(func.count(HRMgntConcur.emp_no))
+            .join(HRMgnt, HRMgntConcur.emp_no == HRMgnt.emp_no)
+            .where(
+                HRMgntConcur.dept_code == dept_code,
+                HRMgntConcur.is_main == "N",
+                HRMgnt.dept_code != dept_code,
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one()

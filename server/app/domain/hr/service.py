@@ -368,40 +368,42 @@ class DepartmentService:
 
     async def get_department_info(self, dept_code: str) -> DepartmentInfo:
         """
-        부서 상세 정보를 조회합니다 (부서장명, 직원 수 포함)
+        부서 상세 정보를 조회합니다 (상위부서명, 부서장명, 직책, 직원 수 포함)
 
         Args:
             dept_code: 부서 코드
 
         Returns:
-            DepartmentInfo: 부서 상세 정보 (부서장명, 소속 직원 수 포함)
+            DepartmentInfo: 부서 상세 정보 (상위부서명, 부서장명, 직책, 소속 직원 수 포함)
 
         Raises:
             NotFoundException: 부서를 찾을 수 없는 경우
         """
-        # 부서 정보 조회
-        department = await self.department_repo.find_by_dept_code(dept_code)
-        if not department:
+        # 부서 정보 조회 (상위부서명 + 부서장 성명/직책 JOIN)
+        dept_info = await self.department_repo.find_department_info_with_upper(dept_code)
+        if not dept_info:
             raise NotFoundException(f"부서를 찾을 수 없습니다: {dept_code}")
 
-        # 부서장 이름 조회
-        dept_head_name: str | None = None
-        if department.dept_head_emp_no:
-            dept_head = await self.employee_repo.find_by_emp_no(department.dept_head_emp_no)
-            if dept_head:
-                dept_head_name = dept_head.name_kor
+        department = dept_info["department"]
 
-        # 소속 직원 수 집계
-        employee_count = await self.employee_repo.count_by_dept_code(dept_code)
+        # 주소속/겸직 직원 수 분리 집계
+        main_employee_count = await self.employee_repo.count_main_by_dept_code(dept_code)
+        concurrent_employee_count = await self.employee_repo.count_concurrent_by_dept_code(
+            dept_code
+        )
 
         return DepartmentInfo(
             dept_code=department.dept_code,
             dept_name=department.dept_name,
             upper_dept_code=department.upper_dept_code,
+            upper_dept_name=dept_info["upper_dept_name"],
             use_yn=department.use_yn,
             dept_head_emp_no=department.dept_head_emp_no,
-            dept_head_name=dept_head_name,
-            employee_count=employee_count,
+            dept_head_name=dept_info["dept_head_name"],
+            dept_head_position=dept_info["dept_head_position"],
+            employee_count=main_employee_count + concurrent_employee_count,
+            main_employee_count=main_employee_count,
+            concurrent_employee_count=concurrent_employee_count,
             in_date=department.in_date,
             up_date=department.up_date,
         )

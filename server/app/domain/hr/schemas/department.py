@@ -38,9 +38,13 @@ class DepartmentInfo(DepartmentBase):
     부서 기본 정보와 부서장 정보를 포함합니다.
     """
 
+    upper_dept_name: Optional[str] = Field(None, description="상위 부서명")
     dept_head_emp_no: Optional[str] = Field(None, description="부서장 사번")
     dept_head_name: Optional[str] = Field(None, description="부서장 성명")
+    dept_head_position: Optional[str] = Field(None, description="부서장 직책명")
     employee_count: int = Field(default=0, description="소속 직원 수 (주소속 + 겸직)")
+    main_employee_count: int = Field(default=0, description="주소속 직원 수")
+    concurrent_employee_count: int = Field(default=0, description="겸직 직원 수")
 
     # 메타 정보
     in_date: datetime = Field(..., description="등록일시")
