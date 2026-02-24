@@ -25,6 +25,7 @@ from server.app.domain.hr.models import (  # noqa: F401
     CMDepartment,
     CMDepartmentTree,
 )
+from server.app.domain.rnr.models import RrLevel, Rr, RrPeriod  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
