@@ -263,6 +263,67 @@ class RrRepository:
                 details={"dept_code": dept_code, "year": year},
             ) from exc
 
+    async def find_emp_no_by_user_id(self, user_id: str) -> str:
+        """
+        user_id(JWT 토큰)로 직원 사번(emp_no)을 조회합니다.
+
+        Args:
+            user_id: 로그인 사용자 ID (cm_user.user_id)
+
+        Returns:
+            str: 직원 사번 (emp_no)
+
+        Raises:
+            NotFoundException: 직원 정보가 없을 때
+        """
+        logger.info("find_emp_no_by_user_id called", extra={"user_id": user_id})
+
+        stmt = select(HRMgnt.emp_no).where(HRMgnt.user_id == user_id)
+        result = await self.db.execute(stmt)
+        row = result.first()
+
+        if row is None:
+            raise NotFoundException(
+                message="직원 정보를 찾을 수 없습니다",
+                details={"user_id": user_id},
+            )
+
+        return row.emp_no
+
+    async def find_rr_by_id(self, rr_id: uuid.UUID) -> RrResponse:
+        """
+        R&R ID로 단건 R&R을 조회합니다 (periods, parent 포함).
+
+        Args:
+            rr_id: R&R UUID
+
+        Returns:
+            RrResponse: 조회된 R&R 응답
+
+        Raises:
+            NotFoundException: 해당 R&R이 없을 때
+        """
+        logger.info("find_rr_by_id called", extra={"rr_id": str(rr_id)})
+
+        stmt = (
+            select(Rr)
+            .where(Rr.rr_id == rr_id)
+            .options(
+                selectinload(Rr.periods),
+                selectinload(Rr.parent),
+            )
+        )
+        result = await self.db.execute(stmt)
+        rr = result.scalar_one_or_none()
+
+        if rr is None:
+            raise NotFoundException(
+                message="R&R을 찾을 수 없습니다",
+                details={"rr_id": str(rr_id)},
+            )
+
+        return self._to_rr_response(rr)
+
     async def find_employee_position(self, emp_no: str) -> str:
         """
         직원의 직책 코드를 조회합니다.
@@ -499,4 +560,4 @@ class RrRepository:
         return level_id
 
 
-__all__ = ["RrRepository"]
+__all__ = ["RrRepository", "LEADER_POSITION_CODES", "MEMBER_POSITION_CODE"]
