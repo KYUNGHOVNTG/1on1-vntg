@@ -337,6 +337,20 @@ client/src/domains/rnr/
   - `create_rr(data)`: R&R 등록 (tb_rr INSERT)
   - `create_rr_periods(rr_id, periods)`: 기간 등록 (tb_rr_period INSERT)
 
+**주의사항 (가이드라인 준수)**
+- 모든 Repository 메서드에 타입 힌트 필수
+  ```python
+  async def find_my_rr_list(self, emp_no: str, year: str) -> list[RrResponse]:
+  async def create_rr(self, data: RrCreateRequest, emp_no: str) -> Rr:
+  ```
+- `create_rr`에서 `in_date` 저장 시 `datetime.utcnow()` 사용 (`datetime.now()` 금지)
+- 데이터 미존재 처리 시 커스텀 예외 사용
+  ```python
+  from server.app.shared.exceptions import NotFoundException
+  raise NotFoundException(message="R&R을 찾을 수 없습니다", details={"rr_id": rr_id})
+  ```
+- 로깅 필수: `from server.app.core.logging import get_logger` 사용
+
 **의존성**: TASK-02 완료 후
 
 ---
@@ -363,6 +377,29 @@ client/src/domains/rnr/
 
 - `server/app/core/routers.py`
   - rnr 라우터 등록 추가
+
+**주의사항 (가이드라인 준수)**
+- Router에서 현재 로그인 사용자 정보 추출: `auth` 도메인의 `get_current_user` Depends 패턴 참조
+  ```python
+  from server.app.domain.auth.dependencies import get_current_user
+
+  @router.get("/my")
+  async def get_my_rr(
+      year: str = Query(default=...),
+      current_user: TokenPayload = Depends(get_current_user),
+      db: AsyncSession = Depends(get_db),
+  ):
+  ```
+- `get_parent_rr_options`에서 `position_code`는 `emp_no`로 `hr_mgnt` 테이블 조회 필요
+  → TASK-04 `RrRepository`에 `find_employee_position(emp_no)` 메서드 추가 고려
+- DB 세션 의존성 주입: `db: AsyncSession = Depends(get_db)` 패턴 사용
+- 모든 Service/Router 메서드에 타입 힌트 필수
+  ```python
+  async def get_my_rr_list(self, emp_no: str, year: str) -> RrListResponse:
+  async def create_rr(self, emp_no: str, position_code: str, request: RrCreateRequest) -> RrResponse:
+  ```
+- 커스텀 예외 사용: `BusinessLogicException`, `NotFoundException` 등 (`server.app.shared.exceptions`)
+- 작업 전 CLAUDE.md 체크리스트 출력 후 사용자 승인 필수
 
 **의존성**: TASK-04 완료 후
 
@@ -534,10 +571,14 @@ TASK-02 (DB 테이블 생성)
 
 ### Backend
 - [ ] Service에서 직접 DB 접근 없음 (Repository 위임)
-- [ ] 모든 함수에 타입 힌트 명시
-- [ ] 커스텀 예외 사용 (`shared.exceptions`)
-- [ ] UTC 기준 시간 처리 (`datetime.utcnow()`)
+- [ ] 모든 함수/메서드에 타입 힌트 필수 (파라미터 + 반환값)
+- [ ] 커스텀 예외 사용 (`server.app.shared.exceptions` — `NotFoundException`, `BusinessLogicException`)
+- [ ] UTC 기준 시간 처리 (`datetime.utcnow()` — `datetime.now()` 금지)
 - [ ] 리스트 API 응답: `{ items: [...], total: N }` 구조
+- [ ] 로깅: `from server.app.core.logging import get_logger` 사용
+- [ ] Router에서 `get_current_user` Depends 패턴 사용 (`auth` 도메인 참조)
+- [ ] DB 세션 주입: `db: AsyncSession = Depends(get_db)` 패턴 사용
+- [ ] 작업 전 CLAUDE.md 체크리스트 출력 후 사용자 승인
 
 ### Frontend
 - [ ] `apiClient` 사용 (axios 직접 import 금지)
