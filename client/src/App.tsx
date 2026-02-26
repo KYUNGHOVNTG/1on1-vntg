@@ -19,7 +19,7 @@ import { IdleTimeoutModal } from './core/components/IdleTimeoutModal';
 
 function App() {
   // useAuthStore에서 인증 상태 가져오기
-  const { isAuthenticated, logout: logoutStore } = useAuthStore();
+  const { isAuthenticated, logout: logoutStore, setUser } = useAuthStore();
 
   // 세션 검증 중 상태
   const [isValidatingSession, setIsValidatingSession] = useState(true);
@@ -69,8 +69,21 @@ function App() {
 
     try {
       console.log('🔄 세션 유효성 검증 중...');
-      await getCurrentUser();
-      console.log('✅ 세션 유효성 검증 완료 - 세션 유효');
+      const userInfo = await getCurrentUser();
+      console.log('✅ 세션 유효성 검증 완료 - 사용자 정보:', userInfo);
+
+      // /me 응답으로 auth store 갱신 (부서·사번·한글이름 포함)
+      setUser({
+        id: userInfo.user_id,
+        email: userInfo.email ?? '',
+        name: userInfo.name_kor ?? userInfo.name ?? userInfo.user_id,
+        position_code: userInfo.position_code ?? 'P005',
+        role_code: userInfo.role_code ?? 'R002',
+        emp_no: userInfo.emp_no,
+        dept_code: userInfo.dept_code,
+        dept_name: userInfo.dept_name,
+        name_kor: userInfo.name_kor,
+      });
     } catch (error: any) {
       // 401 에러는 client.ts의 interceptor에서 이미 처리됨 (toast + redirect)
       // 하지만 네트워크 오류 등 401이 아닌 에러가 발생한 경우 여기서 로그아웃 처리
@@ -83,7 +96,7 @@ function App() {
     } finally {
       setIsValidatingSession(false);
     }
-  }, [handleLogout]);
+  }, [handleLogout, setUser]);
 
   // Activity Tracker 설정
   const { keepAlive } = useActivityTracker({

@@ -57,7 +57,13 @@ class UserInfoResponse(BaseModel):
 
     user_id: str = Field(..., description="사용자 ID")
     email: str | None = Field(None, description="사용자 이메일")
-    name: str | None = Field(None, description="사용자 이름")
+    name: str | None = Field(None, description="사용자 이름 (Google OAuth)")
+    role_code: str | None = Field(None, description="역할 코드 (R001, R002 등)")
+    position_code: str | None = Field(None, description="직급 코드 (P001, P002 등)")
+    emp_no: str | None = Field(None, description="사번 (hr_mgnt)")
+    dept_code: str | None = Field(None, description="부서 코드")
+    dept_name: str | None = Field(None, description="부서명")
+    name_kor: str | None = Field(None, description="한글 이름 (hr_mgnt)")
     message: str = Field(default="인증 성공", description="응답 메시지")
 
 

@@ -20,7 +20,10 @@ from server.app.domain.auth.schemas import (
     GoogleAuthCallbackRequest,
     GoogleAuthResponse,
     GoogleAuthURLResponse,
+    UserInfoResponse,
 )
+from server.app.domain.hr.models.employee import HRMgnt
+from server.app.domain.hr.models.department import CMDepartment
 from server.app.domain.common.service import CommonCodeService
 from server.app.domain.user.models import User
 from server.app.shared.base.service import BaseService
@@ -621,3 +624,59 @@ class GoogleAuthService(BaseService[GoogleAuthCallbackRequest, GoogleAuthRespons
                 extra={"email": email}
             )
             return None
+
+
+class UserInfoService:
+    """
+    현재 로그인 사용자 정보 조회 서비스
+
+    책임:
+        - JWT 토큰에서 추출한 user_id로 cm_user + hr_mgnt + cm_department JOIN 조회
+        - /auth/me 엔드포인트에서 사용
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_current_user_info(self, user_id: str) -> UserInfoResponse:
+        """
+        user_id로 사용자 정보와 HR 인사 데이터를 조회합니다.
+
+        Args:
+            user_id: JWT에서 추출한 사용자 ID
+
+        Returns:
+            UserInfoResponse: cm_user + hr_mgnt + cm_department 통합 정보
+        """
+        result = await self.db.execute(
+            select(User, HRMgnt, CMDepartment)
+            .outerjoin(HRMgnt, User.user_id == HRMgnt.user_id)
+            .outerjoin(CMDepartment, HRMgnt.dept_code == CMDepartment.dept_code)
+            .where(User.user_id == user_id)
+        )
+        row = result.first()
+
+        if not row:
+            raise UnauthorizedException(message="사용자를 찾을 수 없습니다.")
+
+        user, employee, department = row
+
+        logger.info(
+            f"사용자 정보 조회 완료: user_id={user_id}",
+            extra={
+                "emp_no": employee.emp_no if employee else None,
+                "dept_code": employee.dept_code if employee else None,
+            },
+        )
+
+        return UserInfoResponse(
+            user_id=user.user_id,
+            email=user.email,
+            role_code=user.role_code,
+            position_code=user.position_code,
+            emp_no=employee.emp_no if employee else None,
+            dept_code=employee.dept_code if employee else None,
+            dept_name=department.dept_name if department else None,
+            name_kor=employee.name_kor if employee else None,
+            message="인증 성공",
+        )

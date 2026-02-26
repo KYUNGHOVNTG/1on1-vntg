@@ -54,9 +54,22 @@ export interface LogoutResponse {
 
 /**
  * 현재 사용자 정보 응답 (/auth/me)
+ * cm_user + hr_mgnt + cm_department JOIN 결과
  */
 export interface UserInfoResponse {
   user_id: string;
+  email?: string;
+  name?: string;
+  role_code?: string;
+  position_code?: string;
+  /** 사번 (hr_mgnt.emp_no) - HR 데이터 없으면 undefined */
+  emp_no?: string;
+  /** 부서 코드 (hr_mgnt.dept_code) */
+  dept_code?: string;
+  /** 부서명 (cm_department.dept_name) */
+  dept_name?: string;
+  /** 한글 이름 (hr_mgnt.name_kor) */
+  name_kor?: string;
   message: string;
 }
 

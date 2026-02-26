@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getGoogleAuthURL, handleGoogleCallback } from '../api';
+import { getGoogleAuthURL, handleGoogleCallback, getCurrentUser } from '../api';
 import { useAuthStore } from '@/core/store/useAuthStore';
 
 interface LoginPageProps {
@@ -73,35 +73,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         // 토큰 저장
         localStorage.setItem('access_token', response.access_token);
 
-        // ✅ useAuthStore에 사용자 정보 저장
-        if (response.user_id && response.email && response.name) {
+        // ✅ useAuthStore에 사용자 정보 저장 (OAuth 기본 정보 먼저)
+        if (response.user_id && response.email) {
           const positionCode = response.position_code;
           const roleCode = response.role_code;
 
-          if (!positionCode) {
-            console.warn('⚠️ position_code가 백엔드 응답에 없습니다. fallback 사용:', response.position);
-          }
-          if (!roleCode) {
-            console.warn('⚠️ role_code가 백엔드 응답에 없습니다. fallback 사용: R002');
-          }
-
+          // 1단계: OAuth 응답으로 기본 정보 저장
           setUser({
             id: response.user_id,
             email: response.email,
-            name: response.name,
-            position_code: positionCode || response.position || 'P005',
-            role_code: roleCode || 'R002',
+            name: response.name ?? response.user_id,
+            position_code: positionCode ?? 'P005',
+            role_code: roleCode ?? 'R002',
           });
 
-          console.log('✅ useAuthStore에 사용자 정보 저장:', {
-            id: response.user_id,
-            email: response.email,
-            name: response.name,
-            role: response.role,
-            role_code: roleCode || 'R002',
-            position: response.position,
-            position_code: positionCode || response.position || 'P005',
-          });
+          // 2단계: /me 호출로 HR 정보(부서, 사번, 한글이름) 추가 저장
+          try {
+            const userInfo = await getCurrentUser();
+            setUser({
+              id: userInfo.user_id,
+              email: userInfo.email ?? response.email,
+              name: userInfo.name_kor ?? response.name ?? userInfo.user_id,
+              position_code: userInfo.position_code ?? positionCode ?? 'P005',
+              role_code: userInfo.role_code ?? roleCode ?? 'R002',
+              emp_no: userInfo.emp_no,
+              dept_code: userInfo.dept_code,
+              dept_name: userInfo.dept_name,
+              name_kor: userInfo.name_kor,
+            });
+            console.log('✅ useAuthStore HR 정보 포함 저장 완료:', userInfo);
+          } catch (meError) {
+            console.warn('⚠️ /me 호출 실패 - 기본 정보만 저장됨:', meError);
+          }
         }
 
         // 로그인 성공 콜백 호출 (2초 후 대시보드로 이동)

@@ -20,7 +20,7 @@ from server.app.domain.auth.schemas import (
     SessionStatsResponse,
     UserInfoResponse,
 )
-from server.app.domain.auth.service import GoogleAuthService, SessionService
+from server.app.domain.auth.service import GoogleAuthService, SessionService, UserInfoService
 
 logger = get_logger(__name__)
 
@@ -139,31 +139,30 @@ async def logout() -> LogoutResponse:
     "/me",
     response_model=UserInfoResponse,
     summary="현재 사용자 정보 조회",
-    description="JWT 토큰을 검증하고 현재 로그인한 사용자 정보를 반환합니다.",
+    description="JWT 토큰을 검증하고 현재 로그인한 사용자의 정보(부서, 직급, 사번 등)를 반환합니다.",
 )
 async def get_current_user_info(
     user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ) -> UserInfoResponse:
     """
     현재 인증된 사용자 정보를 조회합니다.
-
-    이 엔드포인트는 JWT 토큰 검증 및 세션 검증을 테스트하기 위한 용도입니다.
+    cm_user + hr_mgnt + cm_department를 JOIN하여 전체 프로필을 반환합니다.
 
     Args:
-        user_id: 검증된 사용자 ID (Dependency에서 자동 주입)
+        user_id: JWT에서 추출한 사용자 ID
+        db: 데이터베이스 세션
 
     Returns:
-        UserInfoResponse: 사용자 정보
+        UserInfoResponse: 사용자 + HR 통합 정보 (emp_no, dept_code, dept_name, name_kor 포함)
 
     Raises:
         HTTPException 401: 토큰이 유효하지 않거나 세션이 만료된 경우
     """
     logger.info(f"사용자 정보 조회: user_id={user_id}")
 
-    return UserInfoResponse(
-        user_id=user_id,
-        message="인증 성공"
-    )
+    service = UserInfoService(db)
+    return await service.get_current_user_info(user_id)
 
 
 @router.post(
