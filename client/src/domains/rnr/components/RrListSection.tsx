@@ -42,7 +42,7 @@ export const RrListSection: React.FC<RrListSectionProps> = ({
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
+        <div className="flex flex-col gap-6 mt-6">
             {items.map((rr) => (
                 <RrCard key={rr.rr_id} rr={rr} />
             ))}
