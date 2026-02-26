@@ -6,10 +6,11 @@
  * - RrCard: R&R 카드 컴포넌트
  * - RrListSection: 목록 + EmptyState 분기
  * 
- * TASK-08에서 구현 예정:
+ * TASK-08에서 구현:
  * - RrRegisterModal: 등록 모달
  */
 
 export * from './TimelineBar';
 export * from './RrCard';
 export * from './RrListSection';
+export * from './RrRegisterModal';
