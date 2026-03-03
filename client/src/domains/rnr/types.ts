@@ -127,3 +127,17 @@ export interface RrCreateRequest {
   content: string | null;
   periods: PeriodInput[];
 }
+
+// =============================================
+// R&R 수정 요청
+// =============================================
+
+/**
+ * R&R 수정 요청
+ */
+export interface RrUpdateRequest {
+  parent_rr_id: string | null;
+  title: string;
+  content: string | null;
+  periods: PeriodInput[];
+}

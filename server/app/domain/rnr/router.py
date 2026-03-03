@@ -25,6 +25,7 @@ from server.app.domain.rnr.schemas import (
     RrCreateRequest,
     RrListResponse,
     RrResponse,
+    RrUpdateRequest,
 )
 from server.app.domain.rnr.service import RrService
 
@@ -183,3 +184,72 @@ async def create_rr(
     )
     service = RrService(db)
     return await service.create_rr(user_id, request)
+
+
+# =============================================
+# 수정 API
+# =============================================
+
+
+@router.put(
+    "/{rr_id}",
+    response_model=RrResponse,
+    summary="R&R 수정",
+    description="R&R의 제목, 상세 내용, 상위 R&R, 수행 기간을 수정합니다.",
+)
+async def update_rr(
+    rr_id: str,
+    request: RrUpdateRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> RrResponse:
+    """
+    R&R을 수정합니다.
+
+    Args:
+        rr_id:   R&R UUID (패스 파라미터)
+        request: R&R 수정 요청 데이터
+        user_id: JWT에서 추접한 로그인 사용자 ID
+        db:      데이터베이스 세션
+
+    Returns:
+        RrResponse: 수정된 R&R 정보
+    """
+    logger.info(
+        "PUT /rnr/{rr_id}",
+        extra={"user_id": user_id, "rr_id": rr_id, "title": request.title},
+    )
+    service = RrService(db)
+    return await service.update_rr(rr_id, request)
+
+
+# =============================================
+# 삭제 API
+# =============================================
+
+
+@router.delete(
+    "/{rr_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="R&R 삭제",
+    description="R&R과 고관된 수행 기간을 모두 삭제합니다.",
+)
+async def delete_rr(
+    rr_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    R&R을 삭제합니다.
+
+    Args:
+        rr_id:   R&R UUID (패스 파라미터)
+        user_id: JWT에서 추제한 로그인 사용자 ID
+        db:      데이터베이스 세션
+    """
+    logger.info(
+        "DELETE /rnr/{rr_id}",
+        extra={"user_id": user_id, "rr_id": rr_id},
+    )
+    service = RrService(db)
+    await service.delete_rr(rr_id)

@@ -11,6 +11,7 @@ import type {
   ParentRrOptionsResponse,
   RrItem,
   RrCreateRequest,
+  RrUpdateRequest,
 } from './types';
 
 /**
@@ -75,4 +76,29 @@ export async function getParentRrOptions(
 export async function createRr(request: RrCreateRequest): Promise<RrItem> {
   const response = await apiClient.post<RrItem>('/v1/rnr', request);
   return response.data;
+}
+
+/**
+ * R&R 수정
+ *
+ * 기존 R&R의 제목, 상세 내용, 상위 R&R, 수행 기간을 수정합니다.
+ *
+ * @param rrId    - R&R ID (UUID)
+ * @param request - R&R 수정 요청 데이터
+ * @returns 수정된 R&R 정보
+ */
+export async function updateRr(rrId: string, request: RrUpdateRequest): Promise<RrItem> {
+  const response = await apiClient.put<RrItem>(`/v1/rnr/${rrId}`, request);
+  return response.data;
+}
+
+/**
+ * R&R 삭제
+ *
+ * R&R과 관련된 수행 기간을 모두 삭제합니다.
+ *
+ * @param rrId - R&R ID (UUID)
+ */
+export async function deleteRr(rrId: string): Promise<void> {
+  await apiClient.delete(`/v1/rnr/${rrId}`);
 }

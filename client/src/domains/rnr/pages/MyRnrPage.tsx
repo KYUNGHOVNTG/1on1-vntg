@@ -76,6 +76,7 @@ export const MyRnrPage: React.FC = () => {
         items={myRrList}
         isLoading={isLoading.myRrList}
         onRegisterClick={() => setIsModalOpen(true)}
+        onMutated={loadList}
       />
 
       {/* R&R 등록 모달 */}

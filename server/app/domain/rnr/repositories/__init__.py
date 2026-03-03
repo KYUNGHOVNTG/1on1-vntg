@@ -18,7 +18,7 @@ R&R 도메인 Repository
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,6 +35,7 @@ from server.app.domain.rnr.schemas import (
     PeriodInput,
     RrCreateRequest,
     RrListResponse,
+    RrUpdateRequest,
     RrPeriodSchema,
     RrResponse,
 )
@@ -455,6 +456,116 @@ class RrRepository:
             )
             raise RepositoryException(
                 "R&R 기간 등록에 실패했습니다",
+                details={"rr_id": str(rr_id)},
+            ) from exc
+
+    # ------------------------------------------------------------------
+    # 수정 / 삭제 메서드
+    # ------------------------------------------------------------------
+
+    async def update_rr(self, rr_id: uuid.UUID, data: RrUpdateRequest) -> RrResponse:
+        """
+        R&R을 수정합니다 (tb_rr UPDATE + tb_rr_period 재등록).
+
+        기존 기간(tb_rr_period)을 모두 삭제하고 새 기간으로 대체합니다.
+
+        Args:
+            rr_id: R&R UUID
+            data:  수정 요청 데이터 (RrUpdateRequest)
+
+        Returns:
+            RrResponse: 수정된 R&R 응답
+
+        Raises:
+            NotFoundException:    해당 R&R이 없을 때
+            RepositoryException: DB 수정 실패
+        """
+        logger.info("update_rr called", extra={"rr_id": str(rr_id)})
+
+        try:
+            # 1. 대상 R&R 조회
+            stmt = select(Rr).where(Rr.rr_id == rr_id)
+            result = await self.db.execute(stmt)
+            rr = result.scalar_one_or_none()
+
+            if rr is None:
+                raise NotFoundException(
+                    message="R&R을 찾을 수 없습니다",
+                    details={"rr_id": str(rr_id)},
+                )
+
+            # 2. 필드 업데이트
+            rr.parent_rr_id = data.parent_rr_id
+            rr.title = data.title
+            rr.content = data.content
+
+            # 3. 기존 기간 삭제
+            del_stmt = delete(RrPeriod).where(RrPeriod.rr_id == rr_id)
+            await self.db.execute(del_stmt)
+
+            # 4. 새 기간 등록
+            await self.create_rr_periods(rr_id, data.periods)
+
+            # 5. flush
+            await self.db.flush()
+
+            # 6. 수정된 R&R 반환
+            return await self.find_rr_by_id(rr_id)
+
+        except NotFoundException:
+            raise
+        except Exception as exc:
+            logger.error(
+                "update_rr 실패",
+                extra={"rr_id": str(rr_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "R&R 수정에 실패했습니다",
+                details={"rr_id": str(rr_id)},
+            ) from exc
+
+    async def delete_rr(self, rr_id: uuid.UUID) -> None:
+        """
+        R&R을 삭제합니다 (tb_rr_period → tb_rr 순서로 삭제).
+
+        Args:
+            rr_id: R&R UUID
+
+        Raises:
+            NotFoundException:    해당 R&R이 없을 때
+            RepositoryException: DB 삭제 실패
+        """
+        logger.info("delete_rr called", extra={"rr_id": str(rr_id)})
+
+        try:
+            # 1. 대상 R&R 존재 확인
+            stmt = select(Rr).where(Rr.rr_id == rr_id)
+            result = await self.db.execute(stmt)
+            rr = result.scalar_one_or_none()
+
+            if rr is None:
+                raise NotFoundException(
+                    message="R&R을 찾을 수 없습니다",
+                    details={"rr_id": str(rr_id)},
+                )
+
+            # 2. 기간 먼저 삭제
+            del_periods = delete(RrPeriod).where(RrPeriod.rr_id == rr_id)
+            await self.db.execute(del_periods)
+
+            # 3. R&R 삭제
+            await self.db.delete(rr)
+            await self.db.flush()
+
+        except NotFoundException:
+            raise
+        except Exception as exc:
+            logger.error(
+                "delete_rr 실패",
+                extra={"rr_id": str(rr_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "R&R 삭제에 실패했습니다",
                 details={"rr_id": str(rr_id)},
             ) from exc
 

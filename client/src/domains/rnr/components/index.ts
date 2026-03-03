@@ -8,9 +8,11 @@
  * 
  * TASK-08에서 구현:
  * - RrRegisterModal: 등록 모달
+ * - RrEditModal: 수정 모달
  */
 
 export * from './TimelineBar';
 export * from './RrCard';
 export * from './RrListSection';
 export * from './RrRegisterModal';
+export * from './RrEditModal';

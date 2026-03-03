@@ -26,6 +26,7 @@ from server.app.domain.rnr.schemas import (
     RrCreateRequest,
     RrListResponse,
     RrResponse,
+    RrUpdateRequest,
 )
 
 logger = get_logger(__name__)
@@ -174,6 +175,57 @@ class RrService:
 
         # 7. 등록된 R&R 조회 후 반환 (periods, parent 포함)
         return await self.repo.find_rr_by_id(new_rr.rr_id)
+
+    # ------------------------------------------------------------------
+    # 수정
+    # ------------------------------------------------------------------
+
+    async def update_rr(self, rr_id: str, request: RrUpdateRequest) -> RrResponse:
+        """
+        R&R을 수정합니다.
+
+        처리 순서:
+            1. R&R 수정 (title, content, parent_rr_id, periods 교체)
+            2. 트랜잭션 커밋
+            3. 수정된 R&R 반환
+
+        Args:
+            rr_id:   R&R UUID 문자열
+            request: R&R 수정 요청 데이터
+
+        Returns:
+            RrResponse: 수정된 R&R 응답
+        """
+        import uuid as _uuid
+        logger.info("update_rr called", extra={"rr_id": rr_id})
+
+        rr_uuid = _uuid.UUID(rr_id)
+        updated = await self.repo.update_rr(rr_uuid, request)
+        await self.db.commit()
+        return updated
+
+    # ------------------------------------------------------------------
+    # 삭제
+    # ------------------------------------------------------------------
+
+    async def delete_rr(self, rr_id: str) -> None:
+        """
+        R&R을 삭제합니다.
+
+        처리 순서:
+            1. 기간(tb_rr_period) 삭제
+            2. R&R(tb_rr) 삭제
+            3. 트랜잭션 커밋
+
+        Args:
+            rr_id: R&R UUID 문자열
+        """
+        import uuid as _uuid
+        logger.info("delete_rr called", extra={"rr_id": rr_id})
+
+        rr_uuid = _uuid.UUID(rr_id)
+        await self.repo.delete_rr(rr_uuid)
+        await self.db.commit()
 
 
 __all__ = ["RrService"]

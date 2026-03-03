@@ -154,6 +154,25 @@ class RrCreateRequest(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# R&R 수정 요청
+# ---------------------------------------------------------------------------
+
+class RrUpdateRequest(BaseModel):
+    """R&R 수정 요청 스키마 (title, content, parent_rr_id, periods 수정 가능)"""
+
+    parent_rr_id: uuid.UUID | None = Field(
+        None, description="상위 R&R ID (없으면 null)"
+    )
+    title: str = Field(..., description="R&R 명 (핵심 과업 제목)", min_length=1, max_length=500)
+    content: str | None = Field(None, description="상세 내용")
+    periods: list[PeriodInput] = Field(
+        ...,
+        description="수행 기간 목록 (최소 1개)",
+        min_length=1,
+    )
+
+
 __all__ = [
     "RrLevelResponse",
     "RrPeriodSchema",
@@ -165,4 +184,5 @@ __all__ = [
     "ParentRrOption",
     "ParentRrOptionsResponse",
     "RrCreateRequest",
+    "RrUpdateRequest",
 ]

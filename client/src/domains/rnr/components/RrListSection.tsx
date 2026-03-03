@@ -8,12 +8,14 @@ interface RrListSectionProps {
     items: RrItem[];
     isLoading: boolean;
     onRegisterClick: () => void;
+    onMutated?: () => void;
 }
 
 export const RrListSection: React.FC<RrListSectionProps> = ({
     items,
     isLoading,
     onRegisterClick,
+    onMutated,
 }) => {
     if (isLoading) {
         return (
@@ -44,7 +46,7 @@ export const RrListSection: React.FC<RrListSectionProps> = ({
     return (
         <div className="flex flex-col gap-6 mt-6">
             {items.map((rr) => (
-                <RrCard key={rr.rr_id} rr={rr} />
+                <RrCard key={rr.rr_id} rr={rr} onMutated={onMutated} />
             ))}
         </div>
     );

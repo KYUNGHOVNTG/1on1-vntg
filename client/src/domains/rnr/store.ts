@@ -10,6 +10,7 @@ import type {
   MyDepartmentItem,
   ParentRrOption,
   RrCreateRequest,
+  RrUpdateRequest,
 } from './types';
 import * as rnrApi from './api';
 
@@ -36,6 +37,8 @@ interface RnrState {
     myDepartments: boolean;
     parentRrOptions: boolean;
     createRr: boolean;
+    updateRr: boolean;
+    deleteRr: boolean;
   };
 
   // 에러 상태
@@ -44,6 +47,8 @@ interface RnrState {
     myDepartments: string | null;
     parentRrOptions: string | null;
     createRr: string | null;
+    updateRr: string | null;
+    deleteRr: string | null;
   };
 
   // 액션
@@ -51,6 +56,8 @@ interface RnrState {
   fetchMyDepartments: () => Promise<void>;
   fetchParentRrOptions: (deptCode: string, year?: string) => Promise<void>;
   createRr: (request: RrCreateRequest) => Promise<RrItem>;
+  updateRr: (rrId: string, request: RrUpdateRequest) => Promise<RrItem>;
+  deleteRr: (rrId: string) => Promise<void>;
   clearError: (key: keyof RnrState['error']) => void;
 }
 
@@ -58,7 +65,7 @@ interface RnrState {
 // Store 생성
 // =============================================
 
-export const useRnrStore = create<RnrState>((set, get) => ({
+export const useRnrStore = create<RnrState>((set, _get) => ({
   // 초기 상태
   myRrList: [],
   myRrTotal: 0,
@@ -74,6 +81,8 @@ export const useRnrStore = create<RnrState>((set, get) => ({
     myDepartments: false,
     parentRrOptions: false,
     createRr: false,
+    updateRr: false,
+    deleteRr: false,
   },
 
   error: {
@@ -81,6 +90,8 @@ export const useRnrStore = create<RnrState>((set, get) => ({
     myDepartments: null,
     parentRrOptions: null,
     createRr: null,
+    updateRr: null,
+    deleteRr: null,
   },
 
   // =============================================
@@ -207,5 +218,67 @@ export const useRnrStore = create<RnrState>((set, get) => ({
     set((state) => ({
       error: { ...state.error, [key]: null },
     }));
+  },
+
+  /**
+   * R&R 수정
+   *
+   * @param rrId    - R&R ID (UUID 문자열)
+   * @param request - R&R 수정 요청 데이터
+   * @returns 수정된 R&R 정보
+   */
+  updateRr: async (rrId: string, request: RrUpdateRequest): Promise<RrItem> => {
+    set((state) => ({
+      isLoading: { ...state.isLoading, updateRr: true },
+      error: { ...state.error, updateRr: null },
+    }));
+
+    try {
+      const updated = await rnrApi.updateRr(rrId, request);
+      // 로컬 목록 즉시 업데이트
+      set((state) => ({
+        myRrList: state.myRrList.map((item) =>
+          item.rr_id === rrId ? updated : item
+        ),
+        isLoading: { ...state.isLoading, updateRr: false },
+      }));
+      return updated;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'R&R 수정 실패';
+      set((state) => ({
+        isLoading: { ...state.isLoading, updateRr: false },
+        error: { ...state.error, updateRr: errorMessage },
+      }));
+      throw err;
+    }
+  },
+
+  /**
+   * R&R 삭제
+   *
+   * @param rrId - R&R ID (UUID 문자열)
+   */
+  deleteRr: async (rrId: string): Promise<void> => {
+    set((state) => ({
+      isLoading: { ...state.isLoading, deleteRr: true },
+      error: { ...state.error, deleteRr: null },
+    }));
+
+    try {
+      await rnrApi.deleteRr(rrId);
+      // 로컬 목록에서 즉시 제거
+      set((state) => ({
+        myRrList: state.myRrList.filter((item) => item.rr_id !== rrId),
+        myRrTotal: state.myRrTotal - 1,
+        isLoading: { ...state.isLoading, deleteRr: false },
+      }));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'R&R 삭제 실패';
+      set((state) => ({
+        isLoading: { ...state.isLoading, deleteRr: false },
+        error: { ...state.error, deleteRr: errorMessage },
+      }));
+      throw err;
+    }
   },
 }));
