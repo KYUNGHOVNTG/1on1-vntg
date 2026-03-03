@@ -63,7 +63,7 @@ export const TeamRnrSearchBar: React.FC<TeamRnrSearchBarProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
       <div className="flex flex-wrap gap-3 items-end">
         {/* 기준 연도 */}
         <div className="w-28">
@@ -98,7 +98,7 @@ export const TeamRnrSearchBar: React.FC<TeamRnrSearchBarProps> = ({
         </div>
 
         {/* 성명 */}
-        <div className="w-44">
+        <div className="flex-[2] min-w-40">
           <label className="text-xs font-semibold text-gray-700 ml-1 block mb-1.5">성명</label>
           <Input
             value={empName}
