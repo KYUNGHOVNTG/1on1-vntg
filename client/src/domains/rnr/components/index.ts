@@ -18,6 +18,7 @@ export * from './RrCard';
 export * from './RrListSection';
 export * from './RrRegisterModal';
 export * from './RrEditModal';
+export * from './RrDetailModal';
 export * from './ToggleTabs';
 export * from './MyRnrSimpleGrid';
 export * from './TeamRnrSearchBar';
