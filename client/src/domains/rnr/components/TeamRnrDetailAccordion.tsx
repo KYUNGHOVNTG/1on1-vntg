@@ -3,11 +3,11 @@
  *
  * 팀 R&R 현황 조회 화면
  * - Card DIV 아코디언 방식
- * - 접힌 상태: 부서명, 성명, 보유R&R 갯수
- * - 펼친 상태: 부서명, 성명, 보유R&R 갯수 + 상위R&R + R&R + 수행일정 막대그래프
- *   (1월~12월 레이블은 펼친 영역 최상단에 1번만 표시)
+ * - 접힌 상태: 이름(진하게) + 부서·직책(연하게), R&R 건수 뱃지
+ * - 펼친 상태: grid-cols-12 (4:7:1) 레이아웃으로 상위 R&R/R&R + 타임라인 + 상세버튼
+ *   (1월~12월 레이블은 펼친 영역 최상단에 1번만 표시, flex justify-between)
  * - 사람별 막대그래프 색상 구분
- * - R&R별 상세보기 버튼 → RrDetailModal
+ * - R&R별 상세보기 버튼 → hover 시에만 표시 → RrDetailModal
  */
 
 import React, { useState } from 'react';
@@ -32,6 +32,8 @@ const PERSON_COLOR_CLASSES = [
   'bg-[#D97706]',
 ];
 
+const MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
 interface TeamRnrDetailAccordionProps {
   items: TeamRrEmployeeItem[];
   isLoading: boolean;
@@ -43,19 +45,6 @@ interface AccordionRowProps {
   year: string;
   colorClass: string;
 }
-
-/** 1월~12월 레이블 헤더 (펼친 영역 최상단에 1회만 표시) */
-const MonthHeader: React.FC = () => (
-  <div className="grid grid-cols-12 text-[10px] text-gray-400 font-medium px-4 pb-2 pt-1">
-    {['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'].map(
-      (m) => (
-        <div key={m} className="text-center">
-          {m}
-        </div>
-      ),
-    )}
-  </div>
-);
 
 const AccordionRow: React.FC<AccordionRowProps> = ({ emp, year, colorClass }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,25 +59,34 @@ const AccordionRow: React.FC<AccordionRowProps> = ({ emp, year, colorClass }) =>
   return (
     <>
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* 헤더 (접힌 상태) */}
+        {/* 헤더 (접힌 상태) - 이름+부서·직책 좌측 / R&R 건수 뱃지+화살표 우측 */}
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="w-full flex items-center px-5 py-4 hover:bg-gray-50/70 transition-colors text-left"
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50/70 transition-colors text-left"
         >
-          <span className="w-[30%] text-sm text-gray-600 truncate">{emp.dept_name}</span>
-          <span className="w-[35%] font-semibold text-gray-900 text-sm truncate">{emp.emp_name}</span>
-          <span className="flex-1 text-sm text-gray-500">
-            보유 R&R{' '}
-            <span className="font-semibold text-[#4950DC]">{emp.rr_count}</span>건
-          </span>
-          <ChevronDown
-            size={16}
-            className={cn(
-              'text-gray-400 transition-transform duration-200 flex-shrink-0',
-              isOpen ? 'rotate-180 text-[#4950DC]' : '',
-            )}
-          />
+          {/* 좌측: 이름(크고 진하게) + 부서·직책(작고 연하게) 세로 배치 */}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-base font-bold text-gray-900">{emp.emp_name}</span>
+            <span className="text-xs text-gray-500">
+              {emp.dept_name}
+              {emp.position_name ? ` · ${emp.position_name}` : ''}
+            </span>
+          </div>
+
+          {/* 우측: R&R 건수 뱃지 + 화살표 */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-[#4950DC]/10 text-[#4950DC]">
+              R&amp;R {emp.rr_count}건
+            </span>
+            <ChevronDown
+              size={16}
+              className={cn(
+                'text-gray-400 transition-transform duration-200',
+                isOpen ? 'rotate-180 text-[#4950DC]' : '',
+              )}
+            />
+          </div>
         </button>
 
         {/* 펼침 영역 */}
@@ -98,37 +96,47 @@ const AccordionRow: React.FC<AccordionRowProps> = ({ emp, year, colorClass }) =>
               <p className="text-sm text-gray-400 py-4 text-center">등록된 R&R이 없습니다</p>
             ) : (
               <>
-                {/* 1월~12월 레이블: 최상단 1회만 표시 */}
+                {/* 컬럼 헤더 행: grid-cols-12 (4:7:1) */}
                 <div className="bg-gray-50/60 border-b border-gray-100">
-                  {/* 헤더 라벨 행 */}
-                  <div className="flex items-center px-5 py-2">
-                    <div className="w-[38%] text-xs font-semibold text-gray-500">상위 R&R / R&R</div>
-                    <div className="flex-1">
-                      <MonthHeader />
+                  <div className="grid grid-cols-12 items-center px-5 py-2 gap-2">
+                    {/* 4칸: 레이블 */}
+                    <div className="col-span-4 text-xs font-semibold text-gray-500">
+                      상위 R&amp;R / R&amp;R
                     </div>
-                    <div className="w-[60px]" />
+                    {/* 7칸: 1~12월 헤더 (justify-between) */}
+                    <div className="col-span-7 flex justify-between">
+                      {MONTHS.map((m) => (
+                        <span key={m} className="text-[10px] font-medium text-gray-400">
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                    {/* 1칸: 비어 있음 */}
+                    <div className="col-span-1" />
                   </div>
                 </div>
 
-                {/* R&R 목록 */}
+                {/* R&R 목록: grid-cols-12 (4:7:1) */}
                 <div className="divide-y divide-gray-100">
                   {emp.rr_list.map((rr) => (
-                    <div key={rr.rr_id} className="flex items-center gap-4 px-5 py-3">
-                      {/* 상위 R&R + R&R 명 */}
-                      <div className="w-[38%] min-w-0">
+                    <div
+                      key={rr.rr_id}
+                      className="grid grid-cols-12 items-center px-5 py-3 gap-2 group"
+                    >
+                      {/* 4칸: 상위 R&R + 담당 R&R 텍스트 */}
+                      <div className="col-span-4 min-w-0 pr-2">
                         {rr.parent_title && (
                           <p className="text-xs text-gray-400 truncate mb-0.5">
                             {rr.parent_title}
                           </p>
                         )}
-                        <p className="text-sm font-medium text-gray-900 line-clamp-2">{rr.title}</p>
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                          {rr.title}
+                        </p>
                       </div>
 
-                      {/* 구분선 */}
-                      <div className="w-px bg-gray-100 self-stretch flex-shrink-0" />
-
-                      {/* 수행일정 막대 (레이블 없음) */}
-                      <div className="flex-1 min-w-0 pt-1">
+                      {/* 7칸: 타임라인 막대 (레이블 없음) */}
+                      <div className="col-span-7">
                         <TimelineBar
                           periods={rr.periods}
                           year={year}
@@ -137,12 +145,12 @@ const AccordionRow: React.FC<AccordionRowProps> = ({ emp, year, colorClass }) =>
                         />
                       </div>
 
-                      {/* 상세보기 버튼 */}
-                      <div className="flex-shrink-0">
+                      {/* 1칸: 상세보기 버튼 (hover 시에만 표시) */}
+                      <div className="col-span-1 flex justify-center">
                         <button
                           type="button"
                           onClick={() => handleDetailClick(rr)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#4950DC] bg-[#4950DC]/10 hover:bg-[#4950DC]/20 rounded-lg transition-colors whitespace-nowrap"
+                          className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-[#4950DC] bg-[#4950DC]/10 hover:bg-[#4950DC]/20 rounded-lg transition-all whitespace-nowrap"
                         >
                           <Search size={12} />
                           상세
