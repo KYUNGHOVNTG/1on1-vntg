@@ -4,6 +4,7 @@ import type { RrPeriod } from '../types';
 interface TimelineBarProps {
   periods: RrPeriod[];
   year: string;
+  showLabels?: boolean;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -50,7 +51,7 @@ const getColSpanClass = (span: number) => {
   return map[span] || 'col-span-1';
 };
 
-export const TimelineBar: React.FC<TimelineBarProps> = ({ periods, year }) => {
+export const TimelineBar: React.FC<TimelineBarProps> = ({ periods, year, showLabels = true }) => {
   return (
     <div className="w-full">
       {/* 바 영역 */}
@@ -59,38 +60,40 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ periods, year }) => {
           // 'YYYYMM' 형식에서 년/월 추출
           const startYear = period.start_date.substring(0, 4);
           const endYear = period.end_date.substring(0, 4);
-          
+
           // 조회 연도와 무관한 기간은 제외
           if (startYear > year || endYear < year) return null;
-          
+
           let startMonth = parseInt(period.start_date.substring(4, 6), 10);
           let endMonth = parseInt(period.end_date.substring(4, 6), 10);
-          
+
           // 기간이 연도를 걸치는 경우 현재 연도에 맞게 보정
           if (startYear < year) startMonth = 1;
           if (endYear > year) endMonth = 12;
-          
+
           const span = endMonth - startMonth + 1;
           if (span <= 0) return null;
-          
+
           return (
-            <div 
-              key={period.seq} 
+            <div
+              key={period.seq}
               className={`row-start-1 h-full bg-[#4950DC] rounded-full ${getColStartClass(startMonth)} ${getColSpanClass(span)}`}
               title={`${period.start_date} ~ ${period.end_date}`}
             />
           );
         })}
       </div>
-      
+
       {/* 레이블 영역 */}
-      <div className="grid grid-cols-12 text-[10px] text-gray-400 font-medium">
-        {MONTHS.map((month, idx) => (
-          <div key={idx} className="text-center">
-            {month}
-          </div>
-        ))}
-      </div>
+      {showLabels && (
+        <div className="grid grid-cols-12 text-[10px] text-gray-400 font-medium">
+          {MONTHS.map((month, idx) => (
+            <div key={idx} className="text-center">
+              {month}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
