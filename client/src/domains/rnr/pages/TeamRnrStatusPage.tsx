@@ -5,19 +5,13 @@
  *
  * - 조직장(P001~P004)만 접근 가능
  * - 하위 조직 팀원 전체의 R&R을 부서/직책/성명 필터로 조회
- * - 간단히(기본) / 자세히 토글 뷰 지원
+ * - 아코디언 방식으로 사원별 R&R 현황 표시
  */
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { Breadcrumb } from '@/core/ui';
 import { useRnrStore } from '../store';
-import {
-  TeamRnrSearchBar,
-  TeamRnrSimpleGrid,
-  TeamRnrDetailAccordion,
-  ToggleTabs,
-} from '../components';
-import type { ViewMode } from '../components/ToggleTabs';
+import { TeamRnrSearchBar, TeamRnrDetailAccordion } from '../components';
 
 const CURRENT_YEAR = String(new Date().getFullYear());
 
@@ -36,9 +30,6 @@ export const TeamRnrStatusPage: React.FC = () => {
   const [deptCode, setDeptCode] = useState<string>('');
   const [positionCode, setPositionCode] = useState<string>('');
   const [empName, setEmpName] = useState<string>('');
-
-  // 뷰 모드
-  const [viewMode, setViewMode] = useState<ViewMode>('simple');
 
   // 초기 진입 시 필터 옵션 + 목록 조회
   useEffect(() => {
@@ -66,19 +57,14 @@ export const TeamRnrStatusPage: React.FC = () => {
       />
 
       {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-            조직원 R&R 현황
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {year}년 기준 · 총{' '}
-            <span className="font-semibold text-gray-700">{teamRrTotal}</span>명
-          </p>
-        </div>
-
-        {/* 뷰 전환 탭 */}
-        <ToggleTabs value={viewMode} onChange={setViewMode} />
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+          조직원 R&R 현황
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          {year}년 기준 · 총{' '}
+          <span className="font-semibold text-gray-700">{teamRrTotal}</span>명
+        </p>
       </div>
 
       {/* 조회 조건 필터 */}
@@ -97,20 +83,12 @@ export const TeamRnrStatusPage: React.FC = () => {
         isLoading={isLoading.teamRrList}
       />
 
-      {/* R&R 목록 (간단히 / 자세히) */}
-      {viewMode === 'simple' ? (
-        <TeamRnrSimpleGrid
-          items={teamRrList}
-          isLoading={isLoading.teamRrList}
-          year={year}
-        />
-      ) : (
-        <TeamRnrDetailAccordion
-          items={teamRrList}
-          isLoading={isLoading.teamRrList}
-          year={year}
-        />
-      )}
+      {/* R&R 목록 (아코디언) */}
+      <TeamRnrDetailAccordion
+        items={teamRrList}
+        isLoading={isLoading.teamRrList}
+        year={year}
+      />
     </div>
   );
 };

@@ -5,6 +5,7 @@ interface TimelineBarProps {
   periods: RrPeriod[];
   year: string;
   showLabels?: boolean;
+  colorClass?: string;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -51,7 +52,12 @@ const getColSpanClass = (span: number) => {
   return map[span] || 'col-span-1';
 };
 
-export const TimelineBar: React.FC<TimelineBarProps> = ({ periods, year, showLabels = true }) => {
+export const TimelineBar: React.FC<TimelineBarProps> = ({
+  periods,
+  year,
+  showLabels = true,
+  colorClass = 'bg-[#4950DC]',
+}) => {
   return (
     <div className="w-full">
       {/* 바 영역 */}
@@ -77,7 +83,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ periods, year, showLab
           return (
             <div
               key={period.seq}
-              className={`row-start-1 h-full bg-[#4950DC] rounded-full ${getColStartClass(startMonth)} ${getColSpanClass(span)}`}
+              className={`row-start-1 h-full ${colorClass} rounded-full ${getColStartClass(startMonth)} ${getColSpanClass(span)}`}
               title={`${period.start_date} ~ ${period.end_date}`}
             />
           );

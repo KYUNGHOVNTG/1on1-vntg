@@ -1,19 +1,36 @@
 /**
  * TeamRnrDetailAccordion Component
  *
- * 팀 R&R 현황 자세히 보기
+ * 팀 R&R 현황 조회 화면
  * - Card DIV 아코디언 방식
  * - 접힌 상태: 부서명, 성명, 보유R&R 갯수
  * - 펼친 상태: 부서명, 성명, 보유R&R 갯수 + 상위R&R + R&R + 수행일정 막대그래프
  *   (1월~12월 레이블은 펼친 영역 최상단에 1번만 표시)
+ * - 사람별 막대그래프 색상 구분
+ * - R&R별 상세보기 버튼 → RrDetailModal
  */
 
 import React, { useState } from 'react';
-import { ClipboardList, ChevronDown, Loader2 } from 'lucide-react';
+import { ClipboardList, ChevronDown, Loader2, Search } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
-import type { TeamRrEmployeeItem } from '../types';
+import type { TeamRrEmployeeItem, RrItem } from '../types';
 import { TimelineBar } from './TimelineBar';
+import { RrDetailModal } from './RrDetailModal';
 import { EmptyState } from '../../../core/ui/EmptyState/EmptyState';
+
+/** 사람별 막대그래프 색상 팔레트 */
+const PERSON_COLOR_CLASSES = [
+  'bg-[#4950DC]',
+  'bg-[#14B287]',
+  'bg-[#E64D4D]',
+  'bg-[#F59E0B]',
+  'bg-[#2E81B1]',
+  'bg-[#8B5CF6]',
+  'bg-[#EC4899]',
+  'bg-[#059669]',
+  'bg-[#0EA5E9]',
+  'bg-[#D97706]',
+];
 
 interface TeamRnrDetailAccordionProps {
   items: TeamRrEmployeeItem[];
@@ -24,6 +41,7 @@ interface TeamRnrDetailAccordionProps {
 interface AccordionRowProps {
   emp: TeamRrEmployeeItem;
   year: string;
+  colorClass: string;
 }
 
 /** 1월~12월 레이블 헤더 (펼친 영역 최상단에 1회만 표시) */
@@ -39,79 +57,116 @@ const MonthHeader: React.FC = () => (
   </div>
 );
 
-const AccordionRow: React.FC<AccordionRowProps> = ({ emp, year }) => {
+const AccordionRow: React.FC<AccordionRowProps> = ({ emp, year, colorClass }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedRr, setSelectedRr] = useState<RrItem | null>(null);
+
+  const handleDetailClick = (rr: RrItem) => {
+    setSelectedRr(rr);
+    setModalOpen(true);
+  };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* 헤더 (접힌 상태) */}
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full flex items-center px-5 py-4 hover:bg-gray-50/70 transition-colors text-left"
-      >
-        <span className="w-[30%] text-sm text-gray-600 truncate">{emp.dept_name}</span>
-        <span className="w-[35%] font-semibold text-gray-900 text-sm truncate">{emp.emp_name}</span>
-        <span className="flex-1 text-sm text-gray-500">
-          보유 R&R{' '}
-          <span className="font-semibold text-[#4950DC]">{emp.rr_count}</span>건
-        </span>
-        <ChevronDown
-          size={16}
-          className={cn(
-            'text-gray-400 transition-transform duration-200 flex-shrink-0',
-            isOpen ? 'rotate-180 text-[#4950DC]' : '',
-          )}
-        />
-      </button>
+    <>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* 헤더 (접힌 상태) */}
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="w-full flex items-center px-5 py-4 hover:bg-gray-50/70 transition-colors text-left"
+        >
+          <span className="w-[30%] text-sm text-gray-600 truncate">{emp.dept_name}</span>
+          <span className="w-[35%] font-semibold text-gray-900 text-sm truncate">{emp.emp_name}</span>
+          <span className="flex-1 text-sm text-gray-500">
+            보유 R&R{' '}
+            <span className="font-semibold text-[#4950DC]">{emp.rr_count}</span>건
+          </span>
+          <ChevronDown
+            size={16}
+            className={cn(
+              'text-gray-400 transition-transform duration-200 flex-shrink-0',
+              isOpen ? 'rotate-180 text-[#4950DC]' : '',
+            )}
+          />
+        </button>
 
-      {/* 펼침 영역 */}
-      {isOpen && (
-        <div className="border-t border-gray-100">
-          {emp.rr_list.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">등록된 R&R이 없습니다</p>
-          ) : (
-            <>
-              {/* 1월~12월 레이블: 최상단 1회만 표시 */}
-              <div className="bg-gray-50/60 border-b border-gray-100">
-                {/* 헤더 라벨 행 */}
-                <div className="flex items-center px-5 py-2">
-                  <div className="w-[40%] text-xs font-semibold text-gray-500">상위 R&R / R&R</div>
-                  <div className="flex-1">
-                    <MonthHeader />
+        {/* 펼침 영역 */}
+        {isOpen && (
+          <div className="border-t border-gray-100">
+            {emp.rr_list.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4 text-center">등록된 R&R이 없습니다</p>
+            ) : (
+              <>
+                {/* 1월~12월 레이블: 최상단 1회만 표시 */}
+                <div className="bg-gray-50/60 border-b border-gray-100">
+                  {/* 헤더 라벨 행 */}
+                  <div className="flex items-center px-5 py-2">
+                    <div className="w-[38%] text-xs font-semibold text-gray-500">상위 R&R / R&R</div>
+                    <div className="flex-1">
+                      <MonthHeader />
+                    </div>
+                    <div className="w-[60px]" />
                   </div>
                 </div>
-              </div>
 
-              {/* R&R 목록 */}
-              <div className="divide-y divide-gray-100">
-                {emp.rr_list.map((rr) => (
-                  <div key={rr.rr_id} className="flex items-start gap-4 px-5 py-3">
-                    {/* 상위 R&R + R&R 명 */}
-                    <div className="w-[40%] min-w-0">
-                      {rr.parent_title && (
-                        <p className="text-xs text-gray-400 truncate mb-0.5">
-                          {rr.parent_title}
-                        </p>
-                      )}
-                      <p className="text-sm font-medium text-gray-900 line-clamp-2">{rr.title}</p>
+                {/* R&R 목록 */}
+                <div className="divide-y divide-gray-100">
+                  {emp.rr_list.map((rr) => (
+                    <div key={rr.rr_id} className="flex items-center gap-4 px-5 py-3">
+                      {/* 상위 R&R + R&R 명 */}
+                      <div className="w-[38%] min-w-0">
+                        {rr.parent_title && (
+                          <p className="text-xs text-gray-400 truncate mb-0.5">
+                            {rr.parent_title}
+                          </p>
+                        )}
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2">{rr.title}</p>
+                      </div>
+
+                      {/* 구분선 */}
+                      <div className="w-px bg-gray-100 self-stretch flex-shrink-0" />
+
+                      {/* 수행일정 막대 (레이블 없음) */}
+                      <div className="flex-1 min-w-0 pt-1">
+                        <TimelineBar
+                          periods={rr.periods}
+                          year={year}
+                          showLabels={false}
+                          colorClass={colorClass}
+                        />
+                      </div>
+
+                      {/* 상세보기 버튼 */}
+                      <div className="flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleDetailClick(rr)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#4950DC] bg-[#4950DC]/10 hover:bg-[#4950DC]/20 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          <Search size={12} />
+                          상세
+                        </button>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
-                    {/* 구분선 */}
-                    <div className="w-px bg-gray-100 self-stretch flex-shrink-0" />
-
-                    {/* 수행일정 막대 (레이블 없음) */}
-                    <div className="flex-1 min-w-0 pt-1">
-                      <TimelineBar periods={rr.periods} year={year} showLabels={false} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+      {/* R&R 상세 조회 모달 */}
+      <RrDetailModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        empName={emp.emp_name}
+        deptName={emp.dept_name}
+        rr={selectedRr}
+        year={year}
+      />
+    </>
   );
 };
 
@@ -143,8 +198,13 @@ export const TeamRnrDetailAccordion: React.FC<TeamRnrDetailAccordionProps> = ({
 
   return (
     <div className="space-y-3">
-      {items.map((emp) => (
-        <AccordionRow key={emp.emp_no} emp={emp} year={year} />
+      {items.map((emp, idx) => (
+        <AccordionRow
+          key={emp.emp_no}
+          emp={emp}
+          year={year}
+          colorClass={PERSON_COLOR_CLASSES[idx % PERSON_COLOR_CLASSES.length]}
+        />
       ))}
     </div>
   );
