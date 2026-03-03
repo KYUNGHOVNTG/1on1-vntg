@@ -27,7 +27,10 @@ from server.app.domain.rnr.schemas import (
     RrListResponse,
     RrResponse,
     RrUpdateRequest,
+    TeamRrFilterOptions,
+    TeamRrListResponse,
 )
+from server.app.shared.exceptions import ForbiddenException
 
 logger = get_logger(__name__)
 
@@ -226,6 +229,85 @@ class RrService:
         rr_uuid = _uuid.UUID(rr_id)
         await self.repo.delete_rr(rr_uuid)
         await self.db.commit()
+
+
+    # ------------------------------------------------------------------
+    # 팀 R&R 조회
+    # ------------------------------------------------------------------
+
+    async def get_team_rr_list(
+        self,
+        user_id: str,
+        year: str,
+        dept_code_filter: str | None,
+        position_code_filter: str | None,
+        emp_name_filter: str | None,
+    ) -> TeamRrListResponse:
+        """
+        리더의 팀 R&R 목록을 조회합니다.
+
+        처리 순서:
+            1. user_id → emp_no (리더 사번)
+            2. 리더 직책 검증 (P001~P004 아니면 ForbiddenException)
+            3. find_sub_dept_codes(emp_no) → 부서 코드 목록
+            4. find_team_rr_list(dept_codes, year, filters) → 팀원 R&R 목록
+
+        Args:
+            user_id:              JWT에서 추출한 로그인 사용자 ID
+            year:                 기준 연도 (YYYY)
+            dept_code_filter:     부서 필터 (None 이면 전체)
+            position_code_filter: 직책 필터 (None 이면 전체)
+            emp_name_filter:      성명 부분 검색 (None 이면 전체)
+
+        Returns:
+            TeamRrListResponse: { items: list[TeamRrEmployeeItem], total: int }
+
+        Raises:
+            ForbiddenException: 리더 직책(P001~P004)이 아닌 경우
+        """
+        logger.info(
+            "get_team_rr_list called",
+            extra={"user_id": user_id, "year": year},
+        )
+
+        emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        position_code = await self.repo.find_employee_position(emp_no)
+
+        if position_code not in LEADER_POSITION_CODES:
+            raise ForbiddenException(
+                message="조직원 R&R 현황은 조직장만 조회할 수 있습니다",
+                details={"position_code": position_code},
+            )
+
+        dept_codes = await self.repo.find_sub_dept_codes(emp_no)
+        return await self.repo.find_team_rr_list(
+            dept_codes=dept_codes,
+            year=year,
+            dept_code_filter=dept_code_filter,
+            position_code_filter=position_code_filter,
+            emp_name_filter=emp_name_filter,
+        )
+
+    async def get_team_filter_options(self, user_id: str) -> TeamRrFilterOptions:
+        """
+        팀 R&R 조회조건 선택 목록을 반환합니다.
+
+        처리 순서:
+            1. user_id → emp_no
+            2. find_sub_dept_codes(emp_no) → 부서 코드 목록
+            3. find_team_filter_options(dept_codes) → 부서/직책 목록
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+
+        Returns:
+            TeamRrFilterOptions: { departments, positions }
+        """
+        logger.info("get_team_filter_options called", extra={"user_id": user_id})
+
+        emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        dept_codes = await self.repo.find_sub_dept_codes(emp_no)
+        return await self.repo.find_team_filter_options(dept_codes)
 
 
 __all__ = ["RrService"]

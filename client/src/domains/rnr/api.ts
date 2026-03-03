@@ -12,6 +12,9 @@ import type {
   RrItem,
   RrCreateRequest,
   RrUpdateRequest,
+  TeamRrListResponse,
+  TeamRrFilterOptions,
+  GetTeamRrListParams,
 } from './types';
 
 /**
@@ -101,4 +104,29 @@ export async function updateRr(rrId: string, request: RrUpdateRequest): Promise<
  */
 export async function deleteRr(rrId: string): Promise<void> {
   await apiClient.delete(`/v1/rnr/${rrId}`);
+}
+
+/**
+ * 팀 R&R 현황 목록 조회 (조직장 전용)
+ *
+ * 로그인한 조직장의 하위 조직 팀원 전체의 R&R 목록을 조회합니다.
+ *
+ * @param params - 필터 파라미터 (year, dept_code, position_code, emp_name)
+ * @returns 팀원별 R&R 현황 목록 및 전체 건수
+ */
+export async function getTeamRrList(params?: GetTeamRrListParams): Promise<TeamRrListResponse> {
+  const response = await apiClient.get<TeamRrListResponse>('/v1/rnr/team', { params });
+  return response.data;
+}
+
+/**
+ * 팀 R&R 필터 옵션 조회 (조직장 전용)
+ *
+ * 팀 R&R 조회에 사용하는 부서/직책 필터 목록을 반환합니다.
+ *
+ * @returns 부서 목록 및 직책 목록
+ */
+export async function getTeamFilterOptions(): Promise<TeamRrFilterOptions> {
+  const response = await apiClient.get<TeamRrFilterOptions>('/v1/rnr/team-filter-options');
+  return response.data;
 }

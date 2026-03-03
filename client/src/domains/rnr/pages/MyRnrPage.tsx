@@ -4,7 +4,7 @@
  * 나의 R&R 관리 페이지 (M002_1, /goals/myRnr)
  *
  * - 페이지 진입 시 현재 연도 기준 R&R 목록 자동 조회
- * - 카드 형태 + 타임라인 바로 R&R 시각화
+ * - 간단히(테이블) / 자세히(카드+타임라인) 토글 뷰 지원
  * - 새 R&R 등록 모달 연동 (등록 완료 후 목록 자동 새로고침)
  */
 
@@ -12,7 +12,13 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Breadcrumb, Button } from '@/core/ui';
 import { useRnrStore } from '../store';
-import { RrListSection, RrRegisterModal } from '../components';
+import {
+  RrListSection,
+  RrRegisterModal,
+  MyRnrSimpleGrid,
+  ToggleTabs,
+} from '../components';
+import type { ViewMode } from '../components/ToggleTabs';
 
 const CURRENT_YEAR = String(new Date().getFullYear());
 
@@ -25,6 +31,7 @@ export const MyRnrPage: React.FC = () => {
   } = useRnrStore();
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('detail');
 
   const loadList = useCallback(() => {
     fetchMyRrList(CURRENT_YEAR);
@@ -61,23 +68,36 @@ export const MyRnrPage: React.FC = () => {
             <span className="font-semibold text-gray-700">{myRrTotal}</span>건
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="md"
-          icon={<Plus size={16} />}
-          onClick={() => setIsModalOpen(true)}
-        >
-          새 R&R 등록
-        </Button>
+
+        {/* 우측: 뷰 전환 탭 + 등록 버튼 */}
+        <div className="flex items-center gap-3">
+          <ToggleTabs value={viewMode} onChange={setViewMode} />
+          <Button
+            variant="primary"
+            size="md"
+            icon={<Plus size={16} />}
+            onClick={() => setIsModalOpen(true)}
+          >
+            새 R&R 등록
+          </Button>
+        </div>
       </div>
 
-      {/* R&R 목록 (카드 + 타임라인) */}
-      <RrListSection
-        items={myRrList}
-        isLoading={isLoading.myRrList}
-        onRegisterClick={() => setIsModalOpen(true)}
-        onMutated={loadList}
-      />
+      {/* R&R 목록 (간단히 / 자세히) */}
+      {viewMode === 'simple' ? (
+        <MyRnrSimpleGrid
+          items={myRrList}
+          isLoading={isLoading.myRrList}
+          onRegisterClick={() => setIsModalOpen(true)}
+        />
+      ) : (
+        <RrListSection
+          items={myRrList}
+          isLoading={isLoading.myRrList}
+          onRegisterClick={() => setIsModalOpen(true)}
+          onMutated={loadList}
+        />
+      )}
 
       {/* R&R 등록 모달 */}
       <RrRegisterModal

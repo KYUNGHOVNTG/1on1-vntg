@@ -8,3 +8,4 @@ export * from './types';
 export * from './api';
 export * from './store';
 export * from './pages/MyRnrPage';
+export * from './pages/TeamRnrStatusPage';

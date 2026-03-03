@@ -2,15 +2,19 @@
 R&R 도메인 Pydantic 스키마
 
 요청/응답 DTO 정의.
-- RrLevelResponse       : R&R 레벨 응답
-- RrPeriodSchema        : 업무 기간 입력/응답
-- RrResponse            : 단일 R&R 응답 (상위 R&R 명 + 기간 목록 포함)
-- RrListResponse        : R&R 목록 응답 { items, total }
-- MyDepartmentItem      : 소속 부서 아이템 (겸직 포함)
-- MyDepartmentsResponse : 내 부서 목록 응답 { items, total }
-- ParentRrOption        : 상위 R&R 드롭다운 항목
-- ParentRrOptionsResponse : 상위 R&R 선택 목록 응답 { items, total }
-- RrCreateRequest       : R&R 등록 요청
+- RrLevelResponse        : R&R 레벨 응답
+- RrPeriodSchema         : 업무 기간 입력/응답
+- RrResponse             : 단일 R&R 응답 (상위 R&R 명 + 기간 목록 포함)
+- RrListResponse         : R&R 목록 응답 { items, total }
+- MyDepartmentItem       : 소속 부서 아이템 (겸직 포함)
+- MyDepartmentsResponse  : 내 부서 목록 응답 { items, total }
+- ParentRrOption         : 상위 R&R 드롭다운 항목
+- ParentRrOptionsResponse: 상위 R&R 선택 목록 응답 { items, total }
+- RrCreateRequest        : R&R 등록 요청
+- TeamRrFilterOptionItem : 팀 R&R 조회조건 선택 항목 (부서/직책)
+- TeamRrFilterOptions    : 팀 R&R 조회조건 선택 목록
+- TeamRrEmployeeItem     : 팀원별 R&R 아이템 (자세히 뷰 기반)
+- TeamRrListResponse     : 팀 R&R 목록 응답 { items, total }
 """
 
 import uuid
@@ -173,6 +177,60 @@ class RrUpdateRequest(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# 팀 R&R 조회조건 선택 목록
+# ---------------------------------------------------------------------------
+
+class TeamRrFilterOptionItem(BaseModel):
+    """팀 R&R 조회조건 선택 항목 (부서/직책 공용)"""
+
+    code: str = Field(..., description="코드값 (부서 코드 또는 직책 코드)")
+    name: str = Field(..., description="표시명 (부서명 또는 직책명)")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeamRrFilterOptions(BaseModel):
+    """팀 R&R 조회조건 선택 목록 (부서 SELECT + 직책 SELECT)"""
+
+    departments: list[TeamRrFilterOptionItem] = Field(
+        default_factory=list, description="리더 부서 + 하위 부서 목록"
+    )
+    positions: list[TeamRrFilterOptionItem] = Field(
+        default_factory=list, description="해당 부서 소속 직원 직책 목록"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 팀 R&R 목록 응답
+# ---------------------------------------------------------------------------
+
+class TeamRrEmployeeItem(BaseModel):
+    """팀원별 R&R 아이템 (직원 1명 + R&R 목록)"""
+
+    emp_no: str = Field(..., description="사번")
+    emp_name: str = Field(..., description="성명")
+    dept_code: str = Field(..., description="부서 코드")
+    dept_name: str = Field(..., description="부서명")
+    position_code: str = Field(..., description="직책 코드")
+    position_name: str = Field(..., description="직책명")
+    rr_count: int = Field(..., description="보유 R&R 건수")
+    rr_list: list[RrResponse] = Field(
+        default_factory=list, description="R&R 목록 (기간 포함)"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeamRrListResponse(BaseModel):
+    """팀 R&R 목록 응답 — { items: list[TeamRrEmployeeItem], total: int }"""
+
+    items: list[TeamRrEmployeeItem] = Field(
+        default_factory=list, description="팀원별 R&R 목록"
+    )
+    total: int = Field(..., description="조회된 직원 수")
+
+
 __all__ = [
     "RrLevelResponse",
     "RrPeriodSchema",
@@ -185,4 +243,8 @@ __all__ = [
     "ParentRrOptionsResponse",
     "RrCreateRequest",
     "RrUpdateRequest",
+    "TeamRrFilterOptionItem",
+    "TeamRrFilterOptions",
+    "TeamRrEmployeeItem",
+    "TeamRrListResponse",
 ]
