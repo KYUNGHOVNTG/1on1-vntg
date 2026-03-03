@@ -13,12 +13,15 @@ R&R 도메인 Repository
     - find_employee_position : 직원 직책 코드 조회
     - create_rr              : R&R 등록 (tb_rr INSERT)
     - create_rr_periods      : 기간 등록 (tb_rr_period INSERT)
+    - find_sub_dept_codes    : 리더 부서 + 하위 부서 코드 목록 재귀 조회
+    - find_team_rr_list      : 팀원별 R&R 목록 조회 (조회조건 필터 포함)
+    - find_team_filter_options : 팀 R&R 조회조건 선택 목록 (부서/직책)
 """
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -38,6 +41,10 @@ from server.app.domain.rnr.schemas import (
     RrUpdateRequest,
     RrPeriodSchema,
     RrResponse,
+    TeamRrEmployeeItem,
+    TeamRrFilterOptionItem,
+    TeamRrFilterOptions,
+    TeamRrListResponse,
 )
 from server.app.shared.exceptions import NotFoundException, RepositoryException
 
@@ -669,6 +676,273 @@ class RrRepository:
             )
 
         return level_id
+
+
+    # ------------------------------------------------------------------
+    # 팀 R&R 조회 메서드
+    # ------------------------------------------------------------------
+
+    async def find_sub_dept_codes(self, emp_no: str) -> list[str]:
+        """
+        리더 사번 기준으로 소속 부서 및 모든 하위 부서 코드를 재귀 조회합니다.
+
+        PostgreSQL WITH RECURSIVE CTE를 활용합니다.
+        최상위 부서(리더 소속)를 포함하여 모든 하위 부서를 반환합니다.
+
+        Args:
+            emp_no: 리더 사번
+
+        Returns:
+            list[str]: 부서 코드 목록 (리더 부서 + 모든 하위 부서)
+
+        Raises:
+            NotFoundException: 리더 직원 정보가 없을 때
+        """
+        logger.info("find_sub_dept_codes called", extra={"emp_no": emp_no})
+
+        # 리더 소속 부서 조회
+        dept_stmt = select(HRMgnt.dept_code).where(HRMgnt.emp_no == emp_no)
+        dept_result = await self.db.execute(dept_stmt)
+        dept_row = dept_result.first()
+
+        if dept_row is None:
+            raise NotFoundException(
+                message="직원 정보를 찾을 수 없습니다",
+                details={"emp_no": emp_no},
+            )
+
+        root_dept_code: str = dept_row.dept_code
+
+        # PostgreSQL 재귀 CTE로 하위 부서 전체 조회
+        cte_sql = text("""
+            WITH RECURSIVE sub_depts AS (
+                SELECT dept_code
+                FROM cm_department
+                WHERE dept_code = :root_dept_code
+                  AND use_yn = 'Y'
+                UNION ALL
+                SELECT d.dept_code
+                FROM cm_department d
+                INNER JOIN sub_depts sd ON d.upper_dept_code = sd.dept_code
+                WHERE d.use_yn = 'Y'
+            )
+            SELECT dept_code FROM sub_depts
+        """)
+
+        result = await self.db.execute(cte_sql, {"root_dept_code": root_dept_code})
+        dept_codes = [row.dept_code for row in result.all()]
+
+        logger.info(
+            "find_sub_dept_codes 완료",
+            extra={"emp_no": emp_no, "dept_count": len(dept_codes)},
+        )
+        return dept_codes
+
+    async def find_team_rr_list(
+        self,
+        dept_codes: list[str],
+        year: str,
+        dept_code_filter: str | None,
+        position_code_filter: str | None,
+        emp_name_filter: str | None,
+    ) -> TeamRrListResponse:
+        """
+        부서 코드 목록 기준으로 팀원별 R&R 목록을 조회합니다.
+
+        - 부서 코드 목록에 속한 hr_mgnt 직원 전체 조회
+        - 조회조건(부서/직책/성명) 필터 적용
+        - 각 직원의 tb_rr + tb_rr_period + 상위 R&R명 로드
+        - 직원별로 그룹화하여 TeamRrEmployeeItem 목록 반환
+
+        Args:
+            dept_codes:           리더 부서 + 하위 부서 코드 목록
+            year:                 기준 연도 (YYYY)
+            dept_code_filter:     부서 필터 (None 이면 전체)
+            position_code_filter: 직책 필터 (None 이면 전체)
+            emp_name_filter:      성명 필터 (부분 검색, None 이면 전체)
+
+        Returns:
+            TeamRrListResponse: { items: list[TeamRrEmployeeItem], total: int }
+        """
+        logger.info(
+            "find_team_rr_list called",
+            extra={
+                "dept_count": len(dept_codes),
+                "year": year,
+                "dept_code_filter": dept_code_filter,
+                "position_code_filter": position_code_filter,
+                "emp_name_filter": emp_name_filter,
+            },
+        )
+
+        if not dept_codes:
+            return TeamRrListResponse(items=[], total=0)
+
+        try:
+            # 1. 조건에 맞는 직원 목록 조회 (hr_mgnt + cm_department JOIN)
+            emp_stmt = (
+                select(
+                    HRMgnt.emp_no,
+                    HRMgnt.name_kor,
+                    HRMgnt.dept_code,
+                    HRMgnt.position_code,
+                    CMDepartment.dept_name,
+                )
+                .join(CMDepartment, HRMgnt.dept_code == CMDepartment.dept_code)
+                .where(
+                    HRMgnt.dept_code.in_(dept_codes),
+                    HRMgnt.on_work_yn == "Y",
+                )
+            )
+
+            # 조회조건 필터 적용
+            if dept_code_filter:
+                emp_stmt = emp_stmt.where(HRMgnt.dept_code == dept_code_filter)
+            if position_code_filter:
+                emp_stmt = emp_stmt.where(HRMgnt.position_code == position_code_filter)
+            if emp_name_filter:
+                emp_stmt = emp_stmt.where(HRMgnt.name_kor.ilike(f"%{emp_name_filter}%"))
+
+            emp_stmt = emp_stmt.order_by(CMDepartment.dept_name, HRMgnt.name_kor)
+
+            emp_result = await self.db.execute(emp_stmt)
+            employees = emp_result.all()
+
+            if not employees:
+                return TeamRrListResponse(items=[], total=0)
+
+            # 2. 직원 사번 목록으로 R&R 일괄 조회
+            emp_nos = [row.emp_no for row in employees]
+
+            rr_stmt = (
+                select(Rr)
+                .where(Rr.emp_no.in_(emp_nos), Rr.year == year)
+                .options(
+                    selectinload(Rr.periods),
+                    selectinload(Rr.parent),
+                )
+                .order_by(Rr.emp_no, Rr.in_date.asc())
+            )
+
+            rr_result = await self.db.execute(rr_stmt)
+            all_rrs = rr_result.scalars().all()
+
+            # 3. emp_no 기준 R&R 그룹화
+            rr_map: dict[str, list[Rr]] = {}
+            for rr in all_rrs:
+                rr_map.setdefault(rr.emp_no, []).append(rr)
+
+            # 4. 직책명 매핑 (직책 코드 → 표시명)
+            position_name_map: dict[str, str] = {
+                "P001": "대표이사",
+                "P002": "총괄",
+                "P003": "센터장/실장",
+                "P004": "팀장",
+                "P005": "팀원",
+            }
+
+            # 5. TeamRrEmployeeItem 목록 생성
+            items: list[TeamRrEmployeeItem] = []
+            for row in employees:
+                rr_list = [self._to_rr_response(rr) for rr in rr_map.get(row.emp_no, [])]
+                items.append(
+                    TeamRrEmployeeItem(
+                        emp_no=row.emp_no,
+                        emp_name=row.name_kor,
+                        dept_code=row.dept_code,
+                        dept_name=row.dept_name,
+                        position_code=row.position_code,
+                        position_name=position_name_map.get(row.position_code, row.position_code),
+                        rr_count=len(rr_list),
+                        rr_list=rr_list,
+                    )
+                )
+
+            return TeamRrListResponse(items=items, total=len(items))
+
+        except Exception as exc:
+            logger.error(
+                "find_team_rr_list 실패",
+                extra={"year": year, "error": str(exc)},
+            )
+            raise RepositoryException(
+                "팀 R&R 목록 조회에 실패했습니다",
+                details={"year": year},
+            ) from exc
+
+    async def find_team_filter_options(
+        self, dept_codes: list[str]
+    ) -> TeamRrFilterOptions:
+        """
+        팀 R&R 조회조건 선택 목록을 반환합니다.
+
+        - departments: 리더 부서 + 하위 부서 목록 (cm_department 기준)
+        - positions: 해당 부서 소속 재직 직원들의 직책 목록 (distinct)
+
+        Args:
+            dept_codes: 리더 부서 + 하위 부서 코드 목록
+
+        Returns:
+            TeamRrFilterOptions
+        """
+        logger.info(
+            "find_team_filter_options called",
+            extra={"dept_count": len(dept_codes)},
+        )
+
+        try:
+            # 부서 목록 조회
+            dept_stmt = (
+                select(CMDepartment.dept_code, CMDepartment.dept_name)
+                .where(
+                    CMDepartment.dept_code.in_(dept_codes),
+                    CMDepartment.use_yn == "Y",
+                )
+                .order_by(CMDepartment.dept_name)
+            )
+            dept_result = await self.db.execute(dept_stmt)
+            departments = [
+                TeamRrFilterOptionItem(code=row.dept_code, name=row.dept_name)
+                for row in dept_result.all()
+            ]
+
+            # 직책 목록 조회 (해당 부서 소속 재직자 기준 distinct)
+            pos_stmt = (
+                select(distinct(HRMgnt.position_code))
+                .where(
+                    HRMgnt.dept_code.in_(dept_codes),
+                    HRMgnt.on_work_yn == "Y",
+                )
+                .order_by(HRMgnt.position_code)
+            )
+            pos_result = await self.db.execute(pos_stmt)
+
+            position_name_map: dict[str, str] = {
+                "P001": "대표이사",
+                "P002": "총괄",
+                "P003": "센터장/실장",
+                "P004": "팀장",
+                "P005": "팀원",
+            }
+            positions = [
+                TeamRrFilterOptionItem(
+                    code=row.position_code,
+                    name=position_name_map.get(row.position_code, row.position_code),
+                )
+                for row in pos_result.all()
+            ]
+
+            return TeamRrFilterOptions(departments=departments, positions=positions)
+
+        except Exception as exc:
+            logger.error(
+                "find_team_filter_options 실패",
+                extra={"error": str(exc)},
+            )
+            raise RepositoryException(
+                "팀 R&R 조회조건 조회에 실패했습니다",
+                details={},
+            ) from exc
 
 
 __all__ = ["RrRepository", "LEADER_POSITION_CODES", "MEMBER_POSITION_CODE"]

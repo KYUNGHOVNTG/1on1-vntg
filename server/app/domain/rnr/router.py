@@ -6,6 +6,8 @@ R&R 도메인 라우터
     GET  /v1/rnr/my-departments                    - 내 부서 목록 조회 (겸직 포함)
     GET  /v1/rnr/departments/{dept_code}/parent-rr - 상위 R&R 선택 목록
     POST /v1/rnr                                   - R&R 등록
+    GET  /v1/rnr/team                              - 팀원 R&R 현황 조회 (리더 전용)
+    GET  /v1/rnr/team-filter-options               - 팀 R&R 조회조건 선택 목록 (리더 전용)
 
 인증:
     모든 엔드포인트는 JWT Bearer 토큰 필수 (get_current_user_id 의존성 사용)
@@ -26,6 +28,8 @@ from server.app.domain.rnr.schemas import (
     RrListResponse,
     RrResponse,
     RrUpdateRequest,
+    TeamRrFilterOptions,
+    TeamRrListResponse,
 )
 from server.app.domain.rnr.service import RrService
 
@@ -253,3 +257,92 @@ async def delete_rr(
     )
     service = RrService(db)
     await service.delete_rr(rr_id)
+
+
+# =============================================
+# 팀 R&R 조회 API (리더 전용)
+# =============================================
+
+
+@router.get(
+    "/team",
+    response_model=TeamRrListResponse,
+    summary="팀원 R&R 현황 조회",
+    description=(
+        "리더가 본인 부서 및 하위 부서 전체의 팀원 R&R 현황을 조회합니다. "
+        "조직장 직책(P001~P004)만 접근 가능합니다. "
+        "dept_code, position_code, emp_name 파라미터로 필터링할 수 있습니다."
+    ),
+)
+async def get_team_rr_list(
+    year: str = Query(
+        default=_CURRENT_YEAR,
+        description="기준 연도 (YYYY)",
+        pattern=r"^\d{4}$",
+    ),
+    dept_code: str | None = Query(default=None, description="부서 코드 필터"),
+    position_code: str | None = Query(default=None, description="직책 코드 필터"),
+    emp_name: str | None = Query(default=None, description="성명 검색 (부분 일치)"),
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> TeamRrListResponse:
+    """
+    팀원 R&R 현황을 조회합니다.
+
+    Args:
+        year:          기준 연도 (YYYY, 기본값: 현재 연도)
+        dept_code:     부서 코드 필터 (None: 전체)
+        position_code: 직책 코드 필터 (None: 전체)
+        emp_name:      성명 검색 (None: 전체)
+        user_id:       JWT에서 추출한 로그인 사용자 ID
+        db:            데이터베이스 세션
+
+    Returns:
+        TeamRrListResponse: { items: list[TeamRrEmployeeItem], total: int }
+    """
+    logger.info(
+        "GET /rnr/team",
+        extra={
+            "user_id": user_id,
+            "year": year,
+            "dept_code": dept_code,
+            "position_code": position_code,
+            "emp_name": emp_name,
+        },
+    )
+    service = RrService(db)
+    return await service.get_team_rr_list(
+        user_id=user_id,
+        year=year,
+        dept_code_filter=dept_code,
+        position_code_filter=position_code,
+        emp_name_filter=emp_name,
+    )
+
+
+@router.get(
+    "/team-filter-options",
+    response_model=TeamRrFilterOptions,
+    summary="팀 R&R 조회조건 선택 목록",
+    description=(
+        "팀 R&R 조회 화면의 조회조건에 사용할 부서 및 직책 선택 목록을 반환합니다. "
+        "리더 본인 부서 + 하위 부서 목록과 해당 부서 소속 직원의 직책 목록을 반환합니다."
+    ),
+)
+async def get_team_filter_options(
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> TeamRrFilterOptions:
+    """
+    팀 R&R 조회조건 선택 목록을 반환합니다.
+
+    Args:
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db:      데이터베이스 세션
+
+    Returns:
+        TeamRrFilterOptions: { departments, positions }
+    """
+    logger.info("GET /rnr/team-filter-options", extra={"user_id": user_id})
+    service = RrService(db)
+    return await service.get_team_filter_options(user_id)

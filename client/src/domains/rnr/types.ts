@@ -141,3 +141,55 @@ export interface RrUpdateRequest {
   content: string | null;
   periods: PeriodInput[];
 }
+
+// =============================================
+// 팀 R&R 현황 (조직장 전용)
+// =============================================
+
+/**
+ * 팀 R&R 필터 옵션 항목 (부서 또는 직책)
+ */
+export interface TeamRrFilterOptionItem {
+  code: string;
+  name: string;
+}
+
+/**
+ * 팀 R&R 필터 옵션 (부서 + 직책 선택 목록)
+ */
+export interface TeamRrFilterOptions {
+  departments: TeamRrFilterOptionItem[];
+  positions: TeamRrFilterOptionItem[];
+}
+
+/**
+ * 팀원별 R&R 현황 항목
+ */
+export interface TeamRrEmployeeItem {
+  emp_no: string;
+  emp_name: string;
+  dept_code: string;
+  dept_name: string;
+  position_code: string;
+  position_name: string;
+  rr_count: number;
+  rr_list: RrItem[];
+}
+
+/**
+ * 팀 R&R 현황 목록 응답
+ */
+export interface TeamRrListResponse {
+  items: TeamRrEmployeeItem[];
+  total: number;
+}
+
+/**
+ * 팀 R&R 목록 조회 파라미터
+ */
+export interface GetTeamRrListParams {
+  year?: string;
+  dept_code?: string;
+  position_code?: string;
+  emp_name?: string;
+}

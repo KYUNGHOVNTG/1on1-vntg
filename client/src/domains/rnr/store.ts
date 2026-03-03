@@ -1,7 +1,7 @@
 /**
  * R&R 도메인 Store
  *
- * 나의 R&R 관리 관련 상태 관리 (Zustand)
+ * 나의 R&R 관리 + 팀 R&R 현황 관련 상태 관리 (Zustand)
  */
 
 import { create } from 'zustand';
@@ -11,6 +11,9 @@ import type {
   ParentRrOption,
   RrCreateRequest,
   RrUpdateRequest,
+  TeamRrEmployeeItem,
+  TeamRrFilterOptions,
+  GetTeamRrListParams,
 } from './types';
 import * as rnrApi from './api';
 
@@ -31,6 +34,11 @@ interface RnrState {
   parentRrOptions: ParentRrOption[];
   parentRrOptionsTotal: number;
 
+  // 팀 R&R 현황
+  teamRrList: TeamRrEmployeeItem[];
+  teamRrTotal: number;
+  teamFilterOptions: TeamRrFilterOptions | null;
+
   // 로딩 상태
   isLoading: {
     myRrList: boolean;
@@ -39,6 +47,8 @@ interface RnrState {
     createRr: boolean;
     updateRr: boolean;
     deleteRr: boolean;
+    teamRrList: boolean;
+    teamFilterOptions: boolean;
   };
 
   // 에러 상태
@@ -49,6 +59,8 @@ interface RnrState {
     createRr: string | null;
     updateRr: string | null;
     deleteRr: string | null;
+    teamRrList: string | null;
+    teamFilterOptions: string | null;
   };
 
   // 액션
@@ -58,6 +70,8 @@ interface RnrState {
   createRr: (request: RrCreateRequest) => Promise<RrItem>;
   updateRr: (rrId: string, request: RrUpdateRequest) => Promise<RrItem>;
   deleteRr: (rrId: string) => Promise<void>;
+  fetchTeamRrList: (params?: GetTeamRrListParams) => Promise<void>;
+  fetchTeamFilterOptions: () => Promise<void>;
   clearError: (key: keyof RnrState['error']) => void;
 }
 
@@ -76,6 +90,10 @@ export const useRnrStore = create<RnrState>((set, _get) => ({
   parentRrOptions: [],
   parentRrOptionsTotal: 0,
 
+  teamRrList: [],
+  teamRrTotal: 0,
+  teamFilterOptions: null,
+
   isLoading: {
     myRrList: false,
     myDepartments: false,
@@ -83,6 +101,8 @@ export const useRnrStore = create<RnrState>((set, _get) => ({
     createRr: false,
     updateRr: false,
     deleteRr: false,
+    teamRrList: false,
+    teamFilterOptions: false,
   },
 
   error: {
@@ -92,6 +112,8 @@ export const useRnrStore = create<RnrState>((set, _get) => ({
     createRr: null,
     updateRr: null,
     deleteRr: null,
+    teamRrList: null,
+    teamFilterOptions: null,
   },
 
   // =============================================
@@ -277,6 +299,59 @@ export const useRnrStore = create<RnrState>((set, _get) => ({
       set((state) => ({
         isLoading: { ...state.isLoading, deleteRr: false },
         error: { ...state.error, deleteRr: errorMessage },
+      }));
+      throw err;
+    }
+  },
+
+  /**
+   * 팀 R&R 현황 목록 조회 (조직장 전용)
+   *
+   * @param params - 필터 파라미터 (year, dept_code, position_code, emp_name)
+   */
+  fetchTeamRrList: async (params?: GetTeamRrListParams) => {
+    set((state) => ({
+      isLoading: { ...state.isLoading, teamRrList: true },
+      error: { ...state.error, teamRrList: null },
+    }));
+
+    try {
+      const response = await rnrApi.getTeamRrList(params);
+      set((state) => ({
+        teamRrList: response.items,
+        teamRrTotal: response.total,
+        isLoading: { ...state.isLoading, teamRrList: false },
+      }));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '팀 R&R 목록 조회 실패';
+      set((state) => ({
+        isLoading: { ...state.isLoading, teamRrList: false },
+        error: { ...state.error, teamRrList: errorMessage },
+      }));
+      throw err;
+    }
+  },
+
+  /**
+   * 팀 R&R 필터 옵션 조회 (조직장 전용)
+   */
+  fetchTeamFilterOptions: async () => {
+    set((state) => ({
+      isLoading: { ...state.isLoading, teamFilterOptions: true },
+      error: { ...state.error, teamFilterOptions: null },
+    }));
+
+    try {
+      const options = await rnrApi.getTeamFilterOptions();
+      set((state) => ({
+        teamFilterOptions: options,
+        isLoading: { ...state.isLoading, teamFilterOptions: false },
+      }));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '필터 옵션 조회 실패';
+      set((state) => ({
+        isLoading: { ...state.isLoading, teamFilterOptions: false },
+        error: { ...state.error, teamFilterOptions: errorMessage },
       }));
       throw err;
     }
