@@ -84,6 +84,18 @@ class ApiClient {
         // 에러 처리
         const errorData = ApiErrorHandler.handle(error);
 
+        // 403 권한 없음 처리 (로그인 상태 유지, 토스트만 표시)
+        if (ApiErrorHandler.isForbiddenError(error)) {
+          const errorDetail = error.response?.data?.detail;
+          const errorMessage =
+            typeof errorDetail === 'object'
+              ? errorDetail.message
+              : typeof errorDetail === 'string'
+                ? errorDetail
+                : '접근 권한이 없습니다';
+          toast.error(errorMessage);
+        }
+
         // 401 인증 에러 자동 처리
         if (ApiErrorHandler.isAuthError(error)) {
           // 에러 응답에서 error_code 추출

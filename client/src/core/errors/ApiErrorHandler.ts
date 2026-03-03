@@ -141,7 +141,18 @@ export class ApiErrorHandler {
    */
   static isAuthError(error: AxiosError): boolean {
     const status = error.response?.status;
-    return status === 401 || status === 403;
+    return status === 401;
+  }
+
+  /**
+   * 권한 없음 에러인지 확인 (403 Forbidden)
+   * 인증 상태는 유지하되 해당 리소스에 접근 권한이 없는 경우
+   *
+   * @param error - Axios 에러 객체
+   * @returns 권한 없음 에러 여부
+   */
+  static isForbiddenError(error: AxiosError): boolean {
+    return error.response?.status === 403;
   }
 
   /**
