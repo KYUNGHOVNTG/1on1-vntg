@@ -162,6 +162,30 @@ class Settings(BaseSettings):
     )
 
     # ====================
+    # Google Cloud Storage (GCS) Settings
+    # ====================
+    GCS_BUCKET_NAME: str = Field(
+        default="",
+        description="GCS 버킷 이름"
+    )
+    GCS_PROJECT_ID: str = Field(
+        default="",
+        description="GCS 프로젝트 ID"
+    )
+    GOOGLE_APPLICATION_CREDENTIALS: str = Field(
+        default="",
+        description="GCS 서비스 계정 JSON 파일 경로 (비어있으면 ADC 사용)"
+    )
+
+    # ====================
+    # OpenAI Settings
+    # ====================
+    OPENAI_API_KEY: str = Field(
+        default="",
+        description="OpenAI API 키 (Whisper STT, GPT-4o 사용)"
+    )
+
+    # ====================
     # Domain Plugin Settings
     # ====================
     # 여기에 도메인별 설정을 추가할 수 있습니다
