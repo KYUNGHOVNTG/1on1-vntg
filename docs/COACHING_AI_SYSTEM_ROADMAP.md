@@ -1,8 +1,9 @@
 # 1on1 코칭 AI 시스템 — 전체 개발 로드맵
 
 > 작성일: 2026-03-04
-> 설계 버전: v7.0 THE MASTER SPEC
-> 확정된 결정사항 반영 완료
+> 설계 버전: v7.1 (점검 반영)
+> 최종 수정일: 2026-03-04
+> 변경 내역: 기능/설계 점검 결과 반영 — CRITICAL 5건 수정, MAJOR 6건·MINOR 7건 베타 타협안 적용
 
 ---
 
@@ -18,7 +19,31 @@
 | H-3 N-1/N-2 브리핑 범위 | **미완료 Action Item만** 로드 (AI 요약 제외) |
 | H-4 조직원 사전 아젠다 | **v1 제외** — 항상 빈 배열, 화면에 안내 문구만 표시 |
 | H-5 actual_duration_seconds | **실제 녹음 길이** (오디오 파일 duration 기준) |
-| M-4 팀원/리더 구분 | **position_code 기준** — P004(팀장)=리더, P005(팀원)=멤버 |
+| M-4 팀원/리더 구분 | **position_code 기준** — P001~P004=리더, P005=멤버 (대시보드 필터: `== 'P005'` 사용) |
+
+---
+
+## 🔧 v7.1 수정 내역 (2026-03-04 점검 반영)
+
+| 항목 | 수정 내용 |
+|------|---------|
+| V-1 assignee 누락 | `TbMeetingActionItem.assignee` 컬럼 추가, `ActionItemReport` 스키마 반영 |
+| V-2 position_code 오류 | Task 3 필터 `!= 'P004'` → `== 'P005'` 수정 |
+| V-3 /start 바디 누락 | `MeetingStartRequest` (agendas 목록) 스키마 추가 |
+| V-4 Whisper 25MB 한도 | 오디오 청크 분할 전략 추가 (10분 단위 분할 → 병합) |
+| V-5 alembic env.py | Task 1 체크리스트에 coaching 모델 import 단계 명시 |
+| V-6 /timelines 중복 | Task 5/7 동일 엔드포인트 통합 (`end_time?`, `segment_summary?` Optional 통합) |
+| V-7 MediaRecorder store | Zustand에서 제거 → `useRef`로 관리 명시, `activeRrId` 추가 |
+| V-8 업로드 진행률 | `fetch` → `XMLHttpRequest.upload.onprogress` 명시 |
+| V-9 LLM 동기 지연 | 15초 타임아웃 + fallback 빈 배열 (베타 타협) |
+| V-10 PROCESSING 고착 | scheduler.py 활용 30분 초과 시 FAILED 전환 (베타 타협) |
+| V-11 UPSERT 미명세 | Task 6에 TbCoachingRelation UPSERT 패턴 명시 |
+| V-12 구간 매칭 버그 | `seg['end'] <=` → `seg['start'] <` 경계 조건 수정 |
+| V-13 이월 범위 | N-1/N-2 제한 명확화, assignee 복사 명시 |
+| V-14 GCS CORS | cors.json 설정 예시 추가 |
+| V-15 필터 혼용 | 서버 재조회 시 카드 필터 초기화 명시 |
+| V-16 메뉴 등록 누락 | Task 15에 cm_menu 마이그레이션 항목 추가 |
+| V-17 audio_url 중복 | Report 응답에서 audio_url 제거, 별도 endpoint 사용 통일 |
 
 ---
 
@@ -137,6 +162,7 @@ class TbMeetingActionItem(Base):
     origin_meeting_id = Column(UUID(as_uuid=True), nullable=True)  # 이월 원본 미팅 ID
     is_carried_over = Column(Boolean, default=False, nullable=False)  # True: 이월 항목
     content = Column(Text, nullable=False)
+    assignee = Column(String(10), nullable=True)  # 'LEADER' | 'MEMBER' | None (AI 추출 시 설정, 이월 항목은 origin 값 복사)
     is_completed = Column(Boolean, default=False, nullable=False)
 
     meeting = relationship('TbMeeting', back_populates='action_items')
@@ -240,15 +266,25 @@ server/app/domain/coaching/
 
 **명령어:**
 ```bash
+# 1. alembic/env.py에 coaching 모델 import 추가 (autogenerate 감지용)
+# target_metadata = Base.metadata 위에 아래 import 삽입:
+# from server.app.domain.coaching.models import (
+#     TbCoachingRelation, TbMeeting, TbMeetingAgenda,
+#     TbMeetingActionItem, TbMeetingRecord, TbMeetingTimeline
+# )
+
+# 2. 마이그레이션 생성 + 적용
 alembic revision --autogenerate -m "coaching_ai 도메인 테이블 생성"
 alembic upgrade head
 ```
 
 **예외처리 체크:**
+- [ ] **`alembic/env.py`에 coaching 모델 import 추가** — 빠뜨리면 autogenerate가 새 테이블을 감지 못함
 - [ ] `tb_rr` 테이블이 이미 존재하므로 FK만 참조, 테이블 재생성 금지
 - [ ] `Base` import 경로 확인: `from server.app.core.database import Base`
 - [ ] UUID primary key에 `default=uuid.uuid4` (callable, 괄호 없음)
-- [ ] 마이그레이션 파일에 `downgrade()` 함수 필수 (DROP TABLE 역순)
+- [ ] 마이그레이션 파일에 `downgrade()` 함수 필수 (DROP TABLE 역순: timelines → record → action_items → agendas → meeting → coaching_relation)
+- [ ] `TbCoachingRelation` → `TbMeeting` FK 순서 주의: upgrade 시 `tb_meeting` 먼저 생성, downgrade 시 `tb_coaching_relation` 먼저 DROP
 
 **테스트 방법:**
 ```bash
@@ -301,10 +337,26 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 OPENAI_API_KEY=sk-...
 ```
 
+**GCS 버킷 CORS 설정 (cors.json):**
+```json
+[
+  {
+    "origin": ["http://localhost:5173", "https://your-production-domain.com"],
+    "method": ["PUT", "GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length"],
+    "maxAgeSeconds": 3600
+  }
+]
+```
+```bash
+# 적용 명령어
+gcloud storage buckets update gs://{BUCKET_NAME} --cors-file=cors.json
+```
+
 **예외처리 체크:**
 - [ ] GCS 서비스 계정 JSON 파일 경로 누락 시 명확한 에러 메시지
 - [ ] Presigned URL 만료 시간 기본값 1시간 (대용량 파일 업로드 고려)
-- [ ] CORS 설정: GCS 버킷에 프론트엔드 origin 허용 설정 필요
+- [ ] CORS 설정 적용 확인 (미설정 시 프론트엔드 직접 업로드 시 CORS 에러로 전면 차단됨)
 
 ---
 
@@ -323,8 +375,9 @@ GET /v1/coaching/dashboard
 
 **비즈니스 로직:**
 1. 현재 로그인 유저의 `emp_no` 확인
-2. `hr_mgnt` 테이블에서 같은 `dept_code` 내 `position_code != 'P004'` (팀원) 조회
-3. 각 팀원별 `TbCoachingRelation` JOIN → `last_meeting_date`, `total_meeting_count`
+2. `hr_mgnt` 테이블에서 같은 `dept_code` 내 `position_code == 'P005'` (팀원만) + `on_work_yn == 'Y'` 조회
+   - **주의**: P001~P004는 모두 조직장 코드이므로 제외. `!= 'P004'`가 아닌 `== 'P005'` 조건 사용 필수
+3. 각 팀원별 `TbCoachingRelation` LEFT JOIN → `last_meeting_date`, `total_meeting_count` (없으면 NULL/0)
 4. 면담 상태 계산:
    - `last_meeting_date IS NULL`: 미실시
    - `last_meeting_date < 현재 - 2개월`: 2개월 초과 지연 (경고색)
@@ -354,9 +407,10 @@ class DashboardMemberItem(BaseModel):
 ```
 
 **예외처리 체크:**
-- [ ] position_code로 팀원 필터 시 P004 외 다른 임원급 코드도 제외 필요한지 확인
+- [ ] `position_code == 'P005'` AND `on_work_yn == 'Y'` 조건 필수 (P001~P004 조직장 코드 전체 제외)
 - [ ] `TbCoachingRelation`이 없는 팀원 → `last_meeting_date=None`, `total_meeting_count=0` (LEFT JOIN)
 - [ ] 검색어 2자 미만 시 전체 조회
+- [ ] 리더 자신이 목록에 포함되지 않도록 `emp_no != current_user.emp_no` 조건 추가
 
 **테스트 방법:**
 ```bash
@@ -404,21 +458,38 @@ class PreMeetingResponse(BaseModel):
 3. LLM 호출: member의 R&R + 이전 요약(있으면) → AI 추천 질문 3~5개 생성
 4. 첫 미팅 여부: COMPLETED 미팅이 0건이면 `is_first_meeting=True`
 
+**베타 타협 — LLM 응답 지연 처리:**
+- `GET /pre-meeting` 호출 시 LLM을 동기로 호출하나, 타임아웃 15초 후 빈 배열 fallback
+- 프론트엔드: `ai_suggested_agendas`가 빈 배열이면 "AI 추천 질문을 불러오는 중..." skeleton → 모달 자체는 즉시 표시
+- 베타 10명 규모에서는 동기 방식 허용 (비동기 분리는 실서비스 고도화 시 대응)
+
 **예외처리 체크:**
 - [ ] `DELETE` 시 status가 `REQUESTED`가 아닌 경우 삭제 거부 (이미 시작된 미팅 보호)
-- [ ] LLM 타임아웃 시 빈 배열로 fallback (AI 추천 실패해도 모달은 열려야 함)
+- [ ] LLM 타임아웃 15초 설정 → 초과 시 `ai_suggested_agendas: []` fallback (모달은 정상 오픈)
 - [ ] N-1, N-2 미팅이 PROCESSING 상태이면 Action Item이 없을 수 있음 → 정상 처리 (빈 배열)
 
 ---
 
 #### Task 5 — 미팅 실행 API (Active Meeting)
 
+**요청 바디 스키마 (PATCH /start):**
+```python
+class AgendaStartItem(BaseModel):
+    content: str
+    source: Literal["AI_SUGGESTED", "LEADER_ADDED"]
+
+class MeetingStartRequest(BaseModel):
+    agendas: list[AgendaStartItem]  # 사전 준비 모달에서 선택/추가한 아젠다 목록
+    # MEMBER_PRESET은 v1 미사용 → 프론트에서 항상 제외하고 전달
+```
+
 **엔드포인트:**
 ```
 PATCH /v1/coaching/meetings/{meeting_id}/start
+      body: MeetingStartRequest
       → status = IN_PROGRESS, started_at 기록
-      → 이전 미팅 미완료 Action Item → 현재 미팅에 복사 INSERT (is_carried_over=True)
-      → 사전 아젠다 INSERT (AI_SUGGESTED, LEADER_ADDED)
+      → 이전 미팅(N-1, N-2만) 미완료 Action Item → 현재 미팅에 복사 INSERT (is_carried_over=True, assignee 값 그대로 복사)
+      → 사전 아젠다 INSERT (AI_SUGGESTED, LEADER_ADDED, body.agendas 기준)
 
 GET   /v1/coaching/meetings/{meeting_id}/active
       → 미팅 실행 화면 초기 데이터
@@ -431,8 +502,10 @@ POST  /v1/coaching/meetings/{meeting_id}/timelines
       body: { rr_id, start_time }
 
 PATCH /v1/coaching/meetings/{meeting_id}/timelines/{timeline_id}
-      → 타임라인 카드 마감 (다른 R&R 클릭 시)
-      body: { end_time }
+      → 타임라인 카드 마감 OR 구간 요약 수동 편집 (통합 엔드포인트)
+      body: { end_time?: int, segment_summary?: str }
+      # end_time만 → 카드 마감 (미팅 실행 중)
+      # segment_summary만 → 구간 요약 수정 (히스토리 리포트에서 편집)
 
 PATCH /v1/coaching/meetings/{meeting_id}/memo
       → 개인 메모 저장 (2초 debounce 자동 저장)
@@ -463,6 +536,8 @@ class RrTreeNode(BaseModel):
 
 **예외처리 체크:**
 - [ ] `start` 호출 시 status가 `REQUESTED`가 아니면 400 에러 (중복 시작 방지)
+- [ ] **Action Item 이월 범위: N-1, N-2 미팅만** (COMPLETED 기준 최신 2건) — 더 오래된 미팅은 이월 제외하여 누적 방지
+- [ ] 이월 복사 시 `assignee` 값도 함께 복사 (`origin_meeting_id` + `is_carried_over=True` + `assignee` 유지)
 - [ ] 타임라인 카드 생성 시 동일 meeting_id에 end_time이 NULL인 카드가 있으면 자동 마감 후 신규 생성
 - [ ] 메모 저장은 인증된 leader만 가능 (meeting.leader_emp_no == current_user.emp_no)
 - [ ] Action Item 체크는 이월 항목도 현재 미팅 row에서만 업데이트 (원본 미팅 불변)
@@ -488,7 +563,8 @@ PATCH /v1/coaching/meetings/{meeting_id}/complete
       }
       → status = PROCESSING
       → TbMeetingRecord 생성 (audio_file_url = gcs_path)
-      → TbCoachingRelation 업데이트 (last_meeting_id, last_meeting_date)
+      → TbCoachingRelation UPSERT (row 없으면 INSERT, 있으면 UPDATE)
+        : last_meeting_id, last_meeting_date = completed_at, total_meeting_count += 1
       → AI 파이프라인 BackgroundTask 트리거
 ```
 
@@ -509,6 +585,7 @@ PATCH /v1/coaching/meetings/{meeting_id}/complete
 - [ ] 마지막 타임라인 카드 `end_time` NULL이면 `actual_duration_seconds`로 자동 마감
 - [ ] BackgroundTask 실패 시 status를 `FAILED`로 업데이트 (catch-all try/except 필수)
 - [ ] `/complete` 멱등성: 이미 PROCESSING/COMPLETED이면 200 반환 (중복 호출 무시)
+- [ ] **베타 타협 — PROCESSING 고착 방어:** 기존 `scheduler.py` 활용, 30분 이상 PROCESSING 상태인 미팅을 FAILED로 자동 전환하는 배치 추가 (실서비스 전 Celery/Worker 전환 예정)
 
 ---
 
@@ -523,14 +600,15 @@ GET /v1/coaching/members/{member_emp_no}/meetings
 GET /v1/coaching/meetings/{meeting_id}/report
     → 미팅 상세 리포트 (Bento Grid 데이터)
     → 권한에 따라 private_memo 포함/제외
+    → audio_url 미포함 (별도 /audio-url 엔드포인트 사용)
 
-PATCH /v1/coaching/meetings/{meeting_id}/timelines/{timeline_id}
-      → 타임라인 수동 편집 (STT 재수행 없이 구간 LLM 재요약만 실행)
-      body: { segment_summary }  # 직접 수정 or LLM 재요약 트리거
+# PATCH /timelines → Task 5와 동일 엔드포인트 재사용 (body에 segment_summary 전달)
+# 별도 정의 불필요
 
 GET /v1/coaching/meetings/{meeting_id}/audio-url
     → GCS Presigned Download URL 발급 (오디오 플레이어용)
     → 매 요청마다 새로운 URL 발급 (캐싱 금지)
+    → 권한 체크: current_user.emp_no == meeting.leader_emp_no OR meeting.member_emp_no
 ```
 
 **리포트 응답 구조:**
@@ -545,7 +623,7 @@ class MeetingReportResponse(BaseModel):
     timelines: list[TimelineItem]
     action_items: list[ActionItemReport]
     private_memo: str | None   # 리더만 조회 가능, 멤버는 None 반환
-    audio_url: str | None      # Presigned URL (단기 만료)
+    # audio_url 제외 → GET /audio-url 별도 호출 (리포트 로드와 분리하여 presigned URL 생성 타이밍 제어)
 
 class TimelineItem(BaseModel):
     timeline_id: str
@@ -557,6 +635,7 @@ class TimelineItem(BaseModel):
 class ActionItemReport(BaseModel):
     action_item_id: str
     content: str
+    assignee: str | None    # 'LEADER' | 'MEMBER' | None
     is_completed: bool
     is_carried_over: bool
     origin_meeting_id: str | None
@@ -596,15 +675,22 @@ interface CoachingMeetingStore {
   // 현재 진행 중인 미팅
   activeMeeting: ActiveMeeting | null;
   recordingSeconds: number;        // 녹음 경과 시간 (초)
-  mediaRecorder: MediaRecorder | null;
-  audioChunks: Blob[];
+  isRecording: boolean;
 
   // 실시간 타임라인
   activeTimelineId: string | null;  // 현재 활성 타임라인 카드 ID
+  activeRrId: string | null;        // 현재 활성 R&R ID (같은 카드 연속 클릭 방지용)
 
   // IndexedDB 임시 저장 (유실 방지)
   draftMemo: string;
 }
+
+// ⚠️ MediaRecorder, audioChunks(Blob[])는 Zustand에 넣지 말 것 → useRef로 관리
+// ActiveMeetingPage.tsx 내부:
+// const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+// const audioChunksRef = useRef<Blob[]>([]);
+// → 브라우저 API 객체, 대용량 바이너리는 직렬화 불가능 → store 저장 금지
+```
 ```
 
 **예외처리 체크:**
@@ -637,6 +723,7 @@ pages/CoachingDashboard.tsx
 - [ ] 팀원 0명일 때 EmptyState 컴포넌트 표시
 - [ ] 검색 디바운스 300ms (타이핑 중 과도한 API 호출 방지)
 - [ ] 요약 카드 클릭 시 그리드 필터링 (추가 API 호출 없이 클라이언트 사이드)
+- [ ] **필터 우선순위:** 이름 검색(서버 재조회) 시 카드 필터 상태 초기화 — 혼용 시 충돌 방지를 위해 서버 재조회가 항상 우선
 
 ---
 
@@ -717,22 +804,26 @@ useEffect(() => {
 ```typescript
 // R&R 카드 클릭
 const handleRrClick = async (rrId: string) => {
+  // 같은 R&R 카드 연속 클릭 방지 (activeRrId로 판단)
+  if (activeRrId === rrId) return;
+
   const currentTime = recordingSeconds;
 
   // 현재 활성 카드 마감
   if (activeTimelineId) {
-    await api.closeTimeline(meetingId, activeTimelineId, currentTime);
+    await api.patchTimeline(meetingId, activeTimelineId, { end_time: currentTime });
   }
 
   // 새 타임라인 카드 생성
-  const newTimeline = await api.createTimeline(meetingId, { rrId, startTime: currentTime });
+  const newTimeline = await api.createTimeline(meetingId, { rr_id: rrId, start_time: currentTime });
   setActiveTimelineId(newTimeline.timeline_id);
+  setActiveRrId(rrId);  // ← store에 현재 활성 R&R ID 기록
 };
 ```
 
 **예외처리 체크:**
 - [ ] 페이지 새로고침/이탈 시 `beforeunload` 이벤트에서 경고 다이얼로그 표시
-- [ ] 같은 R&R 카드 연속 클릭: 중복 타임라인 생성 방지 (activeTimelineId === 클릭한 rr의 타임라인이면 무시)
+- [ ] 같은 R&R 카드 연속 클릭: `store.activeRrId === rrId`이면 early return (activeTimelineId 비교 불가, rr_id로 판단)
 - [ ] 메모 저장 API 실패: 로컬 상태 유지, 다음 debounce 시 재시도
 - [ ] AI 추천 질문 클릭 → 메모장 커서 위치에 삽입 (contentEditable or textarea selectionStart/End 활용)
 - [ ] R&R 데이터 없을 때 EmptyState ("R&R이 등록되지 않았습니다")
@@ -774,7 +865,7 @@ const handleTimelineClick = (startTime: number) => {
 
 **예외처리 체크:**
 - [ ] GCS 업로드 실패: 재시도 버튼 제공 (최대 3회 자동 재시도 후 수동 재시도)
-- [ ] 업로드 진행률: `XMLHttpRequest` 또는 `fetch` + `ReadableStream` 활용
+- [ ] 업로드 진행률: **반드시 `XMLHttpRequest` + `upload.onprogress` 사용** — `fetch`는 업로드 진행률 추적 불가 (ReadableStream은 다운로드 전용)
 - [ ] PROCESSING 상태 폴링: 5초 간격, 최대 30분 (타임아웃 시 "분석이 오래 걸리고 있습니다" 안내)
 - [ ] 오디오 URL 만료 (1시간): 재생 중 만료 감지 → 자동 URL 갱신
 - [ ] 리포트 미완성(PROCESSING) 상태: 완성된 데이터만 표시 + "분석 중" 배너
@@ -852,8 +943,40 @@ JSON 형식으로 응답하세요:
 [{"start": float, "end": float, "text": str, "speaker": "LEADER" | "MEMBER"}, ...]
 ```
 
+**Whisper API 파일 크기 제한 처리 (CRITICAL):**
+
+Whisper API 최대 파일 크기: **25MB**. webm 60분 녹음은 수십~수백 MB 가능.
+
+```python
+WHISPER_MAX_BYTES = 24 * 1024 * 1024  # 24MB (여유 1MB)
+
+async def run_stt(audio_bytes: bytes) -> list[dict]:
+    """파일 크기 초과 시 청크 분할 → 순서대로 STT → 결과 병합"""
+    if len(audio_bytes) <= WHISPER_MAX_BYTES:
+        return await _call_whisper(audio_bytes)
+
+    # 베타 타협안: 파일을 시간 기준으로 청크 분할 (pydub 또는 ffmpeg 사용)
+    # 10분 단위 분할 → 각각 STT → transcript 시간 오프셋 보정 후 병합
+    chunks = split_audio_by_duration(audio_bytes, chunk_minutes=10)
+    full_transcript = []
+    time_offset = 0.0
+    for chunk_bytes in chunks:
+        chunk_result = await _call_whisper(chunk_bytes)
+        for seg in chunk_result:
+            full_transcript.append({
+                **seg,
+                "start": seg["start"] + time_offset,
+                "end": seg["end"] + time_offset,
+            })
+        time_offset += chunk_duration_seconds  # 청크 실제 길이
+    return full_transcript
+```
+
+**베타 타협:** 10명 사용자 기준 60분 이하 미팅이 대부분이므로, pydub 없이 ffmpeg CLI로 단순 분할해도 무방.
+
 **예외처리 체크:**
-- [ ] Whisper API 타임아웃: 30분 설정, 실패 시 FAILED
+- [ ] GCS 파일 다운로드: 서비스 계정으로 직접 다운로드 (Presigned URL 아님, 내부 처리)
+- [ ] 파일 크기 확인 후 25MB 초과 시 청크 분할 STT 수행
 - [ ] LLM JSON 파싱 실패: speaker를 UNKNOWN으로 저장 후 계속 진행 (전체 파이프라인 중단 금지)
 - [ ] 빈 오디오 파일 (0초): STT 단계에서 감지 → 빈 transcript로 건너뜀
 - [ ] GCS 파일 다운로드 실패: 재시도 3회 후 FAILED
@@ -873,10 +996,11 @@ async def run_timeline_matching_and_summary(
     """각 타임라인 구간에 해당하는 STT 텍스트를 매칭하고 구간 요약 생성"""
     for timeline in timelines:
         # 구간 내 발화 추출 (start_time ~ end_time)
+        # ⚠️ seg['end'] <= end_time 조건이면 경계 걸친 세그먼트 누락 → seg['start'] 기준으로 판단
         segment_texts = [
             seg for seg in transcript
             if seg['start'] >= timeline.start_time
-            and (timeline.end_time is None or seg['end'] <= timeline.end_time)
+            and (timeline.end_time is None or seg['start'] < timeline.end_time)
         ]
 
         if not segment_texts:
@@ -903,10 +1027,24 @@ JSON 형식:
 [{"content": str, "assignee": "LEADER" | "MEMBER"}, ...]
 ```
 
+**Action Item 저장 시 assignee 반영:**
+```python
+# LLM 추출 결과 → TbMeetingActionItem INSERT
+for item in extracted_items:
+    db.add(TbMeetingActionItem(
+        meeting_id=meeting_id,
+        content=item["content"],
+        assignee=item.get("assignee"),   # 'LEADER' | 'MEMBER' | None
+        is_carried_over=False,
+        is_completed=False,
+    ))
+```
+
 **예외처리 체크:**
 - [ ] 타임라인이 없는 미팅 (녹음만 한 경우): 타임라인 생략하고 전체 요약만 진행
 - [ ] Action Item 0개 추출: 정상 처리 (빈 배열)
 - [ ] LLM 응답이 JSON이 아닌 경우: 정규식으로 JSON 파싱 재시도, 실패 시 빈 배열
+- [ ] Action Item 추출은 AI 파이프라인에서만 수행 → 이월 항목(is_carried_over=True)과 중복 저장 아님 (이월 항목은 PATCH /start에서 INSERT됨)
 
 ---
 
@@ -922,6 +1060,17 @@ JSON 형식:
 from server.app.domain.coaching.router import router as coaching_router
 api_router.include_router(coaching_router, prefix="/coaching", tags=["coaching"])
 ```
+
+**메뉴 등록 (Alembic 마이그레이션):**
+```python
+# alembic revision -m "coaching_ai 메뉴 등록"
+# upgrade():
+#   migration/ 폴더 기존 메뉴 코드 확인 후 INSERT
+#   cm_menu에 '1on1 코칭' 메뉴 추가 (menu_url: /coaching)
+#   cm_role_menu에 P004(리더) 권한 매핑
+# downgrade(): 해당 메뉴 코드 DELETE
+```
+- **베타 타협:** 10명 내부 사용자이므로 전체 권한 부여 후 이후 role 기반 권한 세분화
 
 **통합 테스트 시나리오:**
 
