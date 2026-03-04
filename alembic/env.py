@@ -26,6 +26,14 @@ from server.app.domain.hr.models import (  # noqa: F401
     CMDepartmentTree,
 )
 from server.app.domain.rnr.models import RrLevel, Rr, RrPeriod  # noqa: F401
+from server.app.domain.coaching.models import (  # noqa: F401
+    TbMeeting,
+    TbCoachingRelation,
+    TbMeetingAgenda,
+    TbMeetingActionItem,
+    TbMeetingRecord,
+    TbMeetingTimeline,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
