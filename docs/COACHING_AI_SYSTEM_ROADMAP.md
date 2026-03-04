@@ -222,12 +222,15 @@ class TbMeetingTimeline(Base):
 ## 🗺️ 전체 개발 로드맵
 
 ```
-Phase 0: 인프라 세팅          (Task 1-2)
-Phase 1: Backend API 개발     (Task 3-7)
+Phase 0: 인프라 세팅          (Task 1-2)          ✅ 완료
+Phase 1: Backend API 개발     (Task 3-7)           ✅ Task 3-4 완료 / Task 5-7 대기
 Phase 2: Frontend 개발        (Task 8-12)
+Phase T: 단계별 프론트 테스트  (T-TEST A, B, C)    ← 사용자가 직접 브라우저에서 검증
 Phase 3: AI 파이프라인         (Task 13-14)
 Phase 4: 통합 테스트 & 마무리  (Task 15)
 ```
+
+> **T-TEST 진행 방식**: T-TEST Task를 시작할 때 Claude가 브라우저 단계별 테스트 시나리오를 제공합니다.
 
 ---
 
@@ -239,7 +242,7 @@ Phase 4: 통합 테스트 & 마무리  (Task 15)
 
 ---
 
-#### Task 1 — DB 모델 생성 + Alembic 마이그레이션
+#### Task 1 — DB 모델 생성 + Alembic 마이그레이션 ✅ [완료]
 
 **작업 내용:**
 - `server/app/domain/coaching/models/__init__.py` 생성 (위 모델 코드 그대로)
@@ -301,7 +304,7 @@ print(coaching_tables)
 
 ---
 
-#### Task 2 — GCS 연동 모듈 + 환경변수 세팅
+#### Task 2 — GCS 연동 모듈 + 환경변수 세팅 ✅ [완료]
 
 **작업 내용:**
 - `server/app/core/storage/gcs.py` 생성 (GCS 클라이언트 싱글톤)
@@ -364,7 +367,7 @@ gcloud storage buckets update gs://{BUCKET_NAME} --cors-file=cors.json
 
 ---
 
-#### Task 3 — 대시보드 API
+#### Task 3 — 대시보드 API ✅ [완료]
 
 **엔드포인트:**
 ```
@@ -424,7 +427,7 @@ curl -H "Authorization: Bearer {token}" \
 
 ---
 
-#### Task 4 — 사전 준비 모달 API (Pre-meeting)
+#### Task 4 — 사전 준비 모달 API (Pre-meeting) ✅ [완료]
 
 **엔드포인트:**
 ```
@@ -754,6 +757,27 @@ components/PreMeetingModal.tsx
 
 ---
 
+---
+
+#### T-TEST A — 대시보드 + 사전준비 모달 UI 검증
+
+> **⚠️ 이 Task 시작 시 Claude가 브라우저 단계별 테스트 시나리오를 제공합니다.**
+
+**선행 조건:** Task 3, 4 (백엔드 API) ✅ + Task 8, 9, 10 (프론트엔드) 완료
+
+**검증 범위:**
+- 대시보드 페이지 렌더링 및 팀원 목록 정상 조회
+- 면담 상태 뱃지 색상 구분 (미실시 / 2개월 초과 / 1개월 도래 / 정상)
+- 상단 요약 카드 클릭 → 클라이언트 사이드 필터링 동작
+- 부서 Select + 이름 검색 디바운스 및 서버 재조회
+- [미팅 시작] 버튼 클릭 → POST /meetings 호출 + 사전준비 모달 오픈
+- 모달 내 AI 추천 질문 skeleton → 로딩 완료 표시
+- 첫 미팅: 온보딩 체크리스트 / 재미팅: 미완료 Action Items 표시
+- 리더 즉석 아젠다 추가 인터랙션
+- [취소] 클릭 → ConfirmModal → DELETE API 호출 + 모달 닫힘 확인
+
+---
+
 #### Task 11 — 미팅 실행 화면 (핵심)
 
 **레이아웃:**
@@ -827,6 +851,26 @@ const handleRrClick = async (rrId: string) => {
 - [ ] 메모 저장 API 실패: 로컬 상태 유지, 다음 debounce 시 재시도
 - [ ] AI 추천 질문 클릭 → 메모장 커서 위치에 삽입 (contentEditable or textarea selectionStart/End 활용)
 - [ ] R&R 데이터 없을 때 EmptyState ("R&R이 등록되지 않았습니다")
+
+---
+
+---
+
+#### T-TEST B — 미팅 실행 + 녹음 흐름 UI 검증
+
+> **⚠️ 이 Task 시작 시 Claude가 브라우저 단계별 테스트 시나리오를 제공합니다.**
+
+**선행 조건:** Task 5 (미팅 실행 API) + Task 11 (미팅 실행 화면) 완료
+
+**검증 범위:**
+- 마이크 권한 획득 → 녹음 시작 및 타이머 카운트업 동작
+- R&R 카드 클릭 → 타임라인 카드 생성 + 이전 카드 자동 마감
+- 같은 R&R 연속 클릭 시 중복 타임라인 생성 방지 (activeRrId 체크)
+- 아젠다 항목 체크 / 이월 Action Item 체크 동작
+- 개인 메모 입력 → 2초 debounce 자동 저장 API 호출 확인
+- AI 추천 질문 새로고침 버튼 동작
+- 페이지 이탈 시도 → beforeunload 경고 다이얼로그 표시
+- [미팅 종료] 버튼 → ConfirmModal → GCS 업로드 진행률 표시 → PROCESSING 상태 전환
 
 ---
 
@@ -1048,6 +1092,31 @@ for item in extracted_items:
 
 ---
 
+---
+
+#### T-TEST C — AI 파이프라인 + 히스토리 + 리포트 통합 E2E 검증
+
+> **⚠️ 이 Task 시작 시 Claude가 브라우저 단계별 테스트 시나리오를 제공합니다.**
+
+**선행 조건:** Task 12 (종료 + 히스토리 + 리포트 화면) + Task 13, 14 (AI 파이프라인) 완료
+
+**검증 범위:**
+- 미팅 종료 → GCS 업로드 → PROCESSING 상태 전환 확인
+- PROCESSING 중 리포트 페이지: "분석 중" 배너 표시 + 부분 데이터 렌더링
+- AI 파이프라인 완료 후 COMPLETED 전환 + 리포트 자동 갱신
+- 히스토리 목록 페이지: 팀원별 미팅 카드 뷰 렌더링
+- 리포트 Bento Grid 전체 표시
+  - AI 전체 요약문
+  - 타임라인 카드 목록 → 클릭 시 오디오 해당 구간 이동
+  - Action Items (신규 / 이월 항목 구분 표시)
+  - 비공개 메모 (리더만 편집 버튼 노출)
+- 오디오 플레이어 재생 / 일시정지 / seekbar 조작
+- 타임라인 수동 편집 모달 (segment_summary 수정)
+- **멤버 계정**으로 접근 시 private_memo 비노출 확인
+- 이월 Action Item 체크 후 원본 미팅의 action_item.is_completed 불변 확인
+
+---
+
 ### PHASE 4: 통합 테스트 & 마무리
 
 ---
@@ -1118,21 +1187,31 @@ api_router.include_router(coaching_router, prefix="/coaching", tags=["coaching"]
 ## 📋 Task 요약 및 의존성
 
 ```
-Task 1: DB 모델 + 마이그레이션           (선행 없음, 최우선)
-Task 2: GCS 연동 모듈                   (선행 없음, Task 1과 병행 가능)
-Task 3: 대시보드 API                    (Task 1 필요)
-Task 4: 사전 준비 모달 API              (Task 1, 2 필요)
-Task 5: 미팅 실행 API                   (Task 4 필요)
-Task 6: 미팅 종료 + GCS 업로드 API      (Task 2, 5 필요)
-Task 7: 히스토리 + 리포트 API           (Task 6 필요)
-Task 8: Frontend 기본 구조              (Task 3 API 스펙 확정 후)
-Task 9: 대시보드 페이지                 (Task 3, 8 필요)
-Task 10: 사전 준비 모달                 (Task 4, 8 필요)
-Task 11: 미팅 실행 화면                 (Task 5, 8, 10 필요)
-Task 12: 종료 + 히스토리 + 리포트       (Task 6, 7, 11 필요)
-Task 13: STT + 화자 분리                (Task 6 필요)
-Task 14: 구간 요약 + Action Item 추출   (Task 13 필요)
-Task 15: 통합 테스트 + 배포 준비         (모든 Task 완료 후)
+Task 1:    DB 모델 + 마이그레이션           ✅ 완료
+Task 2:    GCS 연동 모듈                   ✅ 완료
+Task 3:    대시보드 API                    ✅ 완료
+Task 4:    사전 준비 모달 API              ✅ 완료
+──────────────────────────────────────────────────────
+Task 5:    미팅 실행 API                   (Task 4 필요)
+Task 6:    미팅 종료 + GCS 업로드 API      (Task 2, 5 필요)
+Task 7:    히스토리 + 리포트 API           (Task 6 필요)
+Task 8:    Frontend 기본 구조              (Task 3 API 스펙 확정 후)
+Task 9:    대시보드 페이지                 (Task 3, 8 필요)
+Task 10:   사전 준비 모달                  (Task 4, 8 필요)
+──────────────────────────────────────────────────────
+T-TEST A:  대시보드 + 사전준비 모달 UI 검증  (Task 3,4,8,9,10 완료 후)  ← 프론트 테스트
+──────────────────────────────────────────────────────
+Task 11:   미팅 실행 화면                  (Task 5, 8, 10 필요)
+──────────────────────────────────────────────────────
+T-TEST B:  미팅 실행 + 녹음 흐름 UI 검증    (Task 5, 11 완료 후)         ← 프론트 테스트
+──────────────────────────────────────────────────────
+Task 12:   종료 + 히스토리 + 리포트         (Task 6, 7, 11 필요)
+Task 13:   STT + 화자 분리                 (Task 6 필요)
+Task 14:   구간 요약 + Action Item 추출    (Task 13 필요)
+──────────────────────────────────────────────────────
+T-TEST C:  AI 파이프라인 + 히스토리 E2E     (Task 12,13,14 완료 후)      ← 프론트 테스트
+──────────────────────────────────────────────────────
+Task 15:   통합 테스트 + 배포 준비          (모든 Task + T-TEST 완료 후)
 ```
 
 ---
