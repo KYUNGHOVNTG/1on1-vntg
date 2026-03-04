@@ -52,3 +52,42 @@ class DashboardResponse(BaseModel):
     summary: DashboardSummary
     items: list[DashboardMemberItem]
     total: int
+
+
+# =============================================
+# Task 4 — 사전 준비 모달 스키마
+# =============================================
+
+
+class CreateMeetingRequest(BaseModel):
+    """POST /coaching/meetings 요청"""
+
+    member_emp_no: str
+
+
+class CreateMeetingResponse(BaseModel):
+    """POST /coaching/meetings 응답"""
+
+    meeting_id: str
+    member_emp_no: str
+    status: str
+
+
+class ActionItemBrief(BaseModel):
+    """사전 준비 모달용 이전 미팅 미완료 Action Item 요약"""
+
+    action_item_id: str
+    content: str
+    assignee: Optional[str]  # 'LEADER' | 'MEMBER' | None
+    origin_meeting_id: str
+
+
+class PreMeetingResponse(BaseModel):
+    """GET /coaching/meetings/{meeting_id}/pre-meeting 응답"""
+
+    meeting_id: str
+    member_info: MemberInfo
+    is_first_meeting: bool
+    previous_action_items: list[ActionItemBrief]  # 이전 N-1, N-2 미팅 미완료 Action Items
+    ai_suggested_agendas: list[str]  # AI 추천 질문 (LLM 호출, 실패 시 빈 배열)
+    member_preset_agendas: list[str]  # v1: 항상 빈 배열 []
