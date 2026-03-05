@@ -41,6 +41,10 @@ Coaching 도메인 Repository
     - close_open_timeline_with_duration : 미팅 종료 시 마지막 활성 타임라인 자동 마감
     - mark_meeting_failed              : 미팅 status = FAILED 전환
     - find_stuck_processing_meetings   : 30분 이상 PROCESSING 고착 미팅 조회 (스케줄러용)
+
+메서드 목록 (Task 7):
+    - find_meetings_by_member          : 팀원별 미팅 히스토리 목록 조회 (최신순)
+    - find_meeting_with_report_data    : 미팅 리포트용 데이터 조회 (record + timelines + action_items)
 """
 
 import uuid
@@ -1429,3 +1433,89 @@ class CoachingRepository:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    # =============================================
+    # Task 7 — 히스토리 및 리포트 Repository
+    # =============================================
+
+    async def find_meetings_by_member(
+        self,
+        leader_emp_no: str,
+        member_emp_no: str,
+    ) -> list[TbMeeting]:
+        """
+        특정 리더-팀원 쌍의 미팅 히스토리 목록을 최신순으로 조회합니다.
+
+        Action Item 집계를 위해 action_items를 함께 로드합니다.
+        REQUESTED 상태(사전 준비 중 취소된 미팅)는 제외합니다.
+
+        Args:
+            leader_emp_no: 리더 사원번호
+            member_emp_no: 팀원 사원번호
+
+        Returns:
+            list[TbMeeting]: 미팅 목록 (최신순, REQUESTED 제외)
+        """
+        stmt = (
+            select(TbMeeting)
+            .where(
+                and_(
+                    TbMeeting.leader_emp_no == leader_emp_no,
+                    TbMeeting.member_emp_no == member_emp_no,
+                    TbMeeting.status != "REQUESTED",
+                )
+            )
+            .options(selectinload(TbMeeting.action_items))
+            .order_by(desc(TbMeeting.started_at))
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def find_meeting_with_report_data(
+        self,
+        meeting_id: uuid.UUID,
+    ) -> Optional[TbMeeting]:
+        """
+        미팅 리포트에 필요한 전체 데이터를 한 번에 조회합니다.
+
+        record (ai_summary, audio_file_url), timelines, action_items 를 eager load합니다.
+
+        Args:
+            meeting_id: 미팅 UUID
+
+        Returns:
+            TbMeeting | None: 미팅 (없으면 None)
+        """
+        stmt = (
+            select(TbMeeting)
+            .where(TbMeeting.meeting_id == meeting_id)
+            .options(
+                selectinload(TbMeeting.record),
+                selectinload(TbMeeting.timelines),
+                selectinload(TbMeeting.action_items),
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
+
+    async def find_rr_title_map(
+        self,
+        rr_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, str]:
+        """
+        rr_id 목록으로 R&R title 매핑을 조회합니다.
+
+        타임라인 리포트에서 rr_id → rr_name(title) 변환에 사용합니다.
+
+        Args:
+            rr_ids: 조회할 R&R UUID 목록
+
+        Returns:
+            dict: { rr_id: title } 매핑
+        """
+        if not rr_ids:
+            return {}
+
+        stmt = select(Rr.rr_id, Rr.title).where(Rr.rr_id.in_(rr_ids))
+        result = await self.db.execute(stmt)
+        return {row.rr_id: row.title for row in result.all()}

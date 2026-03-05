@@ -21,11 +21,13 @@ from server.app.domain.coaching.calculators import (
 from server.app.domain.coaching.repositories import CoachingRepository
 from server.app.domain.coaching.schemas import (
     ActionItemBrief,
+    ActionItemReport,
     ActiveMeetingActionItem,
     ActiveMeetingAgendaItem,
     ActiveMeetingResponse,
     ActiveMeetingTimelineItem,
     AiQuestionsResponse,
+    AudioUrlResponse,
     CompleteMeetingRequest,
     CreateAgendaResponse,
     CreateMeetingResponse,
@@ -33,12 +35,16 @@ from server.app.domain.coaching.schemas import (
     DashboardMemberItem,
     DashboardResponse,
     DashboardSummary,
+    MeetingHistoryItem,
+    MeetingHistoryResponse,
+    MeetingReportResponse,
     MemberInfo,
     PatchTimelineRequest,
     PreMeetingResponse,
     PresignedUrlResponse,
     RrTreeNode,
     RrTreeResponse,
+    TimelineItem,
 )
 from server.app.shared.exceptions import BusinessLogicException, NotFoundException
 
@@ -1239,4 +1245,275 @@ class CoachingCompleteMeetingService:
                 "gcs_path": body.gcs_path,
                 "duration": body.actual_duration_seconds,
             },
+        )
+
+
+# =============================================
+# Task 7 — 히스토리 및 리포트 Service
+# =============================================
+
+
+class CoachingHistoryService:
+    """
+    미팅 히스토리 및 리포트 서비스
+
+    담당:
+        - 팀원별 미팅 히스토리 목록 조회
+        - 미팅 상세 리포트 조회 (private_memo 권한 체크)
+        - GCS Presigned Download URL 발급 (오디오 재생용)
+    """
+
+    def __init__(self, db: AsyncSession) -> None:
+        self.repo = CoachingRepository(db)
+        self.gcs: GCSClient = get_gcs_client()
+
+    async def get_member_meetings(
+        self,
+        user_id: str,
+        member_emp_no: str,
+    ) -> MeetingHistoryResponse:
+        """
+        팀원과의 미팅 히스토리 목록을 최신순으로 반환합니다.
+
+        Args:
+            user_id: JWT 로그인 사용자 ID (리더 검증용)
+            member_emp_no: 팀원 사원번호
+
+        Returns:
+            MeetingHistoryResponse: 미팅 목록 + total
+
+        Raises:
+            NotFoundException: 팀원 정보를 찾을 수 없을 때
+        """
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        member = await self.repo.find_member_info(member_emp_no)
+
+        meetings = await self.repo.find_meetings_by_member(
+            leader_emp_no=leader_emp_no,
+            member_emp_no=member_emp_no,
+        )
+
+        items: list[MeetingHistoryItem] = []
+        for meeting in meetings:
+            total_action_items = len(meeting.action_items)
+            completed_action_items = sum(
+                1 for ai in meeting.action_items if ai.is_completed
+            )
+            items.append(
+                MeetingHistoryItem(
+                    meeting_id=str(meeting.meeting_id),
+                    started_at=meeting.started_at,
+                    completed_at=meeting.completed_at,
+                    actual_duration_seconds=meeting.actual_duration_seconds,
+                    status=meeting.status,
+                    total_action_items=total_action_items,
+                    completed_action_items=completed_action_items,
+                )
+            )
+
+        dept_name: str = getattr(member, "dept_name", "") or ""
+
+        logger.info(
+            "get_member_meetings 완료",
+            extra={
+                "leader_emp_no": leader_emp_no,
+                "member_emp_no": member_emp_no,
+                "total": len(items),
+            },
+        )
+
+        return MeetingHistoryResponse(
+            member_info=MemberInfo(
+                emp_no=member.emp_no,
+                emp_name=member.emp_name,
+                dept_name=dept_name,
+            ),
+            items=items,
+            total=len(items),
+        )
+
+    async def get_meeting_report(
+        self,
+        user_id: str,
+        meeting_id: str,
+    ) -> MeetingReportResponse:
+        """
+        미팅 상세 리포트를 반환합니다.
+
+        권한 체크:
+            - 리더(meeting.leader_emp_no): private_memo 포함
+            - 팀원(meeting.member_emp_no): private_memo = None
+
+        Args:
+            user_id: JWT 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+
+        Returns:
+            MeetingReportResponse: Bento Grid 데이터
+
+        Raises:
+            NotFoundException: 미팅이 없거나 접근 권한이 없을 때
+        """
+        requester_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+
+        try:
+            meeting_uuid = uuid.UUID(meeting_id)
+        except ValueError as exc:
+            raise NotFoundException(f"유효하지 않은 meeting_id: {meeting_id}") from exc
+
+        meeting = await self.repo.find_meeting_with_report_data(meeting_uuid)
+        if meeting is None:
+            raise NotFoundException(f"미팅을 찾을 수 없습니다: {meeting_id}")
+
+        # 접근 권한 체크: 리더 또는 팀원만 조회 가능
+        is_leader = str(meeting.leader_emp_no) == requester_emp_no
+        is_member = str(meeting.member_emp_no) == requester_emp_no
+        if not (is_leader or is_member):
+            raise NotFoundException(f"미팅 조회 권한이 없습니다: {meeting_id}")
+
+        # 팀원 정보 조회
+        member = await self.repo.find_member_info(str(meeting.member_emp_no))
+        dept_name: str = getattr(member, "dept_name", "") or ""
+
+        # 타임라인 rr_name 매핑 (rr_id → Rr.title)
+        rr_ids = [
+            tl.rr_id
+            for tl in meeting.timelines
+            if tl.rr_id is not None
+        ]
+        rr_title_map = await self.repo.find_rr_title_map(rr_ids)
+
+        # 타임라인 정렬 (start_time 오름차순)
+        sorted_timelines = sorted(meeting.timelines, key=lambda tl: tl.start_time)
+
+        timeline_items: list[TimelineItem] = [
+            TimelineItem(
+                timeline_id=str(tl.timeline_id),
+                rr_name=rr_title_map.get(tl.rr_id) if tl.rr_id else None,
+                start_time=tl.start_time,
+                end_time=tl.end_time,
+                segment_summary=tl.segment_summary,
+            )
+            for tl in sorted_timelines
+        ]
+
+        # Action Item 정렬 (이월 항목 → 신규 항목 순)
+        sorted_action_items = sorted(
+            meeting.action_items,
+            key=lambda ai: (not ai.is_carried_over, ai.action_item_id),
+        )
+
+        action_item_reports: list[ActionItemReport] = [
+            ActionItemReport(
+                action_item_id=str(ai.action_item_id),
+                content=ai.content,
+                assignee=ai.assignee,
+                is_completed=ai.is_completed,
+                is_carried_over=ai.is_carried_over,
+                origin_meeting_id=str(ai.origin_meeting_id) if ai.origin_meeting_id else None,
+            )
+            for ai in sorted_action_items
+        ]
+
+        # private_memo: 리더만 조회 가능
+        private_memo: Optional[str] = meeting.private_memo if is_leader else None
+
+        # AI 요약 (record가 없거나 PROCESSING 중이면 None)
+        ai_summary: Optional[str] = meeting.record.ai_summary if meeting.record else None
+
+        logger.info(
+            "get_meeting_report 완료",
+            extra={
+                "meeting_id": meeting_id,
+                "requester_emp_no": requester_emp_no,
+                "is_leader": is_leader,
+                "status": meeting.status,
+            },
+        )
+
+        return MeetingReportResponse(
+            meeting_id=str(meeting.meeting_id),
+            member_info=MemberInfo(
+                emp_no=member.emp_no,
+                emp_name=member.emp_name,
+                dept_name=dept_name,
+            ),
+            started_at=meeting.started_at,
+            completed_at=meeting.completed_at,
+            actual_duration_seconds=meeting.actual_duration_seconds,
+            status=meeting.status,
+            ai_summary=ai_summary,
+            timelines=timeline_items,
+            action_items=action_item_reports,
+            private_memo=private_memo,
+        )
+
+    async def get_audio_url(
+        self,
+        user_id: str,
+        meeting_id: str,
+    ) -> AudioUrlResponse:
+        """
+        GCS Presigned Download URL을 발급합니다.
+
+        매 요청마다 새로운 URL을 발급하며 캐싱하지 않습니다.
+        만료 시간: 1시간
+
+        권한 체크: 리더 또는 팀원만 호출 가능
+
+        Args:
+            user_id: JWT 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+
+        Returns:
+            AudioUrlResponse: { audio_url, expires_at }
+
+        Raises:
+            NotFoundException: 미팅이 없거나 권한이 없거나 녹음 파일이 없을 때
+        """
+        requester_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+
+        try:
+            meeting_uuid = uuid.UUID(meeting_id)
+        except ValueError as exc:
+            raise NotFoundException(f"유효하지 않은 meeting_id: {meeting_id}") from exc
+
+        meeting = await self.repo.find_meeting_with_report_data(meeting_uuid)
+        if meeting is None:
+            raise NotFoundException(f"미팅을 찾을 수 없습니다: {meeting_id}")
+
+        # 접근 권한 체크: 리더 또는 팀원만 오디오 URL 발급 가능
+        is_leader = str(meeting.leader_emp_no) == requester_emp_no
+        is_member = str(meeting.member_emp_no) == requester_emp_no
+        if not (is_leader or is_member):
+            raise NotFoundException(f"오디오 URL 발급 권한이 없습니다: {meeting_id}")
+
+        # 녹음 파일 경로 확인
+        if meeting.record is None or not meeting.record.audio_file_url:
+            raise NotFoundException(f"녹음 파일을 찾을 수 없습니다: {meeting_id}")
+
+        gcs_path: str = meeting.record.audio_file_url
+
+        # Presigned Download URL 발급 (1시간 만료)
+        from datetime import datetime as dt
+
+        expiration_seconds = 3600
+        presigned_url = await self.gcs.generate_download_presigned_url(
+            gcs_path=gcs_path,
+            expiration_seconds=expiration_seconds,
+        )
+        expires_at = (dt.utcnow() + timedelta(seconds=expiration_seconds)).isoformat() + "Z"
+
+        logger.info(
+            "get_audio_url 완료",
+            extra={
+                "meeting_id": meeting_id,
+                "requester_emp_no": requester_emp_no,
+                "gcs_path": gcs_path,
+            },
+        )
+
+        return AudioUrlResponse(
+            audio_url=presigned_url,
+            expires_at=expires_at,
         )
