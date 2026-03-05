@@ -24,11 +24,14 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  /** Zustand persist hydration 완료 여부 — persist 복원 전까지 false */
+  _hasHydrated: boolean;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   setUser: (user: User) => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -37,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      _hasHydrated: false,
 
       login: async (email: string, password: string) => {
         // TODO: API 호출로 로그인 처리
@@ -54,9 +58,22 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user: User) => {
         set({ user, isAuthenticated: true });
       },
+
+      setHasHydrated: (hasHydrated: boolean) => {
+        set({ _hasHydrated: hasHydrated });
+      },
     }),
     {
       name: 'auth-storage', // localStorage key
+      // _hasHydrated는 persist 대상에서 제외 (항상 런타임에 결정)
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

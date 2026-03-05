@@ -20,7 +20,7 @@ import { IdleTimeoutModal } from './core/components/IdleTimeoutModal';
 
 function App() {
   // useAuthStore에서 인증 상태 가져오기
-  const { isAuthenticated, logout: logoutStore } = useAuthStore();
+  const { isAuthenticated, logout: logoutStore, _hasHydrated } = useAuthStore();
 
   // 세션 검증 중 상태
   const [isValidatingSession, setIsValidatingSession] = useState(true);
@@ -152,8 +152,9 @@ function App() {
     setIsValidatingSession(false);
   };
 
-  // 세션 검증 중일 때는 로딩 표시
-  if (isValidatingSession && isAuthenticated) {
+  // Zustand persist 복원 완료 전 or 세션 검증 중일 때는 로딩 표시
+  // _hasHydrated가 false: localStorage 복원 아직 미완료 → Sidebar 렌더링 금지
+  if (!_hasHydrated || (isValidatingSession && isAuthenticated)) {
     return (
       <>
         <LoadingOverlay />
