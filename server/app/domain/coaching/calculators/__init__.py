@@ -5,6 +5,15 @@ Coaching 도메인 Calculator
 
 Task 4:
     - generate_ai_suggested_agendas : LLM을 통해 AI 추천 질문 생성
+
+Task 6 (BackgroundTask 진입점):
+    - run_ai_pipeline               : AI 파이프라인 전체 실행 (Task 13-14에서 구현)
+
+Task 13-14 (AI 파이프라인 — 추후 구현):
+    - run_stt                       : Whisper STT 호출 + 청크 분할
+    - run_speaker_diarization       : LLM 화자 분리
+    - run_timeline_matching_and_summary : 타임라인 구간 매칭 + 구간 요약
+    - run_full_summary_and_action_items : 전체 요약 + Action Item 추출
 """
 
 import asyncio
@@ -207,3 +216,56 @@ def _parse_agenda_response(raw_content: str) -> list[str]:
         extra={"raw_content_preview": raw_content[:200]},
     )
     return []
+
+
+# =============================================
+# Task 6 — AI 파이프라인 BackgroundTask 진입점
+# (실제 구현은 Task 13-14에서 진행)
+# =============================================
+
+
+async def run_ai_pipeline(meeting_id: str) -> None:
+    """
+    AI 파이프라인 전체를 실행합니다. (BackgroundTask로 호출됨)
+
+    실행 단계:
+        1. GCS에서 오디오 파일 다운로드
+        2. STT (OpenAI Whisper) — 25MB 초과 시 청크 분할
+        3. 화자 분리 (LLM: LEADER / MEMBER 라벨링)
+        4. 타임라인 구간 매칭 + 구간 요약 (LLM)
+        5. 전체 요약 + Action Item 추출 (LLM)
+        6. TbCoachingRelation 통계 갱신 + status=COMPLETED 전환
+
+    현재 상태: Task 13-14 구현 전 placeholder
+        - meeting status를 COMPLETED로 전환하지 않음
+        - 실패 시 mark_meeting_failed 호출하여 FAILED 전환
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+    """
+    logger.info(
+        "[AI Pipeline] 파이프라인 시작 (placeholder)",
+        extra={"meeting_id": meeting_id},
+    )
+
+    # Task 13-14에서 실제 파이프라인 구현
+    # 현재는 placeholder로 로그만 남기고 종료
+    # 실제 구현 시 아래 단계 추가:
+    #
+    # from server.app.core.database import AsyncSessionLocal
+    # async with AsyncSessionLocal() as db:
+    #     try:
+    #         audio_bytes = await _download_audio(meeting_id, db)
+    #         transcript = await run_stt(audio_bytes)
+    #         labeled = await run_speaker_diarization(transcript, ...)
+    #         await run_timeline_matching_and_summary(meeting_id, labeled, db)
+    #         await run_full_summary_and_action_items(meeting_id, db)
+    #         await finalize_meeting(meeting_id, db)
+    #     except Exception as e:
+    #         logger.error(f"[AI Pipeline] 실패: {e}", exc_info=True)
+    #         await mark_meeting_failed_db(meeting_id, db)
+
+    logger.info(
+        "[AI Pipeline] placeholder 완료 — Task 13-14에서 실제 구현 예정",
+        extra={"meeting_id": meeting_id},
+    )

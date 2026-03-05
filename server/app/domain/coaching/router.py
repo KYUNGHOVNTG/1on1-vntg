@@ -16,6 +16,8 @@ Coaching 도메인 라우터
     PATCH  /v1/coaching/meetings/{meeting_id}/action-items/{action_item_id}/complete - Action Item 완료 토글
     POST   /v1/coaching/meetings/{meeting_id}/agendas                          - 즉석 아젠다 추가
     GET    /v1/coaching/meetings/{meeting_id}/ai-questions                     - AI 스마트 아젠다 새로고침
+    POST   /v1/coaching/meetings/{meeting_id}/presigned-url                    - GCS Presigned Upload URL 발급
+    PATCH  /v1/coaching/meetings/{meeting_id}/complete                         - 미팅 종료 처리 (PROCESSING 전환)
 
 인증:
     모든 엔드포인트는 JWT Bearer 토큰 필수 (get_current_user_id 의존성 사용)
@@ -23,7 +25,7 @@ Coaching 도메인 라우터
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.database import get_db
@@ -32,6 +34,7 @@ from server.app.core.logging import get_logger
 from server.app.domain.coaching.schemas import (
     ActiveMeetingResponse,
     AiQuestionsResponse,
+    CompleteMeetingRequest,
     CreateAgendaRequest,
     CreateAgendaResponse,
     CreateMeetingRequest,
@@ -43,10 +46,12 @@ from server.app.domain.coaching.schemas import (
     PatchMemoRequest,
     PatchTimelineRequest,
     PreMeetingResponse,
+    PresignedUrlResponse,
     RrTreeResponse,
 )
 from server.app.domain.coaching.service import (
     CoachingActiveMeetingService,
+    CoachingCompleteMeetingService,
     CoachingDashboardService,
     CoachingPreMeetingService,
 )
@@ -951,4 +956,144 @@ async def get_ai_questions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="AI 질문 조회 중 오류가 발생했습니다",
+        ) from exc
+
+
+# =============================================
+# Task 6 — 미팅 종료 + GCS 업로드 API
+# =============================================
+
+
+@router.post(
+    "/meetings/{meeting_id}/presigned-url",
+    response_model=PresignedUrlResponse,
+    status_code=status.HTTP_200_OK,
+    summary="GCS Presigned Upload URL 발급",
+    description=(
+        "미팅 종료 전 프론트엔드가 오디오 파일을 GCS에 직접 업로드하기 위한 "
+        "Presigned URL을 발급합니다. "
+        "URL 만료 시간은 1시간(3600초)입니다. "
+        "리더만 호출 가능합니다."
+    ),
+)
+async def get_presigned_url(
+    meeting_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> PresignedUrlResponse:
+    """
+    GCS Presigned Upload URL을 발급합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Returns:
+        PresignedUrlResponse: { presigned_url, gcs_path, expires_at }
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): GCS 오류 또는 서버 내부 오류
+    """
+    logger.info(
+        "POST /coaching/meetings/{meeting_id}/presigned-url",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingCompleteMeetingService(db)
+        return await service.get_presigned_url(
+            user_id=user_id,
+            meeting_id=meeting_id,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "POST /coaching/meetings/{meeting_id}/presigned-url 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Presigned URL 발급 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.patch(
+    "/meetings/{meeting_id}/complete",
+    status_code=status.HTTP_200_OK,
+    summary="미팅 종료 처리",
+    description=(
+        "GCS 업로드 완료 후 미팅 종료를 처리합니다. "
+        "status=PROCESSING으로 전환하고, TbMeetingRecord와 TbCoachingRelation을 갱신합니다. "
+        "AI 파이프라인이 BackgroundTask로 트리거됩니다. "
+        "이미 PROCESSING/COMPLETED 상태이면 멱등 처리(200 반환)합니다. "
+        "gcs_path 누락 시 status=FAILED로 전환합니다."
+    ),
+)
+async def complete_meeting(
+    meeting_id: str,
+    body: CompleteMeetingRequest,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    미팅 종료를 처리합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        body: { actual_duration_seconds, gcs_path, private_memo? }
+        background_tasks: FastAPI BackgroundTasks (AI 파이프라인 트리거용)
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "PATCH /coaching/meetings/{meeting_id}/complete",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingCompleteMeetingService(db)
+        await service.complete_meeting(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            body=body,
+            background_tasks=background_tasks,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "PATCH /coaching/meetings/{meeting_id}/complete 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="미팅 종료 처리 중 오류가 발생했습니다",
         ) from exc

@@ -2,6 +2,7 @@
 세션 정리 스케줄러
 
 APScheduler를 사용하여 주기적으로 만료된 세션을 정리합니다.
+추가로 PROCESSING 고착 미팅(30분 초과)을 FAILED로 자동 전환합니다.
 """
 
 import asyncio
@@ -67,6 +68,56 @@ async def cleanup_expired_sessions() -> None:
         logger.error(f"[크론잡] 만료 세션 정리 중 오류: {str(e)}")
 
 
+async def cleanup_stuck_processing_meetings() -> None:
+    """
+    30분 이상 PROCESSING 상태에 고착된 미팅을 FAILED로 자동 전환합니다.
+
+    AI 파이프라인이 실패했지만 상태가 PROCESSING에 머물러 있는 경우를 방어합니다.
+    매 10분마다 실행됩니다.
+
+    베타 타협: 실서비스 전 Celery/Worker로 전환 예정
+    """
+    logger.info("[크론잡] PROCESSING 고착 미팅 정리 시작")
+
+    try:
+        async with AsyncSessionLocal() as db:
+            from server.app.domain.coaching.repositories import CoachingRepository
+
+            repo = CoachingRepository(db)
+            stuck_meetings = await repo.find_stuck_processing_meetings(timeout_minutes=30)
+
+            if not stuck_meetings:
+                logger.debug("[크론잡] PROCESSING 고착 미팅 없음")
+                return
+
+            failed_count = 0
+            for meeting in stuck_meetings:
+                try:
+                    await repo.mark_meeting_failed(meeting.meeting_id)
+                    failed_count += 1
+                    logger.warning(
+                        "[크론잡] PROCESSING 고착 미팅 FAILED 전환",
+                        extra={
+                            "meeting_id": str(meeting.meeting_id),
+                            "completed_at": str(meeting.completed_at),
+                        },
+                    )
+                except Exception as e:
+                    logger.error(
+                        "[크론잡] 미팅 FAILED 전환 실패",
+                        extra={"meeting_id": str(meeting.meeting_id), "error": str(e)},
+                    )
+
+            if failed_count > 0:
+                logger.info(
+                    f"[크론잡] PROCESSING 고착 미팅 정리 완료: {failed_count}개 FAILED 전환",
+                    extra={"failed_count": failed_count},
+                )
+
+    except Exception as e:
+        logger.error(f"[크론잡] PROCESSING 고착 미팅 정리 중 오류: {str(e)}")
+
+
 def start_scheduler() -> AsyncIOScheduler:
     """
     스케줄러를 시작합니다.
@@ -88,6 +139,15 @@ def start_scheduler() -> AsyncIOScheduler:
         trigger=IntervalTrigger(minutes=10),
         id="cleanup_expired_sessions",
         name="만료 세션 정리",
+        replace_existing=True,
+    )
+
+    # PROCESSING 고착 미팅 방어 (매 10분마다)
+    _scheduler.add_job(
+        cleanup_stuck_processing_meetings,
+        trigger=IntervalTrigger(minutes=10),
+        id="cleanup_stuck_processing_meetings",
+        name="PROCESSING 고착 미팅 정리",
         replace_existing=True,
     )
 
