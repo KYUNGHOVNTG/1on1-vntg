@@ -9,10 +9,15 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.core.logging import get_logger
-from server.app.domain.coaching.calculators import generate_ai_suggested_agendas
+from server.app.core.storage.gcs import GCSClient, get_gcs_client
+from server.app.domain.coaching.calculators import (
+    generate_ai_suggested_agendas,
+    run_ai_pipeline,
+)
 from server.app.domain.coaching.repositories import CoachingRepository
 from server.app.domain.coaching.schemas import (
     ActionItemBrief,
@@ -21,6 +26,7 @@ from server.app.domain.coaching.schemas import (
     ActiveMeetingResponse,
     ActiveMeetingTimelineItem,
     AiQuestionsResponse,
+    CompleteMeetingRequest,
     CreateAgendaResponse,
     CreateMeetingResponse,
     CreateTimelineResponse,
@@ -30,6 +36,7 @@ from server.app.domain.coaching.schemas import (
     MemberInfo,
     PatchTimelineRequest,
     PreMeetingResponse,
+    PresignedUrlResponse,
     RrTreeNode,
     RrTreeResponse,
 )
@@ -1041,3 +1048,195 @@ class CoachingActiveMeetingService:
         )
 
         return AiQuestionsResponse(ai_suggested_agendas=ai_suggested_agendas)
+
+
+# =============================================
+# Task 6 — 미팅 종료 + GCS 업로드 Service
+# =============================================
+
+
+class CoachingCompleteMeetingService:
+    """
+    미팅 종료 + GCS 업로드 서비스
+
+    책임:
+        - GCS Presigned Upload URL 발급
+        - 미팅 종료 처리 (PROCESSING 전환 + TbMeetingRecord 생성 + TbCoachingRelation UPSERT)
+        - AI 파이프라인 BackgroundTask 트리거
+    """
+
+    def __init__(self, db: AsyncSession) -> None:
+        """
+        Args:
+            db: 비동기 데이터베이스 세션
+        """
+        self.db = db
+        self.repo = CoachingRepository(db)
+        self.gcs: GCSClient = get_gcs_client()
+
+    async def get_presigned_url(
+        self,
+        user_id: str,
+        meeting_id: str,
+    ) -> PresignedUrlResponse:
+        """
+        GCS Presigned Upload URL을 발급합니다.
+
+        미팅 종료 전 프론트엔드가 호출하여 GCS 직접 업로드용 URL을 발급받습니다.
+        만료 시간은 1시간(3600초)입니다.
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+
+        Returns:
+            PresignedUrlResponse: { presigned_url, gcs_path, expires_at }
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없거나 IN_PROGRESS 상태가 아닐 때
+        """
+        logger.info(
+            "get_presigned_url called",
+            extra={"user_id": user_id, "meeting_id": meeting_id},
+        )
+
+        # 1. user_id → leader_emp_no
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+
+        # 2. 미팅 조회 및 권한 확인
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        # 3. GCS Presigned Upload URL 생성
+        url_data = await self.gcs.generate_upload_presigned_url(
+            leader_emp_no=leader_emp_no,
+            meeting_id=meeting_id,
+        )
+
+        logger.info(
+            "get_presigned_url 완료",
+            extra={"meeting_id": meeting_id, "gcs_path": url_data["gcs_path"]},
+        )
+
+        return PresignedUrlResponse(
+            presigned_url=url_data["presigned_url"],
+            gcs_path=url_data["gcs_path"],
+            expires_at=url_data["expires_at"],
+        )
+
+    async def complete_meeting(
+        self,
+        user_id: str,
+        meeting_id: str,
+        body: CompleteMeetingRequest,
+        background_tasks: BackgroundTasks,
+    ) -> None:
+        """
+        미팅 종료를 처리합니다.
+
+        종료 처리 흐름:
+        1. user_id → leader_emp_no 변환
+        2. 미팅 조회 및 권한 확인
+        3. 멱등성 체크: PROCESSING/COMPLETED이면 즉시 반환
+        4. gcs_path 없으면 FAILED 처리 후 반환
+        5. 마지막 타임라인 카드 end_time NULL이면 actual_duration_seconds로 자동 마감
+        6. TbMeetingRecord 생성 (audio_file_url = gcs_path)
+        7. 미팅 status=PROCESSING, completed_at=utcnow() 업데이트
+        8. TbCoachingRelation UPSERT
+        9. AI 파이프라인 BackgroundTask 트리거
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            body: { actual_duration_seconds, gcs_path, private_memo? }
+            background_tasks: FastAPI BackgroundTasks
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "complete_meeting called",
+            extra={"user_id": user_id, "meeting_id": meeting_id},
+        )
+
+        # 1. user_id → leader_emp_no
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+
+        # 2. 미팅 조회 및 권한 확인
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        # 3. 멱등성 체크: 이미 PROCESSING/COMPLETED이면 200 반환 (중복 호출 무시)
+        if meeting.status in ("PROCESSING", "COMPLETED"):
+            logger.info(
+                "complete_meeting 멱등성 체크: 이미 처리된 미팅",
+                extra={"meeting_id": meeting_id, "status": meeting.status},
+            )
+            return
+
+        # 4. gcs_path 누락 시 FAILED 처리
+        if not body.gcs_path:
+            logger.error(
+                "complete_meeting: gcs_path 누락 → FAILED 처리",
+                extra={"meeting_id": meeting_id},
+            )
+            await self.repo.mark_meeting_failed(meeting.meeting_id)
+            return
+
+        meeting_uuid: uuid.UUID = meeting.meeting_id
+        member_emp_no: str = meeting.member_emp_no
+
+        # 5. 마지막 활성 타임라인 자동 마감
+        await self.repo.close_open_timeline_with_duration(
+            meeting_id=meeting_uuid,
+            actual_duration_seconds=body.actual_duration_seconds,
+        )
+
+        # 6. TbMeetingRecord 생성
+        await self.repo.create_meeting_record(
+            meeting_id=meeting_uuid,
+            audio_file_url=body.gcs_path,
+        )
+
+        # 7. 미팅 PROCESSING 전환
+        completed_meeting = await self.repo.complete_meeting(
+            meeting=meeting,
+            actual_duration_seconds=body.actual_duration_seconds,
+            private_memo=body.private_memo,
+        )
+        completed_at: datetime = completed_meeting.completed_at or datetime.utcnow()
+
+        # 8. TbCoachingRelation UPSERT
+        await self.repo.upsert_coaching_relation(
+            leader_emp_no=leader_emp_no,
+            member_emp_no=member_emp_no,
+            meeting_id=meeting_uuid,
+            completed_at=completed_at,
+        )
+
+        # 9. AI 파이프라인 BackgroundTask 트리거
+        background_tasks.add_task(
+            run_ai_pipeline,
+            meeting_id=str(meeting_uuid),
+        )
+
+        logger.info(
+            "complete_meeting 완료 — AI 파이프라인 BackgroundTask 등록",
+            extra={
+                "meeting_id": meeting_id,
+                "leader_emp_no": leader_emp_no,
+                "member_emp_no": member_emp_no,
+                "gcs_path": body.gcs_path,
+                "duration": body.actual_duration_seconds,
+            },
+        )

@@ -231,3 +231,27 @@ class AiQuestionsResponse(BaseModel):
     """GET /coaching/meetings/{meeting_id}/ai-questions 응답"""
 
     ai_suggested_agendas: list[str]
+
+
+# =============================================
+# Task 6 — 미팅 종료 + GCS 업로드 스키마
+# =============================================
+
+
+class PresignedUrlResponse(BaseModel):
+    """POST /coaching/meetings/{meeting_id}/presigned-url 응답"""
+
+    presigned_url: str
+    gcs_path: str
+    expires_at: str
+
+
+class CompleteMeetingRequest(BaseModel):
+    """PATCH /coaching/meetings/{meeting_id}/complete 요청
+
+    GCS 업로드 완료 후 프론트엔드가 전달합니다.
+    """
+
+    actual_duration_seconds: int  # 실제 녹음 길이(초)
+    gcs_path: str  # 업로드 완료 후 프론트가 전달하는 GCS 경로
+    private_memo: Optional[str] = None  # 최종 메모 (없으면 기존 유지)
