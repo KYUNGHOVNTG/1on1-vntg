@@ -12,6 +12,7 @@ import { PermissionManagementPage } from './domains/permission';
 import { ComponentShowcasePage } from './domains/system/pages/ComponentShowcasePage';
 import { EmployeeListPage, OrgChartPage, DepartmentDetailPage, SyncManagementPage } from './domains/hr';
 import { MyRnrPage, TeamRnrStatusPage } from './domains/rnr';
+import { CoachingDashboardPage, MeetingHistoryPage, MeetingReportPage } from './domains/coaching';
 import { MainLayout } from './core/layout';
 import { useAuthStore } from './core/store/useAuthStore';
 import { useActivityTracker } from './core/hooks';
@@ -189,6 +190,9 @@ function App() {
             <Route path="/system/menus" element={<MenuManagementPage />} />
             <Route path="/system/permissions" element={<PermissionManagementPage />} />
             <Route path="/system/components" element={<ComponentShowcasePage />} />
+            <Route path="/coaching" element={<CoachingDashboardPage />} />
+            <Route path="/coaching/members/:empNo" element={<MeetingHistoryPage />} />
+            <Route path="/coaching/meetings/:id/report" element={<MeetingReportPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </MainLayout>
