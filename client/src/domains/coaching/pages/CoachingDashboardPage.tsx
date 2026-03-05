@@ -20,6 +20,7 @@ import { useCoachingStore } from '../store';
 import { DashboardSummaryCards } from '../components/DashboardSummaryCards';
 import { MemberSearchFilter } from '../components/MemberSearchFilter';
 import { MemberDataGrid } from '../components/MemberDataGrid';
+import { PreMeetingModal } from '../components/PreMeetingModal';
 
 export function CoachingDashboardPage() {
   const { dashboard, isLoading, error, fetchDashboard } = useCoachingStore();
@@ -35,9 +36,8 @@ export function CoachingDashboardPage() {
   // -------- 부서 목록 --------
   const [departments, setDepartments] = useState<Department[]>([]);
 
-  // -------- 미팅 생성 후 오픈 예정 모달 상태 --------
-  // Task 10에서 PreMeetingModal을 구현할 때 사용
-  const [_pendingMeeting, setPendingMeeting] = useState<{
+  // -------- 사전 준비 모달 상태 --------
+  const [pendingMeeting, setPendingMeeting] = useState<{
     meetingId: string;
     memberEmpNo: string;
   } | null>(null);
@@ -81,11 +81,14 @@ export function CoachingDashboardPage() {
     setStatusFilter(filter);
   }, []);
 
-  /** 미팅 생성 완료 콜백 (Task 10 모달 오픈용) */
+  /** 미팅 생성 완료 콜백 → 사전 준비 모달 오픈 */
   const handleMeetingCreated = useCallback((meetingId: string, memberEmpNo: string) => {
     setPendingMeeting({ meetingId, memberEmpNo });
-    // TODO: Task 10에서 PreMeetingModal 오픈 처리
-    console.log('미팅 생성 완료 — 사전 준비 모달 오픈 예정:', { meetingId, memberEmpNo });
+  }, []);
+
+  /** 사전 준비 모달 닫기 */
+  const handleModalClose = useCallback(() => {
+    setPendingMeeting(null);
   }, []);
 
   // -------- 클라이언트 사이드 필터링 --------
@@ -208,6 +211,15 @@ export function CoachingDashboardPage() {
 
       {/* 팀원 목록 그리드 */}
       <MemberDataGrid items={filteredItems} onMeetingCreated={handleMeetingCreated} />
+
+      {/* 사전 준비 모달 */}
+      {pendingMeeting && (
+        <PreMeetingModal
+          meetingId={pendingMeeting.meetingId}
+          memberEmpNo={pendingMeeting.memberEmpNo}
+          onClose={handleModalClose}
+        />
+      )}
     </div>
   );
 }
