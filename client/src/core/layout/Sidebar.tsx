@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import {
-  Layout,
+  LayoutDashboard,
   ListTodo,
   Users,
   Settings,
@@ -31,7 +31,7 @@ interface SidebarProps {
 
 /** 메뉴 아이콘 매핑 */
 const MENU_ICON_MAP: Record<string, LucideIcon> = {
-  M001: Layout, // 대시보드
+  M001: LayoutDashboard, // 대시보드
   M002: ListTodo, // R&R 관리
   M003: Users, // 1on1 미팅
   M004: Settings, // 시스템 관리
@@ -39,7 +39,7 @@ const MENU_ICON_MAP: Record<string, LucideIcon> = {
 
 /** 메뉴 아이콘 가져오기 */
 const getMenuIcon = (menuCode: string): React.ReactNode => {
-  const Icon = MENU_ICON_MAP[menuCode] || Layout;
+  const Icon = MENU_ICON_MAP[menuCode] || LayoutDashboard;
   return <Icon size={20} />;
 };
 
