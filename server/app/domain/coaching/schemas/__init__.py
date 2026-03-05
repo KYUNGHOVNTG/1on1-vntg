@@ -255,3 +255,74 @@ class CompleteMeetingRequest(BaseModel):
     actual_duration_seconds: int  # 실제 녹음 길이(초)
     gcs_path: str  # 업로드 완료 후 프론트가 전달하는 GCS 경로
     private_memo: Optional[str] = None  # 최종 메모 (없으면 기존 유지)
+
+
+# =============================================
+# Task 7 — 히스토리 및 리포트 스키마
+# =============================================
+
+
+class MeetingHistoryItem(BaseModel):
+    """GET /coaching/members/{member_emp_no}/meetings 응답 아이템"""
+
+    meeting_id: str
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    actual_duration_seconds: int
+    status: str  # 'REQUESTED' | 'IN_PROGRESS' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+    total_action_items: int   # 전체 Action Item 수 (이월 포함)
+    completed_action_items: int  # 완료된 Action Item 수
+
+
+class MeetingHistoryResponse(BaseModel):
+    """GET /coaching/members/{member_emp_no}/meetings 응답"""
+
+    member_info: MemberInfo
+    items: list[MeetingHistoryItem]
+    total: int
+
+
+class TimelineItem(BaseModel):
+    """리포트용 타임라인 아이템"""
+
+    timeline_id: str
+    rr_name: Optional[str]   # R&R 이름 (rr_id → TbRr.rr_name JOIN)
+    start_time: int
+    end_time: Optional[int]
+    segment_summary: Optional[str]
+
+
+class ActionItemReport(BaseModel):
+    """리포트용 Action Item"""
+
+    action_item_id: str
+    content: str
+    assignee: Optional[str]   # 'LEADER' | 'MEMBER' | None
+    is_completed: bool
+    is_carried_over: bool
+    origin_meeting_id: Optional[str]
+
+
+class MeetingReportResponse(BaseModel):
+    """GET /coaching/meetings/{meeting_id}/report 응답
+
+    audio_url 미포함 — GET /audio-url 별도 호출 사용
+    """
+
+    meeting_id: str
+    member_info: MemberInfo
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    actual_duration_seconds: int
+    status: str
+    ai_summary: Optional[str]
+    timelines: list[TimelineItem]
+    action_items: list[ActionItemReport]
+    private_memo: Optional[str]  # 리더만 조회 가능, 멤버는 None 반환
+
+
+class AudioUrlResponse(BaseModel):
+    """GET /coaching/meetings/{meeting_id}/audio-url 응답"""
+
+    audio_url: str
+    expires_at: str  # ISO 8601 UTC 문자열

@@ -18,6 +18,9 @@ Coaching 도메인 라우터
     GET    /v1/coaching/meetings/{meeting_id}/ai-questions                     - AI 스마트 아젠다 새로고침
     POST   /v1/coaching/meetings/{meeting_id}/presigned-url                    - GCS Presigned Upload URL 발급
     PATCH  /v1/coaching/meetings/{meeting_id}/complete                         - 미팅 종료 처리 (PROCESSING 전환)
+    GET    /v1/coaching/members/{member_emp_no}/meetings                       - 팀원별 미팅 히스토리 목록
+    GET    /v1/coaching/meetings/{meeting_id}/report                           - 미팅 상세 리포트 (Bento Grid 데이터)
+    GET    /v1/coaching/meetings/{meeting_id}/audio-url                        - GCS Presigned Download URL 발급
 
 인증:
     모든 엔드포인트는 JWT Bearer 토큰 필수 (get_current_user_id 의존성 사용)
@@ -34,6 +37,7 @@ from server.app.core.logging import get_logger
 from server.app.domain.coaching.schemas import (
     ActiveMeetingResponse,
     AiQuestionsResponse,
+    AudioUrlResponse,
     CompleteMeetingRequest,
     CreateAgendaRequest,
     CreateAgendaResponse,
@@ -42,6 +46,8 @@ from server.app.domain.coaching.schemas import (
     CreateTimelineRequest,
     CreateTimelineResponse,
     DashboardResponse,
+    MeetingHistoryResponse,
+    MeetingReportResponse,
     MeetingStartRequest,
     PatchMemoRequest,
     PatchTimelineRequest,
@@ -53,6 +59,7 @@ from server.app.domain.coaching.service import (
     CoachingActiveMeetingService,
     CoachingCompleteMeetingService,
     CoachingDashboardService,
+    CoachingHistoryService,
     CoachingPreMeetingService,
 )
 from server.app.shared.exceptions import BusinessLogicException, NotFoundException
@@ -1096,4 +1103,177 @@ async def complete_meeting(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="미팅 종료 처리 중 오류가 발생했습니다",
+        ) from exc
+
+
+# =============================================
+# Task 7 — 히스토리 및 리포트 엔드포인트
+# =============================================
+
+
+@router.get(
+    "/members/{member_emp_no}/meetings",
+    response_model=MeetingHistoryResponse,
+    summary="팀원별 미팅 히스토리 목록",
+)
+async def get_member_meetings(
+    member_emp_no: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> MeetingHistoryResponse:
+    """
+    특정 팀원과의 미팅 히스토리 목록을 최신순으로 반환합니다.
+
+    REQUESTED 상태(모달 열기 취소된 미팅)는 제외합니다.
+
+    Args:
+        member_emp_no: 팀원 사원번호
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 팀원 정보를 찾을 수 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "GET /coaching/members/{member_emp_no}/meetings",
+        extra={"user_id": user_id, "member_emp_no": member_emp_no},
+    )
+
+    try:
+        service = CoachingHistoryService(db)
+        return await service.get_member_meetings(
+            user_id=user_id,
+            member_emp_no=member_emp_no,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "GET /coaching/members/{member_emp_no}/meetings 실패",
+            extra={"user_id": user_id, "member_emp_no": member_emp_no, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="미팅 히스토리 조회 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.get(
+    "/meetings/{meeting_id}/report",
+    response_model=MeetingReportResponse,
+    summary="미팅 상세 리포트",
+)
+async def get_meeting_report(
+    meeting_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> MeetingReportResponse:
+    """
+    미팅 상세 리포트(Bento Grid 데이터)를 반환합니다.
+
+    권한:
+        - 리더: private_memo 포함
+        - 팀원: private_memo = None (DTO 레벨에서 원천 차단)
+
+    audio_url은 포함되지 않으며, GET /audio-url 별도 호출을 사용합니다.
+
+    PROCESSING 상태: 부분 데이터 허용 (ai_summary, timelines.segment_summary 등은 None)
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅이 없거나 접근 권한이 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "GET /coaching/meetings/{meeting_id}/report",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingHistoryService(db)
+        return await service.get_meeting_report(
+            user_id=user_id,
+            meeting_id=meeting_id,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "GET /coaching/meetings/{meeting_id}/report 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="미팅 리포트 조회 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.get(
+    "/meetings/{meeting_id}/audio-url",
+    response_model=AudioUrlResponse,
+    summary="오디오 Presigned Download URL 발급",
+)
+async def get_audio_url(
+    meeting_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> AudioUrlResponse:
+    """
+    GCS Presigned Download URL을 발급합니다.
+
+    매 요청마다 새로운 URL을 발급하며 캐싱하지 않습니다. (만료: 1시간)
+    오디오 재생 중 URL 만료 시 이 엔드포인트를 재호출하여 갱신합니다.
+
+    권한:
+        - 리더(meeting.leader_emp_no): 접근 가능
+        - 팀원(meeting.member_emp_no): 접근 가능
+        - 그 외: 404 반환
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅이 없거나 녹음 파일이 없거나 권한이 없을 때
+        HTTPException(500): GCS 오류 또는 서버 내부 오류
+    """
+    logger.info(
+        "GET /coaching/meetings/{meeting_id}/audio-url",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingHistoryService(db)
+        return await service.get_audio_url(
+            user_id=user_id,
+            meeting_id=meeting_id,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "GET /coaching/meetings/{meeting_id}/audio-url 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="오디오 URL 발급 중 오류가 발생했습니다",
         ) from exc
