@@ -2,10 +2,20 @@
 Coaching 도메인 라우터
 
 엔드포인트:
-    GET    /v1/coaching/dashboard                          - 대시보드 (팀원 목록 + 면담 현황)
-    POST   /v1/coaching/meetings                           - 미팅 레코드 생성 (REQUESTED)
-    GET    /v1/coaching/meetings/{meeting_id}/pre-meeting  - 사전 준비 데이터 로드
-    DELETE /v1/coaching/meetings/{meeting_id}              - 사전 준비 모달 취소 (REQUESTED 삭제)
+    GET    /v1/coaching/dashboard                                              - 대시보드 (팀원 목록 + 면담 현황)
+    POST   /v1/coaching/meetings                                               - 미팅 레코드 생성 (REQUESTED)
+    GET    /v1/coaching/meetings/{meeting_id}/pre-meeting                      - 사전 준비 데이터 로드
+    DELETE /v1/coaching/meetings/{meeting_id}                                  - 사전 준비 모달 취소 (REQUESTED 삭제)
+    PATCH  /v1/coaching/meetings/{meeting_id}/start                            - 미팅 시작 (IN_PROGRESS)
+    GET    /v1/coaching/meetings/{meeting_id}/active                           - 미팅 실행 화면 초기 데이터
+    GET    /v1/coaching/members/{member_emp_no}/rnr                            - 팀원 R&R 계층 구조 조회
+    POST   /v1/coaching/meetings/{meeting_id}/timelines                        - 타임라인 카드 생성
+    PATCH  /v1/coaching/meetings/{meeting_id}/timelines/{timeline_id}          - 타임라인 카드 마감/편집
+    PATCH  /v1/coaching/meetings/{meeting_id}/memo                             - 개인 메모 저장
+    PATCH  /v1/coaching/meetings/{meeting_id}/agendas/{agenda_id}/complete     - 아젠다 완료 토글
+    PATCH  /v1/coaching/meetings/{meeting_id}/action-items/{action_item_id}/complete - Action Item 완료 토글
+    POST   /v1/coaching/meetings/{meeting_id}/agendas                          - 즉석 아젠다 추가
+    GET    /v1/coaching/meetings/{meeting_id}/ai-questions                     - AI 스마트 아젠다 새로고침
 
 인증:
     모든 엔드포인트는 JWT Bearer 토큰 필수 (get_current_user_id 의존성 사용)
@@ -20,12 +30,26 @@ from server.app.core.database import get_db
 from server.app.core.dependencies import get_current_user_id
 from server.app.core.logging import get_logger
 from server.app.domain.coaching.schemas import (
+    ActiveMeetingResponse,
+    AiQuestionsResponse,
+    CreateAgendaRequest,
+    CreateAgendaResponse,
     CreateMeetingRequest,
     CreateMeetingResponse,
+    CreateTimelineRequest,
+    CreateTimelineResponse,
     DashboardResponse,
+    MeetingStartRequest,
+    PatchMemoRequest,
+    PatchTimelineRequest,
     PreMeetingResponse,
+    RrTreeResponse,
 )
-from server.app.domain.coaching.service import CoachingDashboardService, CoachingPreMeetingService
+from server.app.domain.coaching.service import (
+    CoachingActiveMeetingService,
+    CoachingDashboardService,
+    CoachingPreMeetingService,
+)
 from server.app.shared.exceptions import BusinessLogicException, NotFoundException
 
 logger = get_logger(__name__)
@@ -291,4 +315,640 @@ async def delete_meeting(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="미팅 삭제 중 오류가 발생했습니다",
+        ) from exc
+
+
+# =============================================
+# Task 5 — 미팅 실행 API
+# =============================================
+
+
+@router.patch(
+    "/meetings/{meeting_id}/start",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="미팅 시작",
+    description=(
+        "미팅 상태를 IN_PROGRESS로 전환하고 started_at을 기록합니다. "
+        "REQUESTED 상태인 미팅만 시작 가능합니다 (중복 시작 방지). "
+        "이전 N-1, N-2 미팅의 미완료 Action Item이 현재 미팅으로 이월됩니다. "
+        "사전 준비 모달에서 선택한 아젠다(AI_SUGGESTED, LEADER_ADDED)를 INSERT합니다."
+    ),
+)
+async def start_meeting(
+    meeting_id: str,
+    body: MeetingStartRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    미팅을 시작합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        body: { agendas: [{ content, source }, ...] }
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 권한 없거나 REQUESTED 상태가 아닐 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "PATCH /coaching/meetings/{meeting_id}/start",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        await service.start_meeting(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            agendas=[a.model_dump() for a in body.agendas],
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "PATCH /coaching/meetings/{meeting_id}/start 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="미팅 시작 처리 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.get(
+    "/meetings/{meeting_id}/active",
+    response_model=ActiveMeetingResponse,
+    summary="미팅 실행 화면 초기 데이터 조회",
+    description=(
+        "미팅 실행 화면에 필요한 초기 데이터를 반환합니다. "
+        "아젠다, Action Item, 타임라인을 포함합니다. "
+        "private_memo는 리더만 반환됩니다."
+    ),
+)
+async def get_active_meeting(
+    meeting_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> ActiveMeetingResponse:
+    """
+    미팅 실행 화면 초기 데이터를 조회합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Returns:
+        ActiveMeetingResponse: 미팅 실행 화면 전체 데이터
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "GET /coaching/meetings/{meeting_id}/active",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        return await service.get_active_meeting(user_id=user_id, meeting_id=meeting_id)
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "GET /coaching/meetings/{meeting_id}/active 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="미팅 실행 데이터 조회 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.get(
+    "/members/{member_emp_no}/rnr",
+    response_model=RrTreeResponse,
+    summary="팀원 R&R 계층 구조 조회",
+    description=(
+        "팀원의 R&R을 계층 트리 구조로 반환합니다. "
+        "현재 연도 기준 MEMBER 타입 R&R만 조회합니다. "
+        "미팅 실행 화면의 R&R 패널에서 사용됩니다."
+    ),
+)
+async def get_member_rnr_tree(
+    member_emp_no: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> RrTreeResponse:
+    """
+    팀원의 R&R 계층 구조를 조회합니다.
+
+    Args:
+        member_emp_no: 팀원 사번
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Returns:
+        RrTreeResponse: { items: [RrTreeNode, ...], total: int }
+
+    Raises:
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "GET /coaching/members/{member_emp_no}/rnr",
+        extra={"user_id": user_id, "member_emp_no": member_emp_no},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        return await service.get_member_rnr_tree(
+            user_id=user_id,
+            member_emp_no=member_emp_no,
+        )
+    except Exception as exc:
+        logger.error(
+            "GET /coaching/members/{member_emp_no}/rnr 실패",
+            extra={"user_id": user_id, "member_emp_no": member_emp_no, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="R&R 조회 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.post(
+    "/meetings/{meeting_id}/timelines",
+    response_model=CreateTimelineResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="타임라인 카드 생성",
+    description=(
+        "R&R 클릭 시 타임라인 카드를 생성합니다. "
+        "기존에 end_time IS NULL인 활성 카드가 있으면 start_time으로 자동 마감 후 신규 생성합니다."
+    ),
+)
+async def create_timeline(
+    meeting_id: str,
+    body: CreateTimelineRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> CreateTimelineResponse:
+    """
+    타임라인 카드를 생성합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        body: { rr_id?, start_time }
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Returns:
+        CreateTimelineResponse: 생성된 타임라인 정보
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "POST /coaching/meetings/{meeting_id}/timelines",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        return await service.create_timeline(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            rr_id=body.rr_id,
+            start_time=body.start_time,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "POST /coaching/meetings/{meeting_id}/timelines 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="타임라인 생성 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.patch(
+    "/meetings/{meeting_id}/timelines/{timeline_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="타임라인 카드 마감 또는 구간 요약 편집",
+    description=(
+        "end_time만 전달 시 → 카드 마감 (미팅 실행 중). "
+        "segment_summary만 전달 시 → 구간 요약 수정 (히스토리 리포트에서 편집). "
+        "Task 5와 Task 7 공용 엔드포인트입니다."
+    ),
+)
+async def patch_timeline(
+    meeting_id: str,
+    timeline_id: str,
+    body: PatchTimelineRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    타임라인 카드를 업데이트합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        timeline_id: 타임라인 UUID 문자열
+        body: { end_time?, segment_summary? }
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅 또는 타임라인이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "PATCH /coaching/meetings/{meeting_id}/timelines/{timeline_id}",
+        extra={"user_id": user_id, "meeting_id": meeting_id, "timeline_id": timeline_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        await service.patch_timeline(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            timeline_id=timeline_id,
+            body=body,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "PATCH /coaching/meetings/{meeting_id}/timelines/{timeline_id} 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="타임라인 업데이트 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.patch(
+    "/meetings/{meeting_id}/memo",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="개인 메모 저장",
+    description=(
+        "리더 전용 비공개 메모를 저장합니다. "
+        "프론트엔드에서 2초 debounce 자동 저장으로 호출됩니다. "
+        "리더가 아닌 경우 400 에러를 반환합니다."
+    ),
+)
+async def update_memo(
+    meeting_id: str,
+    body: PatchMemoRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    개인 메모를 저장합니다. (리더 전용)
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        body: { private_memo }
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 리더가 아닐 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "PATCH /coaching/meetings/{meeting_id}/memo",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        await service.update_memo(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            private_memo=body.private_memo,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "PATCH /coaching/meetings/{meeting_id}/memo 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="메모 저장 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.patch(
+    "/meetings/{meeting_id}/agendas/{agenda_id}/complete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="아젠다 완료 토글",
+    description="아젠다의 완료 상태를 토글합니다. (is_completed 반전)",
+)
+async def toggle_agenda_complete(
+    meeting_id: str,
+    agenda_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    아젠다의 완료 상태를 토글합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        agenda_id: 아젠다 UUID 문자열
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅 또는 아젠다가 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "PATCH /coaching/meetings/{meeting_id}/agendas/{agenda_id}/complete",
+        extra={"user_id": user_id, "meeting_id": meeting_id, "agenda_id": agenda_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        await service.toggle_agenda_complete(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            agenda_id=agenda_id,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "PATCH /coaching/meetings/{meeting_id}/agendas/{agenda_id}/complete 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="아젠다 완료 처리 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.patch(
+    "/meetings/{meeting_id}/action-items/{action_item_id}/complete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Action Item 완료 토글",
+    description=(
+        "Action Item의 완료 상태를 토글합니다. "
+        "이월 항목도 현재 미팅 row에서만 업데이트됩니다 (원본 미팅 불변)."
+    ),
+)
+async def toggle_action_item_complete(
+    meeting_id: str,
+    action_item_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Action Item의 완료 상태를 토글합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        action_item_id: Action Item UUID 문자열
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Raises:
+        HTTPException(404): 미팅 또는 Action Item이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "PATCH /coaching/meetings/{meeting_id}/action-items/{action_item_id}/complete",
+        extra={
+            "user_id": user_id,
+            "meeting_id": meeting_id,
+            "action_item_id": action_item_id,
+        },
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        await service.toggle_action_item_complete(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            action_item_id=action_item_id,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "PATCH /coaching/meetings/{meeting_id}/action-items/{action_item_id}/complete 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Action Item 완료 처리 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.post(
+    "/meetings/{meeting_id}/agendas",
+    response_model=CreateAgendaResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="즉석 아젠다 추가",
+    description=(
+        "리더가 미팅 실행 중 즉석으로 아젠다를 추가합니다. "
+        "source=LEADER_ADDED로 자동 설정됩니다."
+    ),
+)
+async def create_agenda(
+    meeting_id: str,
+    body: CreateAgendaRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> CreateAgendaResponse:
+    """
+    즉석 아젠다를 추가합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        body: { content }
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Returns:
+        CreateAgendaResponse: 생성된 아젠다 정보
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "POST /coaching/meetings/{meeting_id}/agendas",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        return await service.create_agenda(
+            user_id=user_id,
+            meeting_id=meeting_id,
+            content=body.content,
+        )
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "POST /coaching/meetings/{meeting_id}/agendas 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="아젠다 추가 중 오류가 발생했습니다",
+        ) from exc
+
+
+@router.get(
+    "/meetings/{meeting_id}/ai-questions",
+    response_model=AiQuestionsResponse,
+    summary="AI 스마트 아젠다 새로고침",
+    description=(
+        "LLM을 재호출하여 AI 추천 질문을 새로 생성합니다. "
+        "LLM 실패 시 빈 배열을 반환합니다 (프론트에서 이전 질문 유지 + 에러 토스트 처리)."
+    ),
+)
+async def get_ai_questions(
+    meeting_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> AiQuestionsResponse:
+    """
+    AI 추천 질문을 새로고침합니다.
+
+    Args:
+        meeting_id: 미팅 UUID 문자열
+        user_id: JWT에서 추출한 로그인 사용자 ID
+        db: 데이터베이스 세션
+
+    Returns:
+        AiQuestionsResponse: { ai_suggested_agendas: [str, ...] }
+
+    Raises:
+        HTTPException(404): 미팅이 없을 때
+        HTTPException(400): 권한 없을 때
+        HTTPException(500): 서버 내부 오류
+    """
+    logger.info(
+        "GET /coaching/meetings/{meeting_id}/ai-questions",
+        extra={"user_id": user_id, "meeting_id": meeting_id},
+    )
+
+    try:
+        service = CoachingActiveMeetingService(db)
+        return await service.get_ai_questions(user_id=user_id, meeting_id=meeting_id)
+    except NotFoundException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except BusinessLogicException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "GET /coaching/meetings/{meeting_id}/ai-questions 실패",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AI 질문 조회 중 오류가 발생했습니다",
         ) from exc

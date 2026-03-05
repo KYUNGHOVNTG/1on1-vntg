@@ -5,6 +5,7 @@ Coaching 도메인 Service
 Repository / Calculator / Formatter 조율
 """
 
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -15,12 +16,22 @@ from server.app.domain.coaching.calculators import generate_ai_suggested_agendas
 from server.app.domain.coaching.repositories import CoachingRepository
 from server.app.domain.coaching.schemas import (
     ActionItemBrief,
+    ActiveMeetingActionItem,
+    ActiveMeetingAgendaItem,
+    ActiveMeetingResponse,
+    ActiveMeetingTimelineItem,
+    AiQuestionsResponse,
+    CreateAgendaResponse,
     CreateMeetingResponse,
+    CreateTimelineResponse,
     DashboardMemberItem,
     DashboardResponse,
     DashboardSummary,
     MemberInfo,
+    PatchTimelineRequest,
     PreMeetingResponse,
+    RrTreeNode,
+    RrTreeResponse,
 )
 from server.app.shared.exceptions import BusinessLogicException, NotFoundException
 
@@ -384,3 +395,649 @@ class CoachingPreMeetingService:
             "delete_meeting 완료",
             extra={"meeting_id": meeting_id, "leader_emp_no": leader_emp_no},
         )
+
+
+# =============================================
+# Task 5 — 미팅 실행 Service
+# =============================================
+
+
+def _build_rr_tree(rr_list: list) -> list[RrTreeNode]:
+    """
+    R&R ORM 객체 목록을 계층 트리 구조로 변환합니다.
+
+    parent_rr_id 기반으로 루트 노드를 찾고 children을 재귀적으로 구성합니다.
+
+    Args:
+        rr_list: Rr ORM 객체 목록 (parent 관계 포함)
+
+    Returns:
+        list[RrTreeNode]: 계층 트리로 변환된 루트 노드 목록
+    """
+    rr_ids = {str(rr.rr_id) for rr in rr_list}
+    nodes: dict[str, RrTreeNode] = {}
+
+    for rr in rr_list:
+        parent_rr_name: Optional[str] = None
+        if rr.parent is not None:
+            parent_rr_name = rr.parent.title
+
+        nodes[str(rr.rr_id)] = RrTreeNode(
+            rr_id=str(rr.rr_id),
+            upper_rr_name=parent_rr_name,
+            rr_name=rr.title,
+            detail_content=rr.content,
+            children=[],
+        )
+
+    # 루트 노드: parent_rr_id가 None이거나 현재 목록에 없는 것
+    root_nodes: list[RrTreeNode] = []
+    for rr in rr_list:
+        node = nodes[str(rr.rr_id)]
+        parent_id = str(rr.parent_rr_id) if rr.parent_rr_id is not None else None
+
+        if parent_id is None or parent_id not in rr_ids:
+            root_nodes.append(node)
+        else:
+            nodes[parent_id].children.append(node)
+
+    return root_nodes
+
+
+class CoachingActiveMeetingService:
+    """
+    미팅 실행 서비스
+
+    책임:
+        - 미팅 시작 (IN_PROGRESS 전환 + 아젠다/이월 Action Item 처리)
+        - 미팅 실행 화면 데이터 조회
+        - R&R 계층 구조 조회
+        - 타임라인 생성/마감/편집
+        - 개인 메모 저장
+        - 아젠다/Action Item 완료 토글
+        - 즉석 아젠다 추가
+        - AI 질문 새로고침
+    """
+
+    def __init__(self, db: AsyncSession) -> None:
+        """
+        Args:
+            db: 비동기 데이터베이스 세션
+        """
+        self.db = db
+        self.repo = CoachingRepository(db)
+
+    async def start_meeting(
+        self,
+        user_id: str,
+        meeting_id: str,
+        agendas: list[dict],
+    ) -> None:
+        """
+        미팅을 시작합니다.
+
+        1. user_id → leader_emp_no 변환
+        2. 미팅 조회 및 권한 확인
+        3. status == REQUESTED 확인 (중복 시작 방지)
+        4. N-1, N-2 미완료 Action Item 이월 복사 INSERT
+        5. 아젠다 INSERT
+        6. status = IN_PROGRESS, started_at 기록
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            agendas: [{"content": str, "source": str}, ...] 형태의 아젠다 목록
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없거나 REQUESTED 상태가 아닐 때
+        """
+        logger.info(
+            "start_meeting called",
+            extra={"user_id": user_id, "meeting_id": meeting_id},
+        )
+
+        # 1. user_id → leader_emp_no
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+
+        # 2. 미팅 조회 및 권한 확인
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        # 3. REQUESTED 상태만 시작 허용 (중복 시작 방지)
+        if meeting.status != "REQUESTED":
+            raise BusinessLogicException(
+                "REQUESTED 상태의 미팅만 시작할 수 있습니다",
+                details={"meeting_id": meeting_id, "current_status": meeting.status},
+            )
+
+        meeting_uuid: uuid.UUID = meeting.meeting_id
+        member_emp_no: str = meeting.member_emp_no
+
+        # 4. N-1, N-2 미완료 Action Item 이월 복사 (COMPLETED 기준 최신 2건)
+        previous_meetings = await self.repo.find_previous_completed_meetings(
+            leader_emp_no=leader_emp_no,
+            member_emp_no=member_emp_no,
+            limit=2,
+        )
+        previous_meeting_ids = [m.meeting_id for m in previous_meetings]
+        incomplete_items = await self.repo.find_incomplete_action_items(previous_meeting_ids)
+        await self.repo.copy_action_items_as_carried_over(
+            meeting_id=meeting_uuid,
+            source_items=incomplete_items,
+        )
+
+        # 5. 아젠다 INSERT (order는 요청 순서 기준)
+        agenda_data = [
+            {"content": a["content"], "source": a["source"], "order": idx}
+            for idx, a in enumerate(agendas)
+        ]
+        await self.repo.insert_agendas(meeting_id=meeting_uuid, agendas=agenda_data)
+
+        # 6. status = IN_PROGRESS, started_at 기록
+        await self.repo.start_meeting(meeting)
+
+        logger.info(
+            "start_meeting 완료",
+            extra={
+                "meeting_id": meeting_id,
+                "leader_emp_no": leader_emp_no,
+                "agendas_inserted": len(agenda_data),
+                "action_items_carried_over": len(incomplete_items),
+            },
+        )
+
+    async def get_active_meeting(
+        self,
+        user_id: str,
+        meeting_id: str,
+    ) -> ActiveMeetingResponse:
+        """
+        미팅 실행 화면 초기 데이터를 조회합니다.
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+
+        Returns:
+            ActiveMeetingResponse: 미팅 실행 화면 전체 데이터
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "get_active_meeting called",
+            extra={"user_id": user_id, "meeting_id": meeting_id},
+        )
+
+        # leader 또는 member 모두 조회 가능 (실행 화면에는 member도 접근 가능)
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+
+        meeting = await self.repo.find_meeting_with_active_data(meeting_id)
+
+        if meeting.leader_emp_no != leader_emp_no and meeting.member_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        if meeting.started_at is None:
+            raise BusinessLogicException(
+                "아직 시작되지 않은 미팅입니다",
+                details={"meeting_id": meeting_id, "status": meeting.status},
+            )
+
+        # 팀원 정보 조회
+        member_raw = await self.repo.find_member_info(meeting.member_emp_no)
+        member_info = MemberInfo(
+            emp_no=member_raw["emp_no"],
+            emp_name=member_raw["emp_name"],
+            dept_name=member_raw["dept_name"],
+        )
+
+        # private_memo: 리더만 반환
+        private_memo: Optional[str] = (
+            meeting.private_memo if meeting.leader_emp_no == leader_emp_no else None
+        )
+
+        agendas = sorted(meeting.agendas, key=lambda a: a.order)
+        agenda_items = [
+            ActiveMeetingAgendaItem(
+                agenda_id=str(a.agenda_id),
+                content=a.content,
+                source=a.source,
+                order=a.order,
+                is_completed=a.is_completed,
+            )
+            for a in agendas
+        ]
+
+        action_items = [
+            ActiveMeetingActionItem(
+                action_item_id=str(ai.action_item_id),
+                content=ai.content,
+                assignee=ai.assignee,
+                is_completed=ai.is_completed,
+                is_carried_over=ai.is_carried_over,
+                origin_meeting_id=str(ai.origin_meeting_id) if ai.origin_meeting_id else None,
+            )
+            for ai in meeting.action_items
+        ]
+
+        timeline_items = [
+            ActiveMeetingTimelineItem(
+                timeline_id=str(t.timeline_id),
+                rr_id=str(t.rr_id) if t.rr_id else None,
+                start_time=t.start_time,
+                end_time=t.end_time,
+                segment_summary=t.segment_summary,
+            )
+            for t in meeting.timelines
+        ]
+
+        logger.info(
+            "get_active_meeting 완료",
+            extra={"meeting_id": meeting_id},
+        )
+
+        return ActiveMeetingResponse(
+            meeting_id=str(meeting.meeting_id),
+            member_info=member_info,
+            started_at=meeting.started_at,
+            status=meeting.status,
+            agendas=agenda_items,
+            action_items=action_items,
+            timelines=timeline_items,
+            private_memo=private_memo,
+        )
+
+    async def get_member_rnr_tree(
+        self,
+        user_id: str,
+        member_emp_no: str,
+    ) -> RrTreeResponse:
+        """
+        팀원의 R&R 계층 구조를 조회합니다.
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID (접근 기록용)
+            member_emp_no: 팀원 사번
+
+        Returns:
+            RrTreeResponse: R&R 트리 목록
+        """
+        logger.info(
+            "get_member_rnr_tree called",
+            extra={"user_id": user_id, "member_emp_no": member_emp_no},
+        )
+
+        rr_list = await self.repo.find_member_rnr_tree(member_emp_no)
+        root_nodes = _build_rr_tree(rr_list)
+
+        logger.info(
+            "get_member_rnr_tree 완료",
+            extra={"member_emp_no": member_emp_no, "root_count": len(root_nodes)},
+        )
+
+        return RrTreeResponse(items=root_nodes, total=len(rr_list))
+
+    async def create_timeline(
+        self,
+        user_id: str,
+        meeting_id: str,
+        rr_id: Optional[str],
+        start_time: int,
+    ) -> CreateTimelineResponse:
+        """
+        타임라인 카드를 생성합니다.
+
+        기존에 end_time IS NULL인 활성 카드가 있으면 자동 마감 후 신규 생성합니다.
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            rr_id: R&R UUID 문자열 (optional)
+            start_time: 녹음 시작 기준 상대 시간(초)
+
+        Returns:
+            CreateTimelineResponse: 생성된 타임라인 정보
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "create_timeline called",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "start_time": start_time},
+        )
+
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        meeting_uuid: uuid.UUID = meeting.meeting_id
+
+        # 활성 타임라인 카드 자동 마감
+        open_timeline = await self.repo.find_open_timeline(meeting_uuid)
+        if open_timeline is not None:
+            await self.repo.patch_timeline(timeline=open_timeline, end_time=start_time)
+
+        # 신규 타임라인 생성
+        rr_uuid: Optional[uuid.UUID] = uuid.UUID(rr_id) if rr_id else None
+        timeline = await self.repo.create_timeline(
+            meeting_id=meeting_uuid,
+            rr_id=rr_uuid,
+            start_time=start_time,
+        )
+
+        logger.info(
+            "create_timeline 완료",
+            extra={"timeline_id": str(timeline.timeline_id)},
+        )
+
+        return CreateTimelineResponse(
+            timeline_id=str(timeline.timeline_id),
+            rr_id=str(timeline.rr_id) if timeline.rr_id else None,
+            start_time=timeline.start_time,
+            end_time=timeline.end_time,
+        )
+
+    async def patch_timeline(
+        self,
+        user_id: str,
+        meeting_id: str,
+        timeline_id: str,
+        body: PatchTimelineRequest,
+    ) -> None:
+        """
+        타임라인 카드를 업데이트합니다.
+
+        end_time → 카드 마감 (미팅 실행 중)
+        segment_summary → 구간 요약 수정 (히스토리 리포트에서 편집)
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            timeline_id: 타임라인 UUID 문자열
+            body: { end_time?, segment_summary? }
+
+        Raises:
+            NotFoundException: 미팅 또는 타임라인이 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "patch_timeline called",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "timeline_id": timeline_id},
+        )
+
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        timeline = await self.repo.find_timeline_by_id(
+            meeting_id=meeting.meeting_id,
+            timeline_id=timeline_id,
+        )
+
+        await self.repo.patch_timeline(
+            timeline=timeline,
+            end_time=body.end_time,
+            segment_summary=body.segment_summary,
+        )
+
+        logger.info(
+            "patch_timeline 완료",
+            extra={"timeline_id": timeline_id},
+        )
+
+    async def update_memo(
+        self,
+        user_id: str,
+        meeting_id: str,
+        private_memo: str,
+    ) -> None:
+        """
+        개인 메모를 저장합니다. (리더만 가능)
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            private_memo: 저장할 메모 내용
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없을 때 (리더가 아닌 경우)
+        """
+        logger.info(
+            "update_memo called",
+            extra={"user_id": user_id, "meeting_id": meeting_id},
+        )
+
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+
+        # 메모 저장은 리더만 가능
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "메모는 리더만 저장할 수 있습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        await self.repo.update_meeting_memo(meeting=meeting, private_memo=private_memo)
+
+        logger.info("update_memo 완료", extra={"meeting_id": meeting_id})
+
+    async def toggle_agenda_complete(
+        self,
+        user_id: str,
+        meeting_id: str,
+        agenda_id: str,
+    ) -> None:
+        """
+        아젠다의 완료 상태를 토글합니다.
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            agenda_id: 아젠다 UUID 문자열
+
+        Raises:
+            NotFoundException: 미팅 또는 아젠다가 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "toggle_agenda_complete called",
+            extra={"user_id": user_id, "meeting_id": meeting_id, "agenda_id": agenda_id},
+        )
+
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        agenda = await self.repo.find_agenda_by_id(
+            meeting_id=meeting.meeting_id,
+            agenda_id=agenda_id,
+        )
+        await self.repo.toggle_agenda_complete(agenda)
+
+        logger.info("toggle_agenda_complete 완료", extra={"agenda_id": agenda_id})
+
+    async def toggle_action_item_complete(
+        self,
+        user_id: str,
+        meeting_id: str,
+        action_item_id: str,
+    ) -> None:
+        """
+        Action Item의 완료 상태를 토글합니다.
+
+        이월 항목도 현재 미팅 row에서만 업데이트합니다 (원본 미팅 불변).
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            action_item_id: Action Item UUID 문자열
+
+        Raises:
+            NotFoundException: 미팅 또는 Action Item이 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "toggle_action_item_complete called",
+            extra={
+                "user_id": user_id,
+                "meeting_id": meeting_id,
+                "action_item_id": action_item_id,
+            },
+        )
+
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        action_item = await self.repo.find_action_item_by_id(
+            meeting_id=meeting.meeting_id,
+            action_item_id=action_item_id,
+        )
+        await self.repo.toggle_action_item_complete(action_item)
+
+        logger.info("toggle_action_item_complete 완료", extra={"action_item_id": action_item_id})
+
+    async def create_agenda(
+        self,
+        user_id: str,
+        meeting_id: str,
+        content: str,
+    ) -> CreateAgendaResponse:
+        """
+        리더가 즉석 아젠다를 추가합니다. (source=LEADER_ADDED)
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+            content: 아젠다 내용
+
+        Returns:
+            CreateAgendaResponse: 생성된 아젠다 정보
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "create_agenda called",
+            extra={"user_id": user_id, "meeting_id": meeting_id},
+        )
+
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        max_order = await self.repo.find_agenda_max_order(meeting.meeting_id)
+        agenda = await self.repo.create_agenda(
+            meeting_id=meeting.meeting_id,
+            content=content,
+            order=max_order + 1,
+        )
+
+        logger.info("create_agenda 완료", extra={"agenda_id": str(agenda.agenda_id)})
+
+        return CreateAgendaResponse(
+            agenda_id=str(agenda.agenda_id),
+            content=agenda.content,
+            source=agenda.source,
+            order=agenda.order,
+            is_completed=agenda.is_completed,
+        )
+
+    async def get_ai_questions(
+        self,
+        user_id: str,
+        meeting_id: str,
+    ) -> AiQuestionsResponse:
+        """
+        AI 스마트 아젠다를 새로고침합니다. (LLM 재호출)
+
+        Args:
+            user_id: JWT에서 추출한 로그인 사용자 ID
+            meeting_id: 미팅 UUID 문자열
+
+        Returns:
+            AiQuestionsResponse: 새로 생성된 AI 추천 질문 목록
+
+        Raises:
+            NotFoundException: 미팅이 없을 때
+            BusinessLogicException: 권한 없을 때
+        """
+        logger.info(
+            "get_ai_questions called",
+            extra={"user_id": user_id, "meeting_id": meeting_id},
+        )
+
+        leader_emp_no = await self.repo.find_emp_no_by_user_id(user_id)
+        meeting = await self.repo.find_meeting_by_id(meeting_id)
+
+        if meeting.leader_emp_no != leader_emp_no:
+            raise BusinessLogicException(
+                "이 미팅에 접근할 권한이 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        member_emp_no: str = meeting.member_emp_no
+
+        # 이전 COMPLETED 미팅 요약 조회
+        previous_meetings = await self.repo.find_previous_completed_meetings(
+            leader_emp_no=leader_emp_no,
+            member_emp_no=member_emp_no,
+            limit=2,
+        )
+        is_first_meeting: bool = len(previous_meetings) == 0
+        member_rnr_titles = await self.repo.find_member_rnr_titles(member_emp_no)
+        previous_summaries: list[str] = [
+            m.record.ai_summary
+            for m in previous_meetings
+            if m.record is not None and m.record.ai_summary is not None
+        ]
+
+        ai_suggested_agendas = await generate_ai_suggested_agendas(
+            member_rnr_titles=member_rnr_titles,
+            previous_summaries=previous_summaries,
+            is_first_meeting=is_first_meeting,
+        )
+
+        logger.info(
+            "get_ai_questions 완료",
+            extra={"meeting_id": meeting_id, "count": len(ai_suggested_agendas)},
+        )
+
+        return AiQuestionsResponse(ai_suggested_agendas=ai_suggested_agendas)

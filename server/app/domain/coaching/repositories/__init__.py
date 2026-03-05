@@ -18,9 +18,25 @@ Coaching 도메인 Repository
     - find_previous_completed_meetings : leader-member 간 이전 COMPLETED 미팅 조회
     - find_incomplete_action_items   : 미완료 Action Item 조회
     - find_member_rnr_titles         : 팀원 R&R 제목 목록 조회 (LLM 프롬프트용)
+
+메서드 목록 (Task 5):
+    - start_meeting                  : 미팅 IN_PROGRESS 전환 + started_at 기록
+    - insert_agendas                 : 아젠다 일괄 INSERT
+    - copy_action_items_as_carried_over : 이전 미팅 미완료 Action Item 이월 복사 INSERT
+    - find_meeting_with_active_data  : 미팅 + 아젠다 + 액션아이템 + 타임라인 일괄 조회
+    - find_member_rnr_tree           : 팀원 R&R 계층 구조 조회
+    - create_timeline                : 타임라인 카드 생성
+    - find_open_timeline             : end_time IS NULL 타임라인 조회
+    - patch_timeline                 : 타임라인 카드 업데이트
+    - update_meeting_memo            : 개인 메모 업데이트
+    - toggle_agenda_complete         : 아젠다 완료 토글
+    - toggle_action_item_complete    : Action Item 완료 토글
+    - create_agenda                  : 즉석 아젠다 추가
+    - find_agenda_max_order          : 현재 미팅 아젠다 최대 order 조회
 """
 
 import uuid
+from datetime import datetime
 from typing import Any, Optional
 
 from sqlalchemy import and_, desc, select
@@ -32,6 +48,8 @@ from server.app.domain.coaching.models import (
     TbCoachingRelation,
     TbMeeting,
     TbMeetingActionItem,
+    TbMeetingAgenda,
+    TbMeetingTimeline,
 )
 from server.app.domain.hr.models.department import CMDepartment
 from server.app.domain.hr.models.employee import HRMgnt
@@ -458,8 +476,6 @@ class CoachingRepository:
         Returns:
             list[str]: R&R 제목 목록
         """
-        from datetime import datetime
-
         current_year = str(datetime.utcnow().year)
 
         logger.info(
@@ -480,3 +496,665 @@ class CoachingRepository:
         )
         result = await self.db.execute(stmt)
         return [row.title for row in result.all()]
+
+    # =============================================
+    # Task 5 — 미팅 실행 Repository 메서드
+    # =============================================
+
+    async def start_meeting(self, meeting: TbMeeting) -> TbMeeting:
+        """
+        미팅 상태를 IN_PROGRESS로 전환하고 started_at을 기록합니다.
+
+        Args:
+            meeting: 상태를 변경할 TbMeeting ORM 객체
+
+        Returns:
+            TbMeeting: 업데이트된 미팅 ORM 객체
+        """
+        logger.info("start_meeting called", extra={"meeting_id": str(meeting.meeting_id)})
+
+        try:
+            meeting.status = "IN_PROGRESS"
+            meeting.started_at = datetime.utcnow()
+            self.db.add(meeting)
+            await self.db.commit()
+            await self.db.refresh(meeting)
+
+            logger.info("start_meeting 완료", extra={"meeting_id": str(meeting.meeting_id)})
+            return meeting
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "start_meeting 실패",
+                extra={"meeting_id": str(meeting.meeting_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "미팅 시작 처리에 실패했습니다",
+                details={"meeting_id": str(meeting.meeting_id)},
+            ) from exc
+
+    async def insert_agendas(
+        self,
+        meeting_id: uuid.UUID,
+        agendas: list[dict[str, Any]],
+    ) -> list[TbMeetingAgenda]:
+        """
+        아젠다 목록을 일괄 INSERT합니다.
+
+        Args:
+            meeting_id: 미팅 UUID
+            agendas: [{"content": str, "source": str, "order": int}, ...] 형태의 아젠다 목록
+
+        Returns:
+            list[TbMeetingAgenda]: 생성된 아젠다 ORM 객체 목록
+        """
+        logger.info(
+            "insert_agendas called",
+            extra={"meeting_id": str(meeting_id), "count": len(agendas)},
+        )
+
+        try:
+            agenda_objects = [
+                TbMeetingAgenda(
+                    agenda_id=uuid.uuid4(),
+                    meeting_id=meeting_id,
+                    content=item["content"],
+                    source=item["source"],
+                    order=item["order"],
+                    is_completed=False,
+                )
+                for item in agendas
+            ]
+            self.db.add_all(agenda_objects)
+            await self.db.commit()
+
+            logger.info(
+                "insert_agendas 완료",
+                extra={"meeting_id": str(meeting_id), "inserted": len(agenda_objects)},
+            )
+            return agenda_objects
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "insert_agendas 실패",
+                extra={"meeting_id": str(meeting_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "아젠다 INSERT에 실패했습니다",
+                details={"meeting_id": str(meeting_id)},
+            ) from exc
+
+    async def copy_action_items_as_carried_over(
+        self,
+        meeting_id: uuid.UUID,
+        source_items: list[TbMeetingActionItem],
+    ) -> list[TbMeetingActionItem]:
+        """
+        이전 미팅의 미완료 Action Item을 현재 미팅으로 이월 복사 INSERT합니다.
+
+        - is_carried_over = True
+        - origin_meeting_id = 원본 meeting_id
+        - assignee = 원본 값 그대로 복사
+        - is_completed = False
+
+        Args:
+            meeting_id: 현재 미팅 UUID (이월 대상)
+            source_items: 복사할 원본 Action Item 목록
+
+        Returns:
+            list[TbMeetingActionItem]: 이월 복사된 Action Item 목록
+        """
+        if not source_items:
+            return []
+
+        logger.info(
+            "copy_action_items_as_carried_over called",
+            extra={"meeting_id": str(meeting_id), "source_count": len(source_items)},
+        )
+
+        try:
+            carried_items = [
+                TbMeetingActionItem(
+                    action_item_id=uuid.uuid4(),
+                    meeting_id=meeting_id,
+                    origin_meeting_id=item.meeting_id,
+                    is_carried_over=True,
+                    content=item.content,
+                    assignee=item.assignee,
+                    is_completed=False,
+                )
+                for item in source_items
+            ]
+            self.db.add_all(carried_items)
+            await self.db.commit()
+
+            logger.info(
+                "copy_action_items_as_carried_over 완료",
+                extra={"meeting_id": str(meeting_id), "copied": len(carried_items)},
+            )
+            return carried_items
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "copy_action_items_as_carried_over 실패",
+                extra={"meeting_id": str(meeting_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "Action Item 이월 복사에 실패했습니다",
+                details={"meeting_id": str(meeting_id)},
+            ) from exc
+
+    async def find_meeting_with_active_data(self, meeting_id: str) -> TbMeeting:
+        """
+        미팅 실행 화면에 필요한 데이터를 일괄 로드합니다.
+        (아젠다, 액션아이템, 타임라인 eagerly loaded)
+
+        Args:
+            meeting_id: 미팅 UUID 문자열
+
+        Returns:
+            TbMeeting: 관계 데이터가 포함된 미팅 ORM 객체
+
+        Raises:
+            NotFoundException: 미팅이 존재하지 않을 때
+        """
+        logger.info("find_meeting_with_active_data called", extra={"meeting_id": meeting_id})
+
+        try:
+            meeting_uuid = uuid.UUID(meeting_id)
+        except ValueError as exc:
+            raise NotFoundException(
+                message="유효하지 않은 미팅 ID입니다",
+                details={"meeting_id": meeting_id},
+            ) from exc
+
+        stmt = (
+            select(TbMeeting)
+            .options(
+                selectinload(TbMeeting.agendas),
+                selectinload(TbMeeting.action_items),
+                selectinload(TbMeeting.timelines),
+            )
+            .where(TbMeeting.meeting_id == meeting_uuid)
+        )
+        result = await self.db.execute(stmt)
+        meeting = result.scalar_one_or_none()
+
+        if meeting is None:
+            raise NotFoundException(
+                message="미팅을 찾을 수 없습니다",
+                details={"meeting_id": meeting_id},
+            )
+
+        return meeting
+
+    async def find_member_rnr_tree(self, member_emp_no: str) -> list[Rr]:
+        """
+        팀원의 R&R을 계층 구조로 조회합니다.
+
+        현재 연도 기준 MEMBER 타입 R&R 전체를 조회하며,
+        parent 관계를 eagerly load합니다.
+
+        Args:
+            member_emp_no: 팀원 사번
+
+        Returns:
+            list[Rr]: R&R ORM 객체 목록 (parent 포함)
+        """
+        current_year = str(datetime.utcnow().year)
+
+        logger.info(
+            "find_member_rnr_tree called",
+            extra={"member_emp_no": member_emp_no, "year": current_year},
+        )
+
+        stmt = (
+            select(Rr)
+            .options(selectinload(Rr.parent))
+            .where(
+                and_(
+                    Rr.emp_no == member_emp_no,
+                    Rr.year == current_year,
+                    Rr.rr_type == "MEMBER",
+                )
+            )
+            .order_by(Rr.title)
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def create_timeline(
+        self,
+        meeting_id: uuid.UUID,
+        rr_id: Optional[uuid.UUID],
+        start_time: int,
+    ) -> TbMeetingTimeline:
+        """
+        타임라인 카드를 생성합니다.
+
+        Args:
+            meeting_id: 미팅 UUID
+            rr_id: R&R UUID (None 가능)
+            start_time: 녹음 시작 기준 상대 시간(초)
+
+        Returns:
+            TbMeetingTimeline: 생성된 타임라인 ORM 객체
+        """
+        logger.info(
+            "create_timeline called",
+            extra={"meeting_id": str(meeting_id), "rr_id": str(rr_id), "start_time": start_time},
+        )
+
+        try:
+            timeline = TbMeetingTimeline(
+                timeline_id=uuid.uuid4(),
+                meeting_id=meeting_id,
+                rr_id=rr_id,
+                start_time=start_time,
+                end_time=None,
+                segment_summary=None,
+            )
+            self.db.add(timeline)
+            await self.db.commit()
+            await self.db.refresh(timeline)
+
+            logger.info(
+                "create_timeline 완료",
+                extra={"timeline_id": str(timeline.timeline_id)},
+            )
+            return timeline
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "create_timeline 실패",
+                extra={"meeting_id": str(meeting_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "타임라인 생성에 실패했습니다",
+                details={"meeting_id": str(meeting_id)},
+            ) from exc
+
+    async def find_open_timeline(
+        self, meeting_id: uuid.UUID
+    ) -> Optional[TbMeetingTimeline]:
+        """
+        end_time IS NULL인 활성 타임라인 카드를 조회합니다.
+
+        Args:
+            meeting_id: 미팅 UUID
+
+        Returns:
+            TbMeetingTimeline | None: 활성 타임라인 (없으면 None)
+        """
+        logger.info("find_open_timeline called", extra={"meeting_id": str(meeting_id)})
+
+        stmt = select(TbMeetingTimeline).where(
+            and_(
+                TbMeetingTimeline.meeting_id == meeting_id,
+                TbMeetingTimeline.end_time.is_(None),
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def find_timeline_by_id(
+        self,
+        meeting_id: uuid.UUID,
+        timeline_id: str,
+    ) -> TbMeetingTimeline:
+        """
+        타임라인 ID로 단건 조회합니다.
+
+        Args:
+            meeting_id: 미팅 UUID (권한 체크용)
+            timeline_id: 타임라인 UUID 문자열
+
+        Returns:
+            TbMeetingTimeline: 타임라인 ORM 객체
+
+        Raises:
+            NotFoundException: 타임라인이 없을 때
+        """
+        try:
+            timeline_uuid = uuid.UUID(timeline_id)
+        except ValueError as exc:
+            raise NotFoundException(
+                message="유효하지 않은 타임라인 ID입니다",
+                details={"timeline_id": timeline_id},
+            ) from exc
+
+        stmt = select(TbMeetingTimeline).where(
+            and_(
+                TbMeetingTimeline.timeline_id == timeline_uuid,
+                TbMeetingTimeline.meeting_id == meeting_id,
+            )
+        )
+        result = await self.db.execute(stmt)
+        timeline = result.scalar_one_or_none()
+
+        if timeline is None:
+            raise NotFoundException(
+                message="타임라인을 찾을 수 없습니다",
+                details={"timeline_id": timeline_id},
+            )
+
+        return timeline
+
+    async def patch_timeline(
+        self,
+        timeline: TbMeetingTimeline,
+        end_time: Optional[int] = None,
+        segment_summary: Optional[str] = None,
+    ) -> TbMeetingTimeline:
+        """
+        타임라인 카드를 업데이트합니다.
+
+        end_time → 카드 마감 (미팅 실행 중)
+        segment_summary → 구간 요약 수정 (히스토리 리포트에서 편집)
+
+        Args:
+            timeline: 업데이트할 TbMeetingTimeline ORM 객체
+            end_time: 종료 시간 (optional)
+            segment_summary: 구간 요약 (optional)
+
+        Returns:
+            TbMeetingTimeline: 업데이트된 타임라인 ORM 객체
+        """
+        logger.info(
+            "patch_timeline called",
+            extra={"timeline_id": str(timeline.timeline_id)},
+        )
+
+        try:
+            if end_time is not None:
+                timeline.end_time = end_time
+            if segment_summary is not None:
+                timeline.segment_summary = segment_summary
+            self.db.add(timeline)
+            await self.db.commit()
+            await self.db.refresh(timeline)
+
+            logger.info("patch_timeline 완료", extra={"timeline_id": str(timeline.timeline_id)})
+            return timeline
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "patch_timeline 실패",
+                extra={"timeline_id": str(timeline.timeline_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "타임라인 업데이트에 실패했습니다",
+                details={"timeline_id": str(timeline.timeline_id)},
+            ) from exc
+
+    async def update_meeting_memo(
+        self,
+        meeting: TbMeeting,
+        private_memo: str,
+    ) -> TbMeeting:
+        """
+        미팅의 비공개 메모를 업데이트합니다.
+
+        Args:
+            meeting: 업데이트할 TbMeeting ORM 객체
+            private_memo: 저장할 메모 내용
+
+        Returns:
+            TbMeeting: 업데이트된 미팅 ORM 객체
+        """
+        logger.info("update_meeting_memo called", extra={"meeting_id": str(meeting.meeting_id)})
+
+        try:
+            meeting.private_memo = private_memo
+            self.db.add(meeting)
+            await self.db.commit()
+            await self.db.refresh(meeting)
+
+            logger.info("update_meeting_memo 완료", extra={"meeting_id": str(meeting.meeting_id)})
+            return meeting
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "update_meeting_memo 실패",
+                extra={"meeting_id": str(meeting.meeting_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "메모 업데이트에 실패했습니다",
+                details={"meeting_id": str(meeting.meeting_id)},
+            ) from exc
+
+    async def find_agenda_by_id(
+        self,
+        meeting_id: uuid.UUID,
+        agenda_id: str,
+    ) -> TbMeetingAgenda:
+        """
+        아젠다 ID로 단건 조회합니다.
+
+        Args:
+            meeting_id: 미팅 UUID (권한 체크용)
+            agenda_id: 아젠다 UUID 문자열
+
+        Returns:
+            TbMeetingAgenda: 아젠다 ORM 객체
+
+        Raises:
+            NotFoundException: 아젠다가 없을 때
+        """
+        try:
+            agenda_uuid = uuid.UUID(agenda_id)
+        except ValueError as exc:
+            raise NotFoundException(
+                message="유효하지 않은 아젠다 ID입니다",
+                details={"agenda_id": agenda_id},
+            ) from exc
+
+        stmt = select(TbMeetingAgenda).where(
+            and_(
+                TbMeetingAgenda.agenda_id == agenda_uuid,
+                TbMeetingAgenda.meeting_id == meeting_id,
+            )
+        )
+        result = await self.db.execute(stmt)
+        agenda = result.scalar_one_or_none()
+
+        if agenda is None:
+            raise NotFoundException(
+                message="아젠다를 찾을 수 없습니다",
+                details={"agenda_id": agenda_id},
+            )
+
+        return agenda
+
+    async def toggle_agenda_complete(self, agenda: TbMeetingAgenda) -> TbMeetingAgenda:
+        """
+        아젠다의 완료 상태를 토글합니다.
+
+        Args:
+            agenda: 토글할 TbMeetingAgenda ORM 객체
+
+        Returns:
+            TbMeetingAgenda: 업데이트된 아젠다 ORM 객체
+        """
+        logger.info("toggle_agenda_complete called", extra={"agenda_id": str(agenda.agenda_id)})
+
+        try:
+            agenda.is_completed = not agenda.is_completed
+            self.db.add(agenda)
+            await self.db.commit()
+            await self.db.refresh(agenda)
+
+            logger.info(
+                "toggle_agenda_complete 완료",
+                extra={"agenda_id": str(agenda.agenda_id), "is_completed": agenda.is_completed},
+            )
+            return agenda
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "toggle_agenda_complete 실패",
+                extra={"agenda_id": str(agenda.agenda_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "아젠다 완료 토글에 실패했습니다",
+                details={"agenda_id": str(agenda.agenda_id)},
+            ) from exc
+
+    async def find_action_item_by_id(
+        self,
+        meeting_id: uuid.UUID,
+        action_item_id: str,
+    ) -> TbMeetingActionItem:
+        """
+        Action Item ID로 단건 조회합니다.
+
+        Args:
+            meeting_id: 미팅 UUID (권한 체크용)
+            action_item_id: Action Item UUID 문자열
+
+        Returns:
+            TbMeetingActionItem: Action Item ORM 객체
+
+        Raises:
+            NotFoundException: Action Item이 없을 때
+        """
+        try:
+            item_uuid = uuid.UUID(action_item_id)
+        except ValueError as exc:
+            raise NotFoundException(
+                message="유효하지 않은 Action Item ID입니다",
+                details={"action_item_id": action_item_id},
+            ) from exc
+
+        stmt = select(TbMeetingActionItem).where(
+            and_(
+                TbMeetingActionItem.action_item_id == item_uuid,
+                TbMeetingActionItem.meeting_id == meeting_id,
+            )
+        )
+        result = await self.db.execute(stmt)
+        item = result.scalar_one_or_none()
+
+        if item is None:
+            raise NotFoundException(
+                message="Action Item을 찾을 수 없습니다",
+                details={"action_item_id": action_item_id},
+            )
+
+        return item
+
+    async def toggle_action_item_complete(
+        self, action_item: TbMeetingActionItem
+    ) -> TbMeetingActionItem:
+        """
+        Action Item의 완료 상태를 토글합니다.
+        이월 항목도 현재 미팅 row에서만 업데이트합니다 (원본 불변).
+
+        Args:
+            action_item: 토글할 TbMeetingActionItem ORM 객체
+
+        Returns:
+            TbMeetingActionItem: 업데이트된 Action Item ORM 객체
+        """
+        logger.info(
+            "toggle_action_item_complete called",
+            extra={"action_item_id": str(action_item.action_item_id)},
+        )
+
+        try:
+            action_item.is_completed = not action_item.is_completed
+            self.db.add(action_item)
+            await self.db.commit()
+            await self.db.refresh(action_item)
+
+            logger.info(
+                "toggle_action_item_complete 완료",
+                extra={
+                    "action_item_id": str(action_item.action_item_id),
+                    "is_completed": action_item.is_completed,
+                },
+            )
+            return action_item
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "toggle_action_item_complete 실패",
+                extra={"action_item_id": str(action_item.action_item_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "Action Item 완료 토글에 실패했습니다",
+                details={"action_item_id": str(action_item.action_item_id)},
+            ) from exc
+
+    async def find_agenda_max_order(self, meeting_id: uuid.UUID) -> int:
+        """
+        현재 미팅의 아젠다 최대 order 값을 조회합니다.
+
+        Args:
+            meeting_id: 미팅 UUID
+
+        Returns:
+            int: 최대 order 값 (아젠다 없으면 -1)
+        """
+        from sqlalchemy import func
+
+        stmt = select(func.max(TbMeetingAgenda.order)).where(
+            TbMeetingAgenda.meeting_id == meeting_id
+        )
+        result = await self.db.execute(stmt)
+        max_order = result.scalar_one_or_none()
+        return max_order if max_order is not None else -1
+
+    async def create_agenda(
+        self,
+        meeting_id: uuid.UUID,
+        content: str,
+        order: int,
+    ) -> TbMeetingAgenda:
+        """
+        리더 즉석 아젠다를 추가합니다. (source=LEADER_ADDED)
+
+        Args:
+            meeting_id: 미팅 UUID
+            content: 아젠다 내용
+            order: 정렬 순서
+
+        Returns:
+            TbMeetingAgenda: 생성된 아젠다 ORM 객체
+        """
+        logger.info("create_agenda called", extra={"meeting_id": str(meeting_id)})
+
+        try:
+            agenda = TbMeetingAgenda(
+                agenda_id=uuid.uuid4(),
+                meeting_id=meeting_id,
+                content=content,
+                source="LEADER_ADDED",
+                order=order,
+                is_completed=False,
+            )
+            self.db.add(agenda)
+            await self.db.commit()
+            await self.db.refresh(agenda)
+
+            logger.info("create_agenda 완료", extra={"agenda_id": str(agenda.agenda_id)})
+            return agenda
+
+        except Exception as exc:
+            await self.db.rollback()
+            logger.error(
+                "create_agenda 실패",
+                extra={"meeting_id": str(meeting_id), "error": str(exc)},
+            )
+            raise RepositoryException(
+                "아젠다 추가에 실패했습니다",
+                details={"meeting_id": str(meeting_id)},
+            ) from exc
